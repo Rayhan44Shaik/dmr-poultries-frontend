@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently -n api,web -c green,cyan \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite --config vite.config.ts",
-    "dev:api": "npm run dev --prefix ../../backend",
+    "dev:api": "npm run free-port --prefix ../../backend && npm run dev:watch --prefix ../../backend",
     "dev:sample": "concurrently -n sample-api,web -c magenta,cyan \"npm:dev:sample-api\" \"npm:dev:web\"",
     "dev:sample-api": "node scripts/quarter-sample-data.mjs",
     "build": "tsc -b && vite build --config vite.config.ts",

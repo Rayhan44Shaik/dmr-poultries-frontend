@@ -1,13 +1,12 @@
-// Re-export from the main i18n implementation
+// Barrel — keep this as .ts (no React components) so Fast Refresh stays clean.
+export type { Language } from './context';
 export {
-  I18nProvider,
-  useI18n,
   STORAGE_KEY,
   makeT,
   translate,
   getLanguage,
   translateStatus,
   translateRole,
-  type Language,
-} from './index.tsx';
+} from './translate';
+export { I18nProvider, useI18n } from './I18nProvider';
 export { ScopedI18nProvider } from './ScopedI18nProvider';

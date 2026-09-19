@@ -47,8 +47,8 @@ function row(overrides: Record<string, unknown> = {}): ShopDelivery {
 // ─── Live KPI totals ──────────────────────────────────────────────
 test("KPI totals are LIVE from current rows and keep bird/weight units separate", () => {
   const rows = [
-    row({ shopId: 1, birds: 54, weight: 950, mortality: 2, mortKg: 2.159, autoCaptureTime: "10:00" }),
-    row({ shopId: 2, birds: 2, weight: 48, mortality: 0, mortKg: 0, autoCaptureTime: "11:00" }),
+    row({ shopId: 1, birds: 54, weight: 950, mortality: 2, mortKg: 2.159, deliveryMode: "box", autoCaptureTime: "10:00" }),
+    row({ shopId: 2, birds: 2, weight: 48, mortality: 0, mortKg: 0, deliveryMode: "box", autoCaptureTime: "11:00" }),
   ];
   const kpi = computeDeliveryKpiTotals(rows);
   assert.equal(kpi.shops, 2);
@@ -56,8 +56,40 @@ test("KPI totals are LIVE from current rows and keep bird/weight units separate"
   assert.equal(kpi.weight, 998);
   // Mortality is a BIRD COUNT (2), never the 2.159 kg weight.
   assert.equal(kpi.mortality, 2);
+  assert.equal(kpi.boxMortality, 2);
+  assert.equal(kpi.weightMortality, 0);
   assert.equal(kpi.mortKg, 2.159);
+  assert.equal(kpi.weightLoss, 0);
   assert.equal(kpi.lastCaptureTime, "11:00");
+});
+
+test("KPI mortKg is box-mode only; weightLoss is weight-mode only", () => {
+  const rows = [
+    row({
+      shopId: 1,
+      birds: 50,
+      weight: 900,
+      mortality: 2,
+      mortKg: 3.5,
+      deliveryMode: "box",
+      farmWeight: 903.5,
+    }),
+    row({
+      shopId: 2,
+      birds: 28,
+      weight: 480,
+      mortality: 1,
+      mortKg: 8, // must NOT roll into mortKg KPI
+      deliveryMode: "weight",
+      farmWeight: 500,
+    }),
+  ];
+  const kpi = computeDeliveryKpiTotals(rows);
+  assert.equal(kpi.mortality, 3);
+  assert.equal(kpi.boxMortality, 2);
+  assert.equal(kpi.weightMortality, 1);
+  assert.equal(kpi.mortKg, 3.5);
+  assert.equal(kpi.weightLoss, 20);
 });
 
 test("KPI totals ignore in-progress rows without shop/birds/weight", () => {

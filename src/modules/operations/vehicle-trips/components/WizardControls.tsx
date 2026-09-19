@@ -52,7 +52,7 @@ export const FieldLabel = React.memo(function FieldLabel({
   );
 });
 
-export function dropdownTriggerClass(invalid: boolean, disabled: boolean): string {
+function dropdownTriggerClass(invalid: boolean, disabled: boolean): string {
   return [
     "mt-1 w-full rounded-xl border bg-white text-sm font-medium outline-none transition-all text-left",
     disabled

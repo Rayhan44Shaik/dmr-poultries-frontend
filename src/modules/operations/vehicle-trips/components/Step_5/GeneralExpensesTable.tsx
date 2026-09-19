@@ -96,19 +96,19 @@ export default function GeneralExpensesTable({
 
   const currentEndMeter = Number(sheetData.endMeter);
   const hasEndMeter = sheetData.endMeter !== undefined && sheetData.endMeter !== null && sheetData.endMeter !== "";
-  // End meter must be STRICTLY greater than the highest of: start / farm dest / any diesel reading.
+  // End meter must be ≥ highest of: start / farm dest / any diesel reading.
   const isEndMeterInvalid =
     hasEndMeter &&
     requiredMinMeter > 0 &&
     Number.isFinite(currentEndMeter) &&
-    currentEndMeter <= requiredMinMeter;
+    currentEndMeter < requiredMinMeter;
   const endMeterErrorMsg = isEndMeterInvalid
     ? t("ops.trip.meter_must_gt", { min: requiredMinMeter })
     : null;
 
   // Distance & average
   const computedDistance =
-    hasEndMeter && actualStartMeter > 0 && currentEndMeter > actualStartMeter
+    hasEndMeter && actualStartMeter > 0 && currentEndMeter >= actualStartMeter
       ? currentEndMeter - actualStartMeter
       : totalDistanceCovered > 0
       ? totalDistanceCovered
@@ -347,7 +347,7 @@ export default function GeneralExpensesTable({
                   </span>
                 ) : requiredMinMeter > 0 ? (
                   <span className="text-[11px] font-medium text-slate-400 tabular-nums">
-                    &gt; {requiredMinMeter} KM
+                    ≥ {requiredMinMeter} KM
                   </span>
                 ) : null}
               </div>
@@ -372,7 +372,7 @@ export default function GeneralExpensesTable({
                     handleChange("endMeter", val);
                     const n = Number(val);
                     const invalid =
-                      val !== "" && requiredMinMeter > 0 && Number.isFinite(n) && n <= requiredMinMeter;
+                      val !== "" && requiredMinMeter > 0 && Number.isFinite(n) && n < requiredMinMeter;
                     if (invalid) {
                       const msg = t("ops.trip.meter_must_gt", { min: requiredMinMeter });
                       if (!meterInvalidRef.current) {

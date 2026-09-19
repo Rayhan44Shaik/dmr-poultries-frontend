@@ -28,9 +28,10 @@ type ApiTripRecord = Record<string, unknown>;
 
 export type LastClosingMeter = {
   closingMeter: number;
-  tripNo: string;
-  tripDate: string;
-  /** Ledger event source (TRIP_START | TRIP_END | FUEL_EXPENSE | MAINTENANCE). */
+  /** Display label: trip number, or "Fuel …" / "Maintenance …". */
+  tripNo: string | null;
+  tripDate: string | null;
+  /** Ledger event source (TRIP_START | TRIP_END | FUEL | MAINTENANCE). */
   source?: string;
   /** Ledger event record id — the trip id for TRIP_START/TRIP_END events. */
   ref?: string | number | null;

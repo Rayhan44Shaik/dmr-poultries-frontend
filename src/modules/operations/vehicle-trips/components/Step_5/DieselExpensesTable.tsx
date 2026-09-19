@@ -422,16 +422,17 @@ export default function DieselExpensesTable({
   const absoluteDestMeter = destMeter || 0;
 
   /**
-   * Each diesel meter must be STRICTLY greater than the previous reading:
-   *   row 1  > farm dest meter
-   *   row N  > row N-1 meter (submitted or currently being edited)
-   * So bill-2 reading 36981 is rejected when bill-1 is 36985.
+   * Each diesel meter must be ≥ the previous reading:
+   *   row 1  ≥ farm dest meter
+   *   row N  ≥ previous filled bill meter (by visible order)
    */
   const getMinAllowedMeter = (num: number, overrideData?: Record<string, unknown>) => {
     const baseLabel = t("ops.trip.farm_meter_label", { meter: absoluteDestMeter });
-    if (num <= 1) return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
+    const ordered = [...rowIndices].sort((a, b) => a - b);
+    const pos = ordered.indexOf(num);
+    const prior = pos > 0 ? ordered.slice(0, pos).reverse() : [];
 
-    for (let i = num - 1; i >= 1; i--) {
+    for (const i of prior) {
       let prevVal: unknown;
       if (overrideData && overrideData[`dieselMeter${i}`] !== undefined) {
         prevVal = overrideData[`dieselMeter${i}`];
@@ -440,7 +441,6 @@ export default function DieselExpensesTable({
       } else {
         prevVal = sheetData[`dieselMeter${i}`];
       }
-      // Prefer any filled previous-row meter (submitted or draft) so chain stays ordered.
       if (prevVal !== undefined && prevVal !== "" && Number.isFinite(Number(prevVal)) && Number(prevVal) > 0) {
         return {
           minAllowed: Number(prevVal),
@@ -649,9 +649,11 @@ export default function DieselExpensesTable({
     return null;
   };
 
-  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows). */
+  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows).
+   *  Preserves local bill images when the API omits large imageData (common on multi-bill trips). */
   const flattenDieselEntries = (saved: Trip | Record<string, unknown>): Record<string, unknown> => {
     const updates: Record<string, unknown> = {};
+    const prev = sheetData as Record<string, unknown>;
     // Keep any already-flattened diesel* keys the API may return.
     for (const [k, v] of Object.entries(saved || {})) {
       if (k.startsWith("diesel") && k !== "dieselEntries") updates[k] = v;
@@ -661,11 +663,18 @@ export default function DieselExpensesTable({
       : [];
     // Clear every known sheet slot (current UI + API flatten keys) so deletes don't leave stale values.
     const clearSlots = new Set<number>([
-      ...collectDieselSlotIndices(sheetData as Record<string, unknown>),
+      ...collectDieselSlotIndices(prev),
       ...collectDieselSlotIndices(updates),
       ...rowIndices,
     ]);
+    const preservedImages = new Map<number, { data: unknown; name: unknown }>();
     for (const i of clearSlots) {
+      if (hasRealBill(prev[`dieselImage${i}`])) {
+        preservedImages.set(i, {
+          data: prev[`dieselImage${i}`],
+          name: prev[`dieselImageName${i}`] ?? "",
+        });
+      }
       updates[`dieselId${i}`] = "";
       updates[`dieselLtr${i}`] = "";
       updates[`dieselRate${i}`] = "";
@@ -703,8 +712,12 @@ export default function DieselExpensesTable({
       updates[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
       updates[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
       updates[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
-      updates[`dieselImage${n}`] = entry.imageData ?? "";
-      updates[`dieselImageName${n}`] = entry.imageName ?? "";
+      const serverImage = entry.imageData ?? "";
+      const kept = preservedImages.get(n);
+      updates[`dieselImage${n}`] = hasRealBill(serverImage)
+        ? serverImage
+        : kept?.data ?? "";
+      updates[`dieselImageName${n}`] = entry.imageName || kept?.name || "";
       updates[`dieselSubmitted${n}`] = entry.submitted !== false;
       updates[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
       updates[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
@@ -1082,7 +1095,7 @@ export default function DieselExpensesTable({
                     <div className="relative">
                       <input
                         type="number"
-                        min={rowMinAllowed > 0 ? rowMinAllowed + 1 : 0}
+                        min={rowMinAllowed > 0 ? rowMinAllowed : 0}
                         inputMode="numeric"
                         disabled={locked}
                         value={meterVal}

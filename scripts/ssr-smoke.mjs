@@ -107,7 +107,7 @@ let hasLoginForm = /Welcome back|Sign in|Username/.test(loginHtml);
 try {
   const { MemoryRouter } = await import("react-router-dom");
   const { default: LoginPage } = await server.ssrLoadModule("/src/modules/auth/LoginPage.tsx");
-  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.ts");
   const { AuthProvider } = await server.ssrLoadModule("/src/providers/AuthProvider.tsx");
   const loginMarkup = renderToString(
     React.createElement(
@@ -166,7 +166,7 @@ try {
     await server.ssrLoadModule("/src/modules/staff/services/staffSampleData.ts");
   const { default: DutyPlannerGrid } = await server.ssrLoadModule("/src/modules/staff/components/duty-planner/DutyPlannerGrid.tsx");
   const { getShiftConfigsForRole } = await server.ssrLoadModule("/src/modules/staff/services/staffService.ts");
-  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.ts");
 
   const week = buildSampleDutyWeek("2026-09-07");
   const weekDays = week.days.map((d) => d.date);
@@ -327,7 +327,7 @@ try {
   const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
   const { SummaryFarmTable, SummaryFarmAmount } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
   const { weekRange, quarterRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
-  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.ts");
   const snapshot = await loadAnalysisSnapshot();
   if (!snapshot.farmPayments.length) {
     console.log("SKIP accounts-farm-table  (no farm payments from the API — sample backend not reachable)");

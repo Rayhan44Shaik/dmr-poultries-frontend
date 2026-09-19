@@ -43,7 +43,7 @@ import StepPickup from "./StepPickup";
 import StepEnd from "./Step_5/StepEnd";
 import StepDeliveries from "./StepDeliveries";
 
-import TripWizardStepper from "./TripWizardStepper";
+import TripWizardStepper from "./TripWizardStepper.tsx";
 import TripFinalKPI from "./TripFinalKPI";
 
 interface Props {
@@ -95,6 +95,7 @@ function Step1View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       employeeOptions={[]}
       editable={false}
       canEdit={false}
+      hideWizardClose
       onCancel={onClose}
       clearForm={onClose}
       subscribeHeaderSaveStatus={() => noop}
@@ -115,6 +116,7 @@ function Step2View({ trip, birdTypes, onClose }: { trip: Trip; birdTypes: BirdTy
       birdTypes={birdTypes}
       editable={false}
       canEdit={false}
+      hideWizardClose
       onCancel={onClose}
       clearForm={onClose}
     />
@@ -132,6 +134,7 @@ function Step3View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       submitPickupStep={noopFalse}
       editable={false}
       canEdit={false}
+      hideWizardClose
       onCancel={onClose}
       clearForm={onClose}
     />
@@ -175,6 +178,7 @@ function Step4View({
       onCancel={onClose}
       canEdit={false}
       editable={false}
+      hideWizardClose
       boxDetails={trip.boxDetails || []}
       persistedDeliveries={deliveries}
       showCommunicationStatus={showCommunicationStatus}
@@ -212,6 +216,7 @@ function Step5View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
       updateTrip={noop}
       canEdit={false}
       editable={false}
+      hideWizardClose
       clearForm={onClose}
       onCancel={onClose}
     />

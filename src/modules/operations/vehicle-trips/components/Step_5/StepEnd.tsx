@@ -3,21 +3,23 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Pencil,
-  AlertTriangle,
   Receipt
 } from "lucide-react";
 import type { Trip } from "../../types/trip";
-import { StepCloseButton, WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { StepCloseButton, WizardActionBar } from "../WizardStepUI";
+import TripStepConfirmDialog from "../TripStepConfirmDialog";
 import { TripNoBadge } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
+import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { useStep5DurableDraft } from "../../hooks/useStep5DurableDraft";
 import { performStep5Save } from "../../services/tripHeaderApiService";
 import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
+import { withMinSaveDuration } from "../../utils/withMinSaveDuration";
 
 /** System `order:<tripNo>` tags written by Finish Assignment — not user notes. */
 function splitRemarks(raw: unknown): { orderTags: string[]; userNotes: string } {
@@ -36,47 +38,6 @@ function mergeRemarks(orderTags: string[], userNotes: string): string {
   if (!notes) return tags.join(" | ");
   if (!tags.length) return notes;
   return [...tags, notes].join(" | ");
-}
-
-// ─── ConfirmationModal ────────────────────────────────────────────
-function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.yes_proceed", cancelLabel = "common.cancel", onConfirm, onCancel, type = "warning" }: {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  type?: "warning" | "info";
-}) {
-  const { t } = useI18n();
-  if (!isOpen) return null;
-  const iconColor = type === "warning" ? "text-amber-500" : "text-emerald-500";
-  const borderColor = type === "warning" ? "border-amber-100" : "border-emerald-100";
-  const bgGradient = type === "warning" ? "from-amber-50 to-orange-50" : "from-emerald-50 to-teal-50";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className={`bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border ${borderColor}`}>
-        <div className={`bg-gradient-to-br ${bgGradient} p-6`}>
-          <div className="flex items-start gap-4">
-            <div className={`mt-0.5 p-2 rounded-full bg-white/80 border ${borderColor}`}>
-              <AlertTriangle size={22} className={iconColor} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-              <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed">{message}</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[15px] font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
-          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-[15px] font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500" : "bg-emerald-500 hover:bg-emerald-600"}`}>
-            {t(confirmLabel)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Main Component ──────────────────────────────────────────────────
@@ -106,7 +67,7 @@ interface Props {
   setTrip?: React.Dispatch<React.SetStateAction<Trip>>;
   updateTrip: (updates: Partial<Trip>, persist?: boolean, silent?: boolean) => void;
   submitExpensesStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
-  saveEndProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  saveEndProgress?: (data: Partial<Trip>, opts?: { silent?: boolean }) => Promise<boolean>;
   submitStartStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
@@ -115,6 +76,8 @@ interface Props {
   /** Close while editing → locked submitted view. */
   onExitEdit?: () => void;
   clearForm?: () => void;
+  /** Hide locked-view Close X (Recent / Trip List read-only view). */
+  hideWizardClose?: boolean;
 }
 
 export default function StepEnd({
@@ -128,8 +91,10 @@ export default function StepEnd({
   onCancel,
   onExitEdit,
   clearForm,
+  hideWizardClose = false,
 }: Props) {
   const { t, language } = useI18n();
+  const { showNotification } = useSafeNotification();
   // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard for final expenses submit. */
@@ -331,7 +296,7 @@ export default function StepEnd({
   const endMeterNum = Number(sheetData.endMeter);
 
   let totalDistanceCovered = 0;
-  if (openingMeter > 0 && endMeterNum > 0 && endMeterNum > openingMeter) {
+  if (openingMeter > 0 && endMeterNum > 0 && endMeterNum >= openingMeter) {
     totalDistanceCovered = endMeterNum - openingMeter;
   }
 
@@ -368,6 +333,9 @@ export default function StepEnd({
 
   const savedSheetRef = useRef(JSON.stringify(buildSheetDataFromTrip(trip)));
   const hasUnsavedChanges = JSON.stringify(sheetData) !== savedSheetRef.current;
+  const expensesLocked = Boolean(trip.expensesStepSubmitted) && !editable && !isLocalEditing;
+  const expensesAutosaveTimerRef = useRef<number | undefined>(undefined);
+  const expensesAutosaveBusyRef = useRef(false);
 
   // ─── Handle field changes in React state (mirrored to the durable draft) ──
   const handleChange = (field: string, value: any) => {
@@ -425,7 +393,7 @@ export default function StepEnd({
     sheetData.endMeter !== "" &&
     sheetData.endMeter != null &&
     requiredMinEndMeter > 0 &&
-    Number(sheetData.endMeter) <= requiredMinEndMeter;
+    Number(sheetData.endMeter) < requiredMinEndMeter;
 
   const EXPENSE_KEYS = [
     "meals",
@@ -473,6 +441,40 @@ export default function StepEnd({
     };
   };
 
+  // Background autosave for Step 5 — same silent pattern as Step 3 Pickup:
+  // debounce after edits settle, persist without header flash / remount.
+  useEffect(() => {
+    if (expensesLocked || !saveEndProgress || !trip.id || isSubmitting) return;
+    if (!hasUnsavedChanges || !userTouchedRef.current) return;
+
+    window.clearTimeout(expensesAutosaveTimerRef.current);
+    expensesAutosaveTimerRef.current = window.setTimeout(() => {
+      if (expensesAutosaveBusyRef.current) return;
+      const fingerprint = JSON.stringify(sheetData);
+      if (fingerprint === savedSheetRef.current) return;
+      const payload = prepareFinalPayload(false) as Partial<Trip>;
+      expensesAutosaveBusyRef.current = true;
+      void (async () => {
+        try {
+          const ok = await saveEndProgress(payload, { silent: true });
+          if (ok) savedSheetRef.current = fingerprint;
+        } finally {
+          expensesAutosaveBusyRef.current = false;
+        }
+      })();
+    }, 2500);
+
+    return () => window.clearTimeout(expensesAutosaveTimerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    sheetData,
+    hasUnsavedChanges,
+    expensesLocked,
+    saveEndProgress,
+    trip.id,
+    isSubmitting,
+  ]);
+
   // ─── Save progress (manual) ──────────────────────────────────────
   // Part K: routed through the durable draft. Online -> real Save Progress,
   // reconcile, clear dirty on confirmed success. Offline / retryable failure
@@ -485,30 +487,32 @@ export default function StepEnd({
     submitLockRef.current = true;
     setIsSubmitting(true);
     try {
-      const canonical = prepareFinalPayload(false);
-      if (canDurable) {
-        // Persist EVERY editable Step 5 field (incl. diesel rows, zeros, cleared)
-        // to the durable draft, then save the canonical payload.
-        const fullFields = { ...sheetData, ...canonical } as Step5DraftFields;
-        const res = await saveProgress(fullFields);
-        if (res.mode === "queued") {
-          savedSheetRef.current = JSON.stringify(sheetData);
-          setToast({ message: t("ops.trip.saved_locally"), type: "info" });
-        } else if (res.ok) {
-          savedSheetRef.current = JSON.stringify(sheetData);
-          setToast({ message: t("ops.trip.end_saved_ok"), type: "success" });
-        } else {
-          setToast({ message: res.error || t("ops.trip.failed_save_end"), type: "error" });
+      const result = await withMinSaveDuration(async () => {
+        const canonical = prepareFinalPayload(false);
+        if (canDurable) {
+          const fullFields = { ...sheetData, ...canonical } as Step5DraftFields;
+          const res = await saveProgress(fullFields);
+          if (res.mode === "queued") {
+            savedSheetRef.current = JSON.stringify(sheetData);
+            return { tone: "info" as const, message: t("ops.trip.saved_locally") };
+          }
+          if (res.ok) {
+            savedSheetRef.current = JSON.stringify(sheetData);
+            return { tone: "success" as const, message: t("ops.trip.end_saved_ok") };
+          }
+          return { tone: "error" as const, message: res.error || t("ops.trip.failed_save_end") };
         }
-      } else if (saveEndProgress) {
-        const success = await saveEndProgress(canonical as Partial<Trip>);
-        setToast(
-          success
-            ? { message: t("ops.trip.end_saved_ok"), type: "success" }
-            : { message: t("ops.trip.failed_save_end"), type: "error" }
-        );
-        if (success) savedSheetRef.current = JSON.stringify(sheetData);
-      }
+        if (saveEndProgress) {
+          const success = await saveEndProgress(canonical as Partial<Trip>);
+          if (success) {
+            savedSheetRef.current = JSON.stringify(sheetData);
+            return { tone: "success" as const, message: t("ops.trip.end_saved_ok") };
+          }
+          return { tone: "error" as const, message: t("ops.trip.failed_save_end") };
+        }
+        return null;
+      });
+      if (result) showNotification(result.message, result.tone);
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -549,8 +553,8 @@ export default function StepEnd({
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
     }
-    if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
-      setErrorMsg(t("ops.trip.meter_must_greater_than", { meter: requiredMinMeter }));
+    if (requiredMinMeter > 0 && endMeterNum < requiredMinMeter) {
+      setErrorMsg(t("ops.trip.meter_must_gt", { min: requiredMinMeter }));
       return;
     }
 
@@ -698,14 +702,16 @@ export default function StepEnd({
               <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {/* Locked / view: Close X → Create New Trip (Trip List style) */}
-              <StepCloseButton
-                onClose={() => {
-                  if (onCancel) onCancel();
-                  else clearForm?.();
-                }}
-                animated
-              />
+              {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
+              {!hideWizardClose && (
+                <StepCloseButton
+                  onClose={() => {
+                    if (onCancel) onCancel();
+                    else clearForm?.();
+                  }}
+                  animated
+                />
+              )}
               {canEdit && (
                 <button
                   type="button"
@@ -933,11 +939,9 @@ export default function StepEnd({
             <span className="text-emerald-500 tabular-nums">{formatInr(remainingBalance)}</span>
           </div>
 
-          <WizardStepNotice
+          <WizardActionBar
             notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
             dirty={hasUnsavedChanges}
-          />
-          <WizardActionBar
             onCancel={handleCloseView}
             onSave={saveEndProgress ? handleSaveProgress : undefined}
             onSubmit={handleInitiateSubmit}
@@ -949,7 +953,7 @@ export default function StepEnd({
         </div>
       )}
 
-      <ConfirmationModal
+      <TripStepConfirmDialog
         isOpen={confirmation.isOpen}
         title={confirmation.title}
         message={confirmation.message}

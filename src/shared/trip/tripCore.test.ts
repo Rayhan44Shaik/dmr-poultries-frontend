@@ -66,7 +66,7 @@ test("shared workflow and validation preserve current Step 1 to Step 5 behavior"
   assert.equal(getNextIncompleteTripStep(started), 1);
 });
 
-test("Step 2 submit validation: address and GPS required, meter > start; toll 0 valid", () => {
+test("Step 2 submit validation: GPS required, address optional, meter > start; toll 0 valid", () => {
   const farmTrip = {
     ...createEmptyTrip({ tripDate: "2026-08-16" }),
     sourceFarmId: 1,
@@ -84,8 +84,8 @@ test("Step 2 submit validation: address and GPS required, meter > start; toll 0 
   assert.equal(validateFarmStep(farmTrip).valid, true);
   assert.equal(validateFarmStep({ ...farmTrip, destMeter: 49999 }).valid, false);
   assert.equal(validateFarmStep({ ...farmTrip, destMeter: 50000 }).valid, false);
-  // The persisted farm address is part of the submitted trip snapshot.
-  assert.equal(validateFarmStep({ ...farmTrip, farmAddress: "" }).valid, false);
+  // Farm address is optional.
+  assert.equal(validateFarmStep({ ...farmTrip, farmAddress: "" }).valid, true);
   // GPS capture is MANDATORY (missing or 0,0 coordinates are rejected).
   assert.equal(validateFarmStep({ ...farmTrip, farmGpsLat: null, farmGpsLon: null }).valid, false);
   assert.equal(validateFarmStep({ ...farmTrip, farmGpsLat: 0, farmGpsLon: 0 }).valid, false);

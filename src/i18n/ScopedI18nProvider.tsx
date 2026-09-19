@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { I18nContext, type Language } from "./context";
-import { makeT } from "./index.tsx";
+import { makeT } from "./translate";
 
 type ScopedI18nProviderProps = {
   children: ReactNode;

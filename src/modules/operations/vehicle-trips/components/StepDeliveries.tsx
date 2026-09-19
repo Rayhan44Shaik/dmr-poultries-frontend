@@ -21,7 +21,10 @@ interface Props {
   trip: Trip;
   updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
   submitDeliveriesStep: () => boolean | string | Promise<boolean | string>;
-  saveDeliveriesProgress?: (rows: ShopDelivery[]) => Promise<boolean>;
+  saveDeliveriesProgress?: (
+    rows: ShopDelivery[],
+    opts?: { silent?: boolean }
+  ) => Promise<boolean>;
   clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
@@ -30,6 +33,8 @@ interface Props {
   onCancel?: () => void;
   /** Close while editing → locked submitted view. */
   onExitEdit?: () => void;
+  /** Hide locked-view Close X (Recent / Trip List read-only view). */
+  hideWizardClose?: boolean;
   boxDetails?: BoxDetail[];
   persistedDeliveries?: ShopDelivery[];
   showCommunicationStatus?: boolean;
@@ -62,6 +67,7 @@ export default function StepDeliveries({
   canEdit = true,
   onCancel,
   onExitEdit,
+  hideWizardClose = false,
   boxDetails = [],
   persistedDeliveries,
   showCommunicationStatus = false,
@@ -181,14 +187,16 @@ export default function StepDeliveries({
               cancel affordance in first-submit / Edit mode. */}
           {isLocked ? (
             <div className="flex items-center gap-2">
-              {/* Locked / view: Close X → Create New Trip (Trip List style) */}
-              <StepCloseButton
-                onClose={() => {
-                  if (onCancel) onCancel();
-                  else clearForm();
-                }}
-                animated
-              />
+              {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
+              {!hideWizardClose && (
+                <StepCloseButton
+                  onClose={() => {
+                    if (onCancel) onCancel();
+                    else clearForm();
+                  }}
+                  animated
+                />
+              )}
               {canEdit && (
                 <button
                   type="button"
@@ -237,7 +245,11 @@ export default function StepDeliveries({
         supervisorPhone=""
         tripDate={trip.tripDate}
         updateDeliveries={updateDeliveries}
-        saveDeliveries={saveDeliveriesProgress ? async () => saveDeliveriesProgress(rows) : undefined}
+        saveDeliveries={
+          saveDeliveriesProgress
+            ? async (opts) => saveDeliveriesProgress(rows, opts)
+            : undefined
+        }
         submitDeliveries={handleLockDeliveries}
         onClose={handleCancelWizard}
         persistedRows={persistedDeliveries ?? []}

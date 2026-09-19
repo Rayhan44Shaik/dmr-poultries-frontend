@@ -1,13 +1,14 @@
 /** English default — UI prefers i18n keys via `t()`. */
 export function meterMustBeGreaterThan(min: number): string {
-  return `Meter reading must be greater than ${min}.`;
+  return `Meter reading must be at least ${min}.`;
 }
 
+/** Invalid when strictly less than previous. Equal readings are allowed. */
 export function isMeterInvalid(value: unknown, previous: number): boolean {
   if (value === "" || value == null) return false;
   const n = Number(value);
   if (!Number.isFinite(n) || previous <= 0) return false;
-  return n <= previous;
+  return n < previous;
 }
 
 export type DieselMeterSlot = {
@@ -58,8 +59,8 @@ export type MeterChainIssue = {
 };
 
 /**
- * Scan the diesel meter chain. Each reading must be strictly greater than the previous.
- * `farmDest` is the lower bar for the first bill (destination farm meter).
+ * Scan the diesel meter chain. Each reading must be ≥ the previous
+ * (farm dest / earlier bill). Strict decreases are blocked; equals are OK.
  */
 export function findMeterChainIssues(
   slots: DieselMeterSlot[],
@@ -70,7 +71,7 @@ export function findMeterChainIssues(
   let prevRow = 0;
   let prevSno = "Farm";
   for (const slot of slots) {
-    if (prevMeter > 0 && slot.meter <= prevMeter) {
+    if (prevMeter > 0 && slot.meter < prevMeter) {
       issues.push({
         row: slot.row,
         sno: slot.sno,
@@ -80,7 +81,7 @@ export function findMeterChainIssues(
         prevMeter,
       });
     }
-    if (slot.meter > prevMeter) {
+    if (slot.meter >= prevMeter) {
       prevMeter = slot.meter;
       prevRow = slot.row;
       prevSno = slot.sno;
@@ -91,7 +92,7 @@ export function findMeterChainIssues(
 
 /**
  * When submitting / saving row `submitRow` with `submitMeter`, find later bills
- * whose meter is ≤ this value (they would break the chain).
+ * whose meter is strictly below this value (they would break a ≥ chain).
  */
 export function findLaterBillsBelow(
   slots: DieselMeterSlot[],
@@ -104,7 +105,7 @@ export function findLaterBillsBelow(
   const submitSno = submit?.sno || String(submitRow).padStart(2, "0");
   for (const slot of slots) {
     if (slot.row <= submitRow) continue;
-    if (slot.meter <= submitMeter) {
+    if (slot.meter < submitMeter) {
       issues.push({
         row: slot.row,
         sno: slot.sno,

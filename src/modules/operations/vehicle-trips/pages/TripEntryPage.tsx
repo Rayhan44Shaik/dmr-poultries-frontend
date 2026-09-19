@@ -7,7 +7,7 @@ import { FileText, Plus } from "lucide-react";
 // --- Components ---
 import TripRecentTable from "../components/TripRecentTable";
 import { RecentTripViewModal } from "../components/TripViewModal";
-import TripWizardStepper from "../components/TripWizardStepper";
+import TripWizardStepper from "../components/TripWizardStepper.tsx";
 import { WizardStepNotice } from "../components/WizardStepUI";
 import StepStart from "../components/StepStart";
 import StepDeliveries from "../components/StepDeliveries";
@@ -104,6 +104,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     updateStartStep,
     submitFarmStep,
     saveFarmProgress,
+    saveStartProgress,
     submitPickupStep,
     savePickupProgress,
     submitDeliveriesStep,
@@ -537,6 +538,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateTrip={updateStartTrip}
           submitStartStep={submitStartStep}
           updateStartStep={updateStartStep}
+          saveStartProgress={saveStartProgress}
           hasUnsavedChanges={JSON.stringify({
             vehicleId: trip.vehicleId, vehicleNo: trip.vehicleNo, driverId: trip.driverId,
             driverName: trip.driverName, supervisorId: trip.supervisorId,

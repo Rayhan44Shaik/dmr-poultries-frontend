@@ -27,7 +27,7 @@ import {
   formatIstStamp,
 } from "../services/tripHeaderApiService";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar, type WizardNoticeState } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { translateValidationMessage } from "../utils/translateValidation";
@@ -35,8 +35,11 @@ import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
+import TripStepConfirmDialog from "./TripStepConfirmDialog";
+import { withMinSaveDuration } from "../utils/withMinSaveDuration";
 
 /** Match backend tripNumbering bounds (Asia/Kolkata business calendar). */
 const TRIP_DATE_MAX_PAST_DAYS = 730;
@@ -82,6 +85,8 @@ interface Props {
   /** Header Close while editing a submitted step → back to locked view. */
   onExitEdit?: () => void;
   clearForm?: () => void;
+  /** Hide locked-view Close X (Recent / Trip List read-only view). */
+  hideWizardClose?: boolean;
   headerLoading?: boolean;
   subscribeHeaderSaveStatus: (listener: () => void) => () => void;
   getHeaderSaveStatus: () => SaveStatus;
@@ -104,6 +109,31 @@ type Step1FormState = {
 function formatNumericField(value: number | undefined | null): string {
   if (value === undefined || value === null) return "";
   return String(value);
+}
+
+/** Step 1 opening-meter hint — never render literal "null"/"undefined". */
+function formatLastMeterHint(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  latestMeter: { meter: number; tripNo: string; tripDate: string }
+): string {
+  const meter = latestMeter.meter;
+  const rawNo = latestMeter.tripNo == null ? "" : String(latestMeter.tripNo).trim();
+  const no =
+    !rawNo || rawNo === "null" || rawNo === "undefined" ? "" : rawNo;
+  const rawDate = latestMeter.tripDate == null ? "" : String(latestMeter.tripDate).trim();
+  const date =
+    !rawDate || rawDate === "null" || rawDate === "undefined" ? "" : rawDate;
+
+  if (no && date) {
+    return t("ops.trip.last_trip_reading_hint", { meter, no, date });
+  }
+  if (date) {
+    return t("ops.trip.last_reading_hint_meter_date", { meter, date });
+  }
+  if (no) {
+    return t("ops.trip.last_trip_reading_hint", { meter, no, date: "—" });
+  }
+  return t("ops.trip.last_reading_hint_meter_only", { meter });
 }
 
 function parseNumericField(text: string): number | null {
@@ -545,11 +575,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         <p className="mt-1.5 text-xs font-medium text-slate-400 flex items-start gap-1">
           <span aria-hidden>↳</span>
           <span className="truncate">
-            {t("ops.trip.last_trip_reading_hint", {
-              meter: latestMeter.meter,
-              no: latestMeter.tripNo,
-              date: latestMeter.tripDate,
-            })}
+            {formatLastMeterHint(t, latestMeter)}
           </span>
         </p>
       ) : null}
@@ -614,6 +640,7 @@ function StepStart({
   updateTrip,
   submitStartStep,
   updateStartStep,
+  saveStartProgress,
   hasUnsavedChanges = false,
   vehicleOptions,
   employeeOptions,
@@ -622,9 +649,11 @@ function StepStart({
   onCancel,
   onExitEdit,
   clearForm,
+  hideWizardClose = false,
   headerLoading = false,
 }: Props) {
   const { t, language } = useI18n();
+  const { showNotification } = useSafeNotification();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
@@ -633,6 +662,21 @@ function StepStart({
   }, [editable, tripId]);
   const [showErrors, setShowErrors] = useState(false);
   const [notice, setNotice] = useState<WizardNoticeState>(null);
+  const [confirmation, setConfirmation] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: "warning" | "info";
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
   const [latestMeter, setLatestMeter] = useState<{
     meter: number;
     tripNo: string;
@@ -711,7 +755,11 @@ function StepStart({
         setLatestMeter(
           isSelf
             ? null
-            : { meter: data.closingMeter, tripNo: data.tripNo, tripDate: data.tripDate }
+            : {
+                meter: data.closingMeter,
+                tripNo: data.tripNo == null ? "" : String(data.tripNo),
+                tripDate: data.tripDate == null ? "" : String(data.tripDate),
+              }
         );
       })
       .catch(() => {
@@ -888,7 +936,7 @@ function StepStart({
     ? "ops.trip.update_start_details"
     : "ops.trip.submit_start_details";
 
-  const handleSubmit = useCallback(async () => {
+  const runStartSubmit = useCallback(async () => {
     if (submitLockRef.current || isSubmitting || headerLoading) return;
     const patch = formToTripPatch(formRef.current);
     const candidate = {
@@ -936,6 +984,97 @@ function StepStart({
     }
   }, [loadSnapshot, submitStartStep, updateStartStep, startStepSubmitted, tripId, updateTrip, t, isSubmitting, headerLoading]);
 
+  const handleSaveProgress = useCallback(async () => {
+    if (!saveStartProgress || submitLockRef.current || isSubmitting || headerLoading) return;
+    const patch = formToTripPatch(formRef.current);
+    const candidate = {
+      ...loadSnapshot,
+      ...patch,
+      startStepSubmitted: false,
+    } as Trip;
+    const validation = validateStartStep(candidate);
+    if (!validation.valid) {
+      setShowErrors(true);
+      setNotice({
+        type: "error",
+        message: translateValidationMessage(t, validation.errors[0]) || t("ops.trip.complete_required_fields"),
+      });
+      return;
+    }
+
+    submitLockRef.current = true;
+    setIsSubmitting(true);
+    updateTrip(patch);
+    try {
+      const success = await withMinSaveDuration(() => saveStartProgress(patch));
+      if (success) {
+        showNotification(t("ops.trip.progress_saved"), "success");
+        setNotice(null);
+      } else if (tripId <= 0) {
+        // Hook already toasts submit_start_first when no trip id exists.
+        setNotice(null);
+      } else {
+        showNotification(t("ops.trip.submission_failed"), "error");
+      }
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
+    }
+  }, [
+    saveStartProgress,
+    isSubmitting,
+    headerLoading,
+    loadSnapshot,
+    updateTrip,
+    showNotification,
+    t,
+    tripId,
+  ]);
+
+  const handleSubmit = useCallback(() => {
+    if (submitLockRef.current || isSubmitting || headerLoading) return;
+    const patch = formToTripPatch(formRef.current);
+    const candidate = {
+      ...loadSnapshot,
+      ...patch,
+      startStepSubmitted: false,
+    } as Trip;
+    const validation = validateStartStep(candidate);
+    if (!validation.valid) {
+      setShowErrors(true);
+      setNotice({
+        type: "error",
+        message: translateValidationMessage(t, validation.errors[0]) || t("ops.trip.complete_required_fields"),
+      });
+      return;
+    }
+
+    const isEditMode = tripId > 0 && startStepSubmitted;
+    setConfirmation({
+      isOpen: true,
+      title: isEditMode ? t("ops.trip.update_start_details") : t("ops.trip.submit_start_details"),
+      message: isEditMode
+        ? t("ops.trip.confirm_update_start")
+        : t("ops.trip.confirm_submit_start"),
+      confirmLabel: isEditMode ? t("ops.trip.yes_update") : t("ops.trip.yes_create"),
+      cancelLabel: t("common.cancel"),
+      type: isEditMode ? "info" : "warning",
+      onConfirm: () => {
+        setConfirmation((prev) => ({ ...prev, isOpen: false }));
+        void runStartSubmit();
+      },
+      onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+    });
+  }, [
+    isSubmitting,
+    headerLoading,
+    loadSnapshot,
+    t,
+    tripId,
+    startStepSubmitted,
+    runStartSubmit,
+  ]);
+
   if (startStepSubmitted && !editable && !isLocalEditing) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
@@ -948,14 +1087,16 @@ function StepStart({
             <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
-            <StepCloseButton
-              onClose={() => {
-                if (onCancel) onCancel();
-                else clearForm?.();
-              }}
-              animated
-            />
+            {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
+            {!hideWizardClose && (
+              <StepCloseButton
+                onClose={() => {
+                  if (onCancel) onCancel();
+                  else clearForm?.();
+                }}
+                animated
+              />
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -1154,17 +1295,28 @@ function StepStart({
           />
         </div>
 
-        <WizardStepNotice notice={notice} dirty={hasUnsavedChanges} />
         <WizardActionBar
+          notice={notice}
+          dirty={hasUnsavedChanges}
           onCancel={handleCancelEdit}
-          // Step 1 has NO "Save Progress": opening the page never creates a
-          // draft, and Start Details are only persisted on submit.
+          onSave={saveStartProgress && tripId > 0 ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={inputsLocked}
-          saveDisabled={!hasUnsavedChanges}
+          saveDisabled={!hasUnsavedChanges && !formHasEdits(form)}
           submitLabel={submitLabel}
         />
       </div>
+
+      <TripStepConfirmDialog
+        isOpen={confirmation.isOpen}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        cancelLabel={confirmation.cancelLabel}
+        type={confirmation.type}
+        onConfirm={confirmation.onConfirm}
+        onCancel={confirmation.onCancel || (() => setConfirmation((prev) => ({ ...prev, isOpen: false })))}
+      />
     </>
   );
 }
@@ -1182,6 +1334,7 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.employeeOptions === next.employeeOptions &&
     prev.updateTrip === next.updateTrip &&
     prev.submitStartStep === next.submitStartStep &&
+    prev.saveStartProgress === next.saveStartProgress &&
     prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
     prev.onExitEdit === next.onExitEdit &&

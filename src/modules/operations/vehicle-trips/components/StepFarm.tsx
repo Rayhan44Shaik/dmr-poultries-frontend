@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
-import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
@@ -14,8 +14,11 @@ import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation
 import { translateValidationMessage } from "../utils/translateValidation";
 import { captureGpsQuiet } from "../utils/captureGps";
 import { useI18n } from "../../../../i18n";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
+import TripStepConfirmDialog from "./TripStepConfirmDialog";
+import { withMinSaveDuration } from "../utils/withMinSaveDuration";
 
 interface Props {
   trip: Trip;
@@ -34,7 +37,8 @@ interface Props {
   onExitEdit?: () => void;
   /** Close the whole Trip Entry editor (no data change). */
   clearForm?: () => void;
-  showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
+  /** Hide locked-view Close X (Recent / Trip List read-only view). */
+  hideWizardClose?: boolean;
 }
 
 function farmMasterAddress(farm: any): string {
@@ -55,9 +59,10 @@ export default function StepFarm({
   onCancel,
   onExitEdit,
   clearForm: _clearForm,
-  showNotification,
+  hideWizardClose = false,
 }: Props) {
   const { t, language } = useI18n();
+  const { showNotification } = useSafeNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard (React state lags one frame). */
   const submitLockRef = useRef(false);
@@ -67,14 +72,57 @@ export default function StepFarm({
   }, [editable, trip.id]);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    type?: "warning" | "info";
+    onConfirm: () => void;
+    onCancel?: () => void;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+  const [fieldErrors, setFieldErrors] = useState<{
+    farm?: string;
+    birdType?: string;
+    gps?: string;
+    destMeter?: string;
+    tolls?: string;
+    avgBirdWeight?: string;
+  }>({});
+
+  const clearFieldError = (key: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const mapFarmValidationToFields = (errors: string[]) => {
+    const next: typeof fieldErrors = {};
+    for (const raw of errors) {
+      const msg = translateValidationMessage(t, raw);
+      const lower = raw.toLowerCase();
+      if (lower.includes("farm") && lower.includes("select")) next.farm = msg;
+      else if (lower.includes("bird type")) next.birdType = msg;
+      else if (lower.includes("gps")) next.gps = msg;
+      else if (lower.includes("farm meter") || lower.includes("starting meter")) next.destMeter = msg;
+      else if (lower.includes("toll")) next.tolls = msg;
+      else if (lower.includes("bird weight") || lower.includes("average bird")) next.avgBirdWeight = msg;
+    }
+    setFieldErrors(next);
+    return next;
+  };
 
   const notify = (msg: string, type: "success" | "error" | "warning" = "success") => {
-    if (showNotification) {
-      showNotification(msg, type);
-    } else {
-      setToast({ message: msg, type });
-    }
+    showNotification(msg, type);
   };
 
   const farmAddress = trip.farmAddress || "";
@@ -125,6 +173,7 @@ export default function StepFarm({
         farmGpsAccuracy: gps.accuracy,
         farmGpsTime: gps.capturedAt,
       });
+      clearFieldError("gps");
       // Never toast "Unable to fetch/retrieve location" — GPS always lands.
       setIsFetchingLocation(false);
     });
@@ -141,6 +190,7 @@ export default function StepFarm({
       sourceFarm: farm ? farm.farmName : "",
       farmAddress: farm ? farmMasterAddress(farm) : "",
     }));
+    clearFieldError("farm");
   };
 
   const handleBirdChange = (value: string) => {
@@ -151,6 +201,7 @@ export default function StepFarm({
       birdTypeId: id,
       birdType: bird ? (bird.birdType ?? bird.name ?? "") : "",
     }));
+    clearFieldError("birdType");
   };
 
   const handleDestMeterChange = (value: string) => {
@@ -159,43 +210,75 @@ export default function StepFarm({
     const prev = Number(trip.openingMeter ?? 0);
     const invalid = isMeterInvalid(num, prev) && num > 0;
     setDestMeterError(invalid ? meterMustBeGreaterThan(prev) : null);
+    clearFieldError("destMeter");
   };
 
   const handleTollsChange = (value: string) => {
     if (value === "") {
       updateTrip({ pickupTolls: 0 });
+      clearFieldError("tolls");
       return;
     }
     const num = Number(value);
     updateTrip({ pickupTolls: Number.isFinite(num) && num < 0 ? 0 : Number.isFinite(num) ? num : 0 });
+    clearFieldError("tolls");
   };
 
   const handleSubmit = async () => {
     if (submitLockRef.current || isSubmitting) return;
     const validation = validateFarmStep(trip);
     if (!validation.valid) {
-      notify(translateValidationMessage(t, validation.errors[0]), "warning");
+      const mapped = mapFarmValidationToFields(validation.errors);
+      const firstFieldMsg =
+        mapped.farm ||
+        mapped.birdType ||
+        mapped.gps ||
+        mapped.destMeter ||
+        mapped.tolls ||
+        mapped.avgBirdWeight ||
+        translateValidationMessage(t, validation.errors[0]);
+      notify(firstFieldMsg, "warning");
       return;
     }
+    setFieldErrors({});
     if (destMeterError) {
+      setFieldErrors({ destMeter: destMeterError });
       notify(destMeterError, "warning");
       return;
     }
 
-    submitLockRef.current = true;
-    setIsSubmitting(true);
-    try {
-      const success = await submitFarmStep({});
-      if (success) {
-        setIsLocalEditing(false);
-        notify(t("ops.trip.step2_submitted"), "success");
-      } else {
-        notify(t("ops.trip.submission_failed"), "error");
-      }
-    } finally {
-      submitLockRef.current = false;
-      setIsSubmitting(false);
-    }
+    const isEditMode = Boolean(trip.farmStepSubmitted);
+    setConfirmation({
+      isOpen: true,
+      title: isEditMode ? t("ops.trip.update_farm_details") : t("ops.trip.submit_farm_details"),
+      message: isEditMode
+        ? t("ops.trip.confirm_update_farm")
+        : t("ops.trip.confirm_submit_farm"),
+      confirmLabel: isEditMode ? t("ops.trip.yes_update") : t("ops.trip.yes_create"),
+      cancelLabel: t("common.cancel"),
+      type: isEditMode ? "info" : "warning",
+      onConfirm: () => {
+        setConfirmation((prev) => ({ ...prev, isOpen: false }));
+        void (async () => {
+          if (submitLockRef.current || isSubmitting) return;
+          submitLockRef.current = true;
+          setIsSubmitting(true);
+          try {
+            const success = await submitFarmStep({});
+            if (success) {
+              setIsLocalEditing(false);
+              notify(t("ops.trip.step2_submitted"), "success");
+            } else {
+              notify(t("ops.trip.submission_failed"), "error");
+            }
+          } finally {
+            submitLockRef.current = false;
+            setIsSubmitting(false);
+          }
+        })();
+      },
+      onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+    });
   };
 
   const handleSaveProgress = async () => {
@@ -203,8 +286,9 @@ export default function StepFarm({
     submitLockRef.current = true;
     setIsSubmitting(true);
     try {
-      const success = await saveFarmProgress({});
+      const success = await withMinSaveDuration(() => saveFarmProgress({}));
       if (success) notify(t("ops.trip.progress_saved"), "success");
+      else notify(t("ops.trip.submission_failed"), "error");
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -232,14 +316,16 @@ export default function StepFarm({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
-            <StepCloseButton
-              onClose={() => {
-                if (onCancel) onCancel();
-                else _clearForm?.();
-              }}
-              animated
-            />
+            {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
+            {!hideWizardClose && (
+              <StepCloseButton
+                onClose={() => {
+                  if (onCancel) onCancel();
+                  else _clearForm?.();
+                }}
+                animated
+              />
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -397,14 +483,27 @@ export default function StepFarm({
               placeholder={t("ops.trip.search_farm")}
               searchPlaceholder={t("ops.trip.search_farm")}
               disabled={false}
+              invalid={Boolean(fieldErrors.farm)}
               onChange={handleFarmChange}
             />
+            {fieldErrors.farm ? (
+              <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
+                <span aria-hidden>⚠</span>
+                <span>{fieldErrors.farm}</span>
+              </p>
+            ) : null}
           </div>
 
           <div className="sm:col-span-2">
             <FieldLabel icon={MapPin} tone="bg-cyan-50/70 text-cyan-500" label="GPS" required />
             <div className="flex items-center gap-2 mt-1">
-              <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
+              <div
+                className={`flex-1 min-w-0 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 flex items-center ${
+                  fieldErrors.gps
+                    ? "border-red-500 ring-2 ring-red-400/10"
+                    : "border-slate-200"
+                }`}
+              >
                 {hasGps ? (
                   <span className="truncate">
                     <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="ops.trip.location_captured" />
@@ -424,7 +523,12 @@ export default function StepFarm({
                 <span className="hidden sm:inline">{t("ops.trip.get_gps")}</span>
               </button>
             </div>
-            {hasGps && trip.farmGpsTime ? (
+            {fieldErrors.gps ? (
+              <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
+                <span aria-hidden>⚠</span>
+                <span>{fieldErrors.gps}</span>
+              </p>
+            ) : hasGps && trip.farmGpsTime ? (
               <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.captured_at")}: {trip.farmGpsTime}</p>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.gps_stays_empty")}</p>
@@ -444,11 +548,17 @@ export default function StepFarm({
               placeholder={t("ops.trip.search_bird_type")}
               searchPlaceholder={t("ops.trip.search_bird_type")}
               disabled={false}
+              invalid={Boolean(fieldErrors.birdType)}
               onChange={handleBirdChange}
             />
-            {birdTypeOptions.length <= 1 && (
+            {fieldErrors.birdType ? (
+              <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
+                <span aria-hidden>⚠</span>
+                <span>{fieldErrors.birdType}</span>
+              </p>
+            ) : birdTypeOptions.length <= 1 ? (
               <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.no_active_bird_types")}</p>
-            )}
+            ) : null}
           </div>
 
           <div className="sm:col-span-1">
@@ -456,6 +566,7 @@ export default function StepFarm({
               icon={MapPin}
               tone="bg-rose-50/70 text-rose-500"
               label={t("ops.trip.field.farm_address")}
+              required={TRIP_FIELD_DEFINITIONS.farmAddress.required}
             />
             <input
               type="text"
@@ -482,15 +593,15 @@ export default function StepFarm({
               onChange={(e) => handleDestMeterChange(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
-                destMeterError
+                destMeterError || fieldErrors.destMeter
                   ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
                   : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
               } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="0.00"
             />
-            {destMeterError ? (
+            {destMeterError || fieldErrors.destMeter ? (
               <div className="mt-1 rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-[11px] font-semibold text-red-500">
-                {destMeterError}
+                {destMeterError || fieldErrors.destMeter}
               </div>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">
@@ -512,10 +623,21 @@ export default function StepFarm({
               value={trip.pickupTolls ?? 0}
               onChange={(e) => handleTollsChange(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
+              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
+                fieldErrors.tolls
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+                  : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
+              } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="0"
             />
-            <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.tolls_hint")}</p>
+            {fieldErrors.tolls ? (
+              <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
+                <span aria-hidden>⚠</span>
+                <span>{fieldErrors.tolls}</span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.tolls_hint")}</p>
+            )}
           </div>
 
           <div>
@@ -534,11 +656,22 @@ export default function StepFarm({
               onChange={(e) => {
                 const val = e.target.value === "" ? 0 : Number(e.target.value);
                 updateTrip({ avgBirdWeight: val });
+                clearFieldError("avgBirdWeight");
               }}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
+              className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
+                fieldErrors.avgBirdWeight
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+                  : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
+              } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="e.g., 1.5"
             />
+            {fieldErrors.avgBirdWeight ? (
+              <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
+                <span aria-hidden>⚠</span>
+                <span>{fieldErrors.avgBirdWeight}</span>
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -557,11 +690,8 @@ export default function StepFarm({
           </div>
         </div>
 
-        <WizardStepNotice
-          notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
-          dirty={hasUnsavedChanges}
-        />
         <WizardActionBar
+          dirty={hasUnsavedChanges}
           onCancel={() => {
             // Cancel → leave wizard entirely (Create New Trip).
             setIsLocalEditing(false);
@@ -575,6 +705,17 @@ export default function StepFarm({
           submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
         />
       </div>
+
+      <TripStepConfirmDialog
+        isOpen={confirmation.isOpen}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmLabel={confirmation.confirmLabel}
+        cancelLabel={confirmation.cancelLabel}
+        type={confirmation.type}
+        onConfirm={confirmation.onConfirm}
+        onCancel={confirmation.onCancel || (() => setConfirmation((prev) => ({ ...prev, isOpen: false })))}
+      />
     </>
   );
 }

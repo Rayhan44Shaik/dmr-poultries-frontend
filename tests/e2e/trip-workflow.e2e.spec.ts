@@ -69,7 +69,7 @@ async function apiTrips(request: APIRequestContext, opts = '') {
   return res.json() as Promise<Array<Record<string, unknown>>>;
 }
 
-// The i18n provider persists the choice under this exact key (src/i18n/index.tsx STORAGE_KEY).
+// The i18n provider persists the choice under this exact key (src/i18n/translate.ts STORAGE_KEY).
 const LANG_STORAGE_KEY = 'dmr-language';
 async function setLanguage(page: Page, lang: 'en' | 'te') {
   await page.addInitScript(

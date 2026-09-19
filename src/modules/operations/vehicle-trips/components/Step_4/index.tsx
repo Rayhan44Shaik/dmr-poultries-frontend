@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
-  AlertTriangle, FileText, Box
+  FileText, Box
 } from "lucide-react";
 import TripPagination from "../TripPagination";
 import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
@@ -28,14 +28,17 @@ import {
   step4ShopsCount,
 } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
+import { withMinSaveDuration } from "../../utils/withMinSaveDuration";
 import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import { validateDeliveriesStep } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
-import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { WizardActionBar } from "../WizardStepUI";
+import TripStepConfirmDialog from "../TripStepConfirmDialog";
 import { useI18n } from "../../../../../i18n";
+import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { translateValidationMessage } from "../../utils/translateValidation";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
@@ -60,7 +63,7 @@ interface Props {
   tripDate?: string;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
-  saveDeliveries?: () => Promise<boolean>;
+  saveDeliveries?: (opts?: { silent?: boolean }) => Promise<boolean>;
   submitDeliveries?: () => boolean | string | Promise<boolean | string>;
   onClose?: () => void;
   persistedRows?: ShopDelivery[];
@@ -82,74 +85,6 @@ interface Props {
   whatsappFailureReasonFor?: (deliveryId: number) => string | null;
   onSendOneWhatsApp?: (delivery: ShopDelivery) => void;
 }
-
-// ─── Confirmation Modal Component ───────────────────────────────────
-function ConfirmationModal({
-  isOpen,
-  title,
-  message,
-  confirmLabel = "ops.trip.yes_proceed",
-  cancelLabel = "common.cancel",
-  onConfirm,
-  onCancel,
-  type = "warning",
-}: {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  type?: "warning" | "info";
-}) {
-  const { t } = useI18n();
-  if (!isOpen) return null;
-
-  const iconColor = type === "warning" ? "text-amber-500" : "text-emerald-500";
-  const borderColor = type === "warning" ? "border-amber-100" : "border-emerald-100";
-  const bgGradient = type === "warning"
-    ? "from-amber-50 to-orange-50"
-    : "from-emerald-50 to-teal-50";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-      <div className={`bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border ${borderColor}`}>
-        <div className={`bg-gradient-to-br ${bgGradient} p-6`}>
-          <div className="flex items-start gap-4">
-            <div className={`mt-0.5 p-2 rounded-full bg-white/80 border ${borderColor}`}>
-              <AlertTriangle size={22} className={iconColor} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{message}</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button
-            onClick={onCancel}
-            className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0"
-          >
-            {t(cancelLabel)}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
-              type === "warning"
-                ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
-                : "bg-emerald-500 hover:bg-emerald-600"
-            }`}
-          >
-            {t(confirmLabel)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Balance Mismatch Panel ─────────────────────────────────────
 
 /** Pending (not-yet-delivered) shops in DELIVERY order — the same order the
  *  dropdown shows (priority route first, then alphabetical) — mapped to
@@ -315,6 +250,7 @@ export default function UnLoadingTable({
   onSendOneWhatsApp,
 }: Props) {
   const { t, language } = useI18n();
+  const { showNotification } = useSafeNotification();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
@@ -350,7 +286,19 @@ export default function UnLoadingTable({
   const autosaveInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
-  const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
+  // Background autosave for Step 4 — same silent pattern as Step 3 Pickup:
+  // debounce after edits settle, persist without header flash / remount.
+  const deliveriesDraftFingerprint = useMemo(
+    () => JSON.stringify(safeRows),
+    [safeRows]
+  );
+  const [lastSavedDeliveriesFingerprint, setLastSavedDeliveriesFingerprint] = useState(() =>
+    JSON.stringify(persistedRows ?? [])
+  );
+  useEffect(() => {
+    setLastSavedDeliveriesFingerprint(JSON.stringify(persistedRows ?? []));
+  }, [persistedRows]);
+  const hasUnsavedChanges = deliveriesDraftFingerprint !== lastSavedDeliveriesFingerprint;
 
   // Auto-clear notices (Progress saved / shop saved) after 5 seconds.
   useEffect(() => {
@@ -360,24 +308,37 @@ export default function UnLoadingTable({
     return () => window.clearTimeout(toastTimerRef.current);
   }, [toast]);
 
-  // Quiet autosave whenever delivery rows change (keeps Step 4 in sync with
-  // the server so assigned shops / boxes never drift).
   useEffect(() => {
-    if (readOnly || !saveDeliveries || !hasUnsavedChanges || isSubmitting || showForm) return;
+    if (readOnly || !saveDeliveries || isSubmitting || showForm || isSaving) return;
+    if (deliveriesDraftFingerprint === lastSavedDeliveriesFingerprint) return;
+
     window.clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = window.setTimeout(() => {
-      if (autosaveInFlightRef.current || isSaving) return;
+      if (autosaveInFlightRef.current) return;
+      const fingerprint = JSON.stringify(safeRows);
+      if (fingerprint === lastSavedDeliveriesFingerprint) return;
       autosaveInFlightRef.current = true;
       void (async () => {
         try {
-          await saveDeliveries();
+          const ok = await saveDeliveries({ silent: true });
+          if (ok) setLastSavedDeliveriesFingerprint(fingerprint);
         } finally {
           autosaveInFlightRef.current = false;
         }
       })();
-    }, 1200);
+    }, 2500);
+
     return () => window.clearTimeout(autosaveTimerRef.current);
-  }, [safeRows, readOnly, saveDeliveries, hasUnsavedChanges, isSubmitting, showForm, isSaving]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    deliveriesDraftFingerprint,
+    lastSavedDeliveriesFingerprint,
+    readOnly,
+    saveDeliveries,
+    isSubmitting,
+    showForm,
+    isSaving,
+  ]);
 
   // ─── Confirmation Modal State ────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
@@ -415,6 +376,7 @@ export default function UnLoadingTable({
     mortKg,
     deliveredBirds,
     deliveredWeight,
+    weightLoss,
     validate,
   } = useShopDeliveryForm(safeRows, safeBoxDetails, editingId);
 
@@ -538,15 +500,16 @@ export default function UnLoadingTable({
     if (readOnly || !saveDeliveries || isSaving) return;
     setIsSaving(true);
     try {
-      const success = await saveDeliveries();
+      const success = await withMinSaveDuration(() => saveDeliveries());
       if (success) {
-        setToast({ message: t("ops.trip.progress_saved"), type: "success" });
+        setLastSavedDeliveriesFingerprint(JSON.stringify(safeRows));
+        showNotification(t("ops.trip.progress_saved"), "success");
       } else {
-        setToast({ message: t("ops.trip.failed_save_delivery"), type: "error" });
+        showNotification(t("ops.trip.failed_save_delivery"), "error");
       }
     } catch (error) {
       console.error("Save progress error:", error);
-      setToast({ message: t("ops.trip.failed_save_delivery"), type: "error" });
+      showNotification(t("ops.trip.failed_save_delivery"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -953,6 +916,7 @@ export default function UnLoadingTable({
         !validationErrors.birdsExceed
       );
     } else {
+      // mortWeight is optional in weight mode — 0 / empty is allowed.
       return (
         formData.shopId > 0 &&
         formData.birdTypeId > 0 &&
@@ -960,7 +924,7 @@ export default function UnLoadingTable({
         Number(formData.birds) > 0 &&
         Number(formData.weight) > 0 &&
         formData.mortality >= 0 &&
-        formData.mortWeight >= 0 &&
+        Number(formData.mortWeight || 0) >= 0 &&
         !validationErrors.birdsExceed &&
         !validationErrors.birdsMismatch &&
         !validationErrors.birdsExceedFarm &&
@@ -1164,12 +1128,12 @@ export default function UnLoadingTable({
             <span className="truncate">{t("ops.trip.shops")}</span>
           </span>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500">
-              <Box size={13} className="text-blue-500" /> {boxModeCount}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500" title={t("ops.trip.weight_mode")}>
+              <Scale size={13} className="text-purple-500" /> {weightModeCount}
             </span>
             <span className="h-4 w-px bg-slate-200" aria-hidden />
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500">
-              <Scale size={13} className="text-purple-500" /> {weightModeCount}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500" title={t("ops.trip.box_mode")}>
+              <Box size={13} className="text-blue-500" /> {boxModeCount}
             </span>
             <span className="text-sm font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
           </div>
@@ -1194,26 +1158,54 @@ export default function UnLoadingTable({
             {topKpiTotals.weight ? topKpiTotals.weight.toFixed(2) : "—"}
           </span>
         </div>
+        {/* Mortality — same layout as Shops: Weight · Box · cumulative birds */}
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
               <AlertCircle size={12} />
             </span>
-            <span className="truncate">{t("operations.mortality_count")}</span>
+            <span className="truncate">{t("ops.trip.mortality")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">
-            {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} ${t("common.birds")}` : "—"}
-          </span>
+          <div className="flex items-center gap-3">
+            <span
+              className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500 tabular-nums"
+              title={t("ops.trip.weight_mode")}
+            >
+              <Scale size={13} className="text-purple-500 shrink-0" />
+              {topKpiTotals.weightMortality}
+            </span>
+            <span className="h-4 w-px bg-slate-200" aria-hidden />
+            <span
+              className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500 tabular-nums min-w-0"
+              title={
+                topKpiTotals.mortKg > 0
+                  ? `${t("ops.trip.box_mode")} · ${topKpiTotals.mortKg.toFixed(2)} ${t("common.kg")}`
+                  : t("ops.trip.box_mode")
+              }
+            >
+              <Box size={13} className="text-blue-500 shrink-0" />
+              {topKpiTotals.boxMortality}
+              {topKpiTotals.mortKg > 0 ? (
+                <span className="text-[10px] font-bold text-blue-400/90 truncate">
+                  · {topKpiTotals.mortKg.toFixed(2)} {t("common.kg")}
+                </span>
+              ) : null}
+            </span>
+            <span className="text-sm font-bold text-slate-800 ml-auto tabular-nums">
+              {topKpiTotals.mortality > 0 ? topKpiTotals.mortality : "—"}
+            </span>
+          </div>
         </div>
+        {/* Weight loss — weight mode deliveries only */}
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-amber-50/70 text-amber-500 flex items-center justify-center shrink-0">
               <Scale size={12} />
             </span>
-            <span className="truncate">{t("ops.trip.mortality_weight")}</span>
+            <span className="truncate">{t("ops.trip.kpi_weight_loss")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">
-            {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} ${t("common.kg")}` : "—"}
+          <span className="block text-sm font-bold text-slate-800 tabular-nums">
+            {topKpiTotals.weightLoss > 0 ? `${topKpiTotals.weightLoss.toFixed(2)} ${t("common.kg")}` : "—"}
           </span>
         </div>
       </div>
@@ -1233,6 +1225,7 @@ export default function UnLoadingTable({
           mortKg={mortKg}
           deliveredBirds={deliveredBirds}
           deliveredWeight={deliveredWeight}
+          weightLoss={weightLoss}
           usedBoxIds={usedBoxIds}
           safeBoxDetails={availableBoxDetails}
           readOnly={false}
@@ -1334,28 +1327,22 @@ export default function UnLoadingTable({
         </>
       )}
 
-      {/* ─── BOTTOM ACTION CONTROL BAR (ONLY VISIBLE IN UNLOCKED/EDIT MODE) ─── */}
+      {/* ─── BOTTOM ACTION BAR (same as Steps 3 / 5 — no extra card) ─── */}
       {!showForm && !readOnly && (
-        <div className="bg-white border border-slate-200 p-4 rounded-2xl shadow-xs">
+        <>
           {showBalanceError && balanceError && (
-            <div className="mb-3">
-              <DeliveryBalanceErrorPanel
-                error={balanceError}
-                onClose={() => setShowBalanceError(false)}
-              />
-            </div>
+            <DeliveryBalanceErrorPanel
+              error={balanceError}
+              onClose={() => setShowBalanceError(false)}
+            />
           )}
-          <WizardStepNotice
+          <WizardActionBar
             notice={
               toast
                 ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message }
-                : hasUnsavedChanges
-                  ? { type: "info", message: t("ops.trip.unsaved_changes") }
-                  : null
+                : null
             }
-            dirty={false}
-          />
-          <WizardActionBar
+            dirty={hasUnsavedChanges}
             onCancel={handleCloseView}
             onSave={saveDeliveries ? handleSaveProgress : undefined}
             onSubmit={handleSubmitOrUpdateDeliveries}
@@ -1364,11 +1351,10 @@ export default function UnLoadingTable({
             submitDisabled={safeRows.length === 0}
             submitLabel={hasBeenSubmitted ? "ops.trip.update_deliveries" : "ops.trip.submit_deliveries"}
           />
-        </div>
+        </>
       )}
 
-      {/* Confirmation Modal */}
-      <ConfirmationModal
+      <TripStepConfirmDialog
         isOpen={confirmation.isOpen}
         title={confirmation.title}
         message={confirmation.message}

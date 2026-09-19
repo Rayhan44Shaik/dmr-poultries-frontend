@@ -65,9 +65,7 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (required("birdTypeId") && (!trip.birdTypeId || !trip.birdType)) {
     errors.push("Please select a Bird Type.");
   }
-  if (required("farmAddress") && !String(trip.farmAddress ?? "").trim()) {
-    errors.push("Farm address is required.");
-  }
+  // Farm address is optional — masters may not have one yet.
   // GPS capture is MANDATORY at the farm (Step 2). A valid non-zero pair of
   // coordinates must be present before the step can be submitted.
   const farmLat = Number(trip.farmGpsLat);

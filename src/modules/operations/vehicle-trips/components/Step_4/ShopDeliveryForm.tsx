@@ -46,6 +46,8 @@ export interface Props {
   mortKg: number;
   deliveredBirds: number;
   deliveredWeight: number;
+  /** Weight mode only: farmWeight − delivery weight. */
+  weightLoss?: number;
 
   usedBoxIds: number[];
   safeBoxDetails: any[];
@@ -147,6 +149,7 @@ export default function ShopDeliveryForm({
   mortKg,
   deliveredBirds,
   deliveredWeight,
+  weightLoss = 0,
   usedBoxIds,
   safeBoxDetails,
   readOnly,
@@ -449,7 +452,7 @@ export default function ShopDeliveryForm({
               />
             </div>
 
-            {/* Mortality — birds above weight */}
+            {/* Mortality — birds (input) + weight auto from avg farm wt */}
             <div className="space-y-3">
               <MetricTile
                 icon={AlertCircle}
@@ -556,7 +559,7 @@ export default function ShopDeliveryForm({
                 </MetricTile>
               </div>
 
-              {/* Mortality — birds above weight (inputs) */}
+              {/* Mortality — birds + optional weight (not mandatory) */}
               <div className="space-y-3">
                 <MetricTile
                   icon={AlertCircle}
@@ -583,27 +586,54 @@ export default function ShopDeliveryForm({
                     type="number"
                     step="0.01"
                     value={formData.mortWeight || ""}
-                    onChange={(e) => handleFormChange("mortWeight", Number(e.target.value))}
-                    placeholder="0.00"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      handleFormChange("mortWeight", raw === "" ? 0 : Number(raw));
+                    }}
+                    placeholder={t("ops.trip.optional")}
                     min="0"
                     className={neutralInputClass()}
                   />
+                  <p className="mt-1 text-[10px] text-slate-400 font-medium">{t("ops.trip.optional")}</p>
                 </MetricTile>
               </div>
             </div>
         )}
 
-        {/* Remarks */}
-        <div>
-          <FormLabel icon={MessageSquare} tone="bg-violet-50/70 text-violet-500">
-            {t("common.remarks")}
-          </FormLabel>
-          <input
-            value={formData.remarks || ""}
-            onChange={(e) => handleFormChange("remarks", e.target.value)}
-            placeholder={t("ops.trip.optional_delivery_notes")}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
-          />
+        {/* Weight Loss first (wider), then Remarks — weight mode only */}
+        <div
+          className={`grid gap-3 ${
+            mode === "weight"
+              ? "grid-cols-1 sm:grid-cols-[minmax(16rem,1.35fr)_minmax(0,1fr)]"
+              : "grid-cols-1"
+          }`}
+        >
+          {mode === "weight" && (
+            <div>
+              <FormLabel icon={Scale} tone="bg-amber-50/70 text-amber-500">
+                {t("ops.trip.kpi_weight_loss")}
+              </FormLabel>
+              <div className="h-[40px] rounded-xl border border-amber-100 bg-amber-50/40 px-3.5 flex items-center justify-between gap-3">
+                <span className="text-[11px] text-slate-500 font-medium truncate">
+                  {t("ops.trip.farm_weight_kg")} − {t("ops.trip.delivered_weight_kg")}
+                </span>
+                <span className="text-sm font-bold text-amber-600 tabular-nums shrink-0">
+                  {weightLoss > 0 ? weightLoss.toFixed(2) : "0.00"} {t("common.kg")}
+                </span>
+              </div>
+            </div>
+          )}
+          <div>
+            <FormLabel icon={MessageSquare} tone="bg-violet-50/70 text-violet-500">
+              {t("common.remarks")}
+            </FormLabel>
+            <input
+              value={formData.remarks || ""}
+              onChange={(e) => handleFormChange("remarks", e.target.value)}
+              placeholder={t("ops.trip.optional_delivery_notes")}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
+            />
+          </div>
         </div>
       </div>
 

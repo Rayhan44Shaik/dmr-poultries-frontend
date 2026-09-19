@@ -4,12 +4,12 @@ import { createElement, type ComponentType, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider, useI18n } from '../../src/i18n/index.ts';
 
-type I18nModule = typeof import('../../src/i18n/index.tsx');
+type I18nModule = typeof import('../../src/i18n/I18nProvider.tsx');
 
 // Like a Vite HMR update, a distinct URL re-evaluates the provider/hook module
 // while the existing tree can still reference the preceding generation.
 const reloadI18n = (generation: string): Promise<I18nModule> =>
-  import(new URL(`../../src/i18n/index.tsx?hmr=${generation}`, import.meta.url).href);
+  import(new URL(`../../src/i18n/I18nProvider.tsx?hmr=${generation}`, import.meta.url).href);
 
 function renderLabel(Provider: ComponentType<{ children: ReactNode }>, hook: typeof useI18n) {
   function Consumer() {

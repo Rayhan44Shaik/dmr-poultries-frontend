@@ -318,7 +318,7 @@ export function useTripEntry(
       }
       return true;
     } catch (error) {
-      if (!silent && (step === "farm" || step === "pickup")) {
+      if (!silent && (step === "farm" || step === "pickup" || step === "start" || step === "expenses")) {
         notifyRef.current?.(handleApiError(error), "error");
       } else if (!silent) {
         console.error(`Unable to save ${label.toLowerCase()} details:`, error);
@@ -336,33 +336,55 @@ export function useTripEntry(
     saveStepProgress("farm", data, opts);
   const savePickupProgress = (data: Partial<Trip> = {}, opts?: { silent?: boolean }) =>
     saveStepProgress("pickup", data, opts);
-  const saveDeliveriesProgress = async (rows: ShopDelivery[]): Promise<boolean> => {
+  const saveDeliveriesProgress = async (
+    rows: ShopDelivery[],
+    opts: { silent?: boolean } = {}
+  ): Promise<boolean> => {
+    const silent = Boolean(opts.silent);
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
+      if (!silent) notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
       return false;
     }
     const withKeys = rows.map((row) => ({
       ...row,
-      clientKey: row.clientKey || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${row.id}`),
+      clientKey:
+        row.clientKey ||
+        (typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `ck-${row.id}`),
     }));
-    const lockKey = "save:deliveries";
+    const lockKey = silent ? "save-silent:deliveries" : "save:deliveries";
     if (!acquireOperationLock(lockKey)) return false;
-    setHeaderLoading(true);
+    // Silent background saves must never flash header loading or remount forms.
+    if (!silent) setHeaderLoading(true);
     try {
       const saved = await saveTripDeliveries(current.id, { ...current, deliveries: withKeys });
-      applySavedTrip(saved);
+      if (silent) {
+        tripRef.current = {
+          ...tripRef.current,
+          updatedAt: saved.updatedAt ?? tripRef.current.updatedAt,
+          version: saved.version ?? tripRef.current.version,
+        };
+        setSavedTrip((prev) => ({
+          ...prev,
+          updatedAt: saved.updatedAt ?? prev.updatedAt,
+          version: saved.version ?? prev.version,
+        }));
+      } else {
+        applySavedTrip(saved);
+      }
       return true;
     } catch (error) {
-      notifyRef.current?.(handleApiError(error), "error");
+      if (!silent) notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
       releaseOperationLock(lockKey);
-      setHeaderLoading(false);
+      if (!silent) setHeaderLoading(false);
     }
   };
-  const saveEndProgress = (data: Partial<Trip> = {}) =>
-    saveStepProgress("expenses", data);
+  const saveEndProgress = (data: Partial<Trip> = {}, opts?: { silent?: boolean }) =>
+    saveStepProgress("expenses", data, opts);
 
   /** Pickup edits stay in React state until Submit — no localStorage, no backend. */
   const updateBoxDetails = (

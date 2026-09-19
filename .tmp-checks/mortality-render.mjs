@@ -54,7 +54,7 @@ const server = await createServer({
 const React = (await import("react")).default;
 const { renderToStaticMarkup } = await import("react-dom/server");
 
-const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.ts");
 const pageModule = await server.ssrLoadModule("/src/modules/operations/mortality/pages/MortalityEntryPage.tsx");
 const tableModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossTable.tsx");
 const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/CumulativeSummary.tsx");

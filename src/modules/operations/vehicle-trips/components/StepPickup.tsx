@@ -1,23 +1,26 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Scale, Bird, Box, Gauge, Clock, Pencil, Package, Lock,
-  Plus, Trash2, FileText, AlertTriangle, Camera, Download
+  Plus, Trash2, FileText, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles, loadVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
-import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { StepCloseButton, WizardActionBar } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { StepKpiCard } from "./WizardControls";
+import TripStepConfirmDialog from "./TripStepConfirmDialog";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { compressImageFile } from "../../../../utils/compressImage";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { formatTripViewStamp } from "../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "./TripTimestampDisplay";
+import { withMinSaveDuration } from "../utils/withMinSaveDuration";
 
 interface Props {
   trip: Trip;
@@ -33,6 +36,8 @@ interface Props {
   /** Header Close while editing → locked submitted view. */
   onExitEdit?: () => void;
   clearForm?: () => void;
+  /** Hide locked-view Close X (Recent / Trip List read-only view). */
+  hideWizardClose?: boolean;
 }
 
 type Row = BoxDetail & { uid: string };
@@ -72,74 +77,6 @@ function photosFromTrip(trip: Pick<Trip, "id" | "dcPhotoKey" | "dcPhotoKey2" | "
   return out.slice(0, 2);
 }
 
-// ─── Confirmation Modal ──────────────────────────────────────────────
-interface ConfirmationModalProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  type?: "warning" | "info";
-}
-
-function ConfirmationModal({
-  isOpen,
-  title,
-  message,
-  confirmLabel = "ops.trip.yes_proceed",
-  cancelLabel = "common.cancel",
-  onConfirm,
-  onCancel,
-  type = "warning",
-}: ConfirmationModalProps) {
-  const { t } = useI18n();
-  if (!isOpen) return null;
-
-  const iconColor = type === "warning" ? "text-amber-500" : "text-blue-500";
-  const borderColor = type === "warning" ? "border-amber-100" : "border-slate-200";
-  const bgGradient = type === "warning"
-    ? "from-amber-50 to-orange-50"
-    : "from-blue-50 to-slate-50";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className={`bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border ${borderColor}`}>
-        <div className={`bg-gradient-to-br ${bgGradient} p-6`}>
-          <div className="flex items-start gap-4">
-            <div className={`mt-0.5 p-2 rounded-full bg-white/60 border ${borderColor}`}>
-              <AlertTriangle size={22} className={iconColor} />
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-              <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed">{message}</p>
-            </div>
-          </div>
-        </div>
-        <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button
-            onClick={onCancel}
-            className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[15px] font-medium text-slate-600 transition-all hover:shadow-sm inline-flex items-center justify-center shrink-0"
-          >
-            {t(cancelLabel)}
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`h-10 px-5 rounded-lg text-[15px] font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
-              type === "warning"
-                ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
-                : "bg-blue-500 hover:bg-blue-600"
-            }`}
-          >
-            {t(confirmLabel)}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function StepPickup({
   trip,
   updateTrip,
@@ -150,8 +87,10 @@ export default function StepPickup({
   onCancel,
   onExitEdit,
   clearForm,
+  hideWizardClose = false,
 }: Props) {
   const { t, language } = useI18n();
+  const { showNotification } = useSafeNotification();
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard. */
   const submitLockRef = useRef(false);
@@ -165,9 +104,9 @@ export default function StepPickup({
     const details = trip.boxDetails || [];
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
-  /** After Add Box, focus the new row's Birds field. */
-  const pendingBirdsFocusUidRef = useRef<string | null>(null);
-  const birdsInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  /** After Add Box, focus the new row's Weight field (birds are defaulted). */
+  const pendingWeightFocusUidRef = useRef<string | null>(null);
+  const weightInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // Temporary session default for NEW box bird counts only — never persisted,
@@ -190,12 +129,18 @@ export default function StepPickup({
     setDefaultBoxSizeDraft(String(n));
     // Only fill blank draft rows (no birds and no weight yet). Already-entered
     // boxes keep whatever the user typed.
-    setRows((prev) =>
-      prev.map((row) => {
+    let focusUid: string | null = null;
+    setRows((prev) => {
+      const next = prev.map((row) => {
         if (row.birds > 0 || row.weight > 0) return row;
+        if (!focusUid) focusUid = row.uid;
         return { ...row, birds: n, avgWeight: calculateBoxAvgWeight(n, row.weight) };
-      })
-    );
+      });
+      if (!focusUid && next[0]) focusUid = next[0].uid;
+      return next;
+    });
+    // Birds are filled — put the caret on Weight so Tab flow starts there.
+    if (focusUid) pendingWeightFocusUidRef.current = focusUid;
   };
 
   const [maxBoxes, setMaxBoxes] = useState<number>(() => {
@@ -443,18 +388,18 @@ export default function StepPickup({
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
-  /** After Add Box, focus the new row's Birds field once it mounts. */
+  /** After Add Box, focus the new row's Weight field once it mounts. */
   useEffect(() => {
-    const uid = pendingBirdsFocusUidRef.current;
+    const uid = pendingWeightFocusUidRef.current;
     if (!uid) return;
-    const el = birdsInputRefs.current.get(uid);
+    const el = weightInputRefs.current.get(uid);
     if (!el) return;
     el.focus();
     el.select();
-    pendingBirdsFocusUidRef.current = null;
+    pendingWeightFocusUidRef.current = null;
   }, [rows]);
 
-  const addRow = (options?: { focusBirds?: boolean }) => {
+  const addRow = (options?: { focusWeight?: boolean }) => {
     if (maxBoxes > 0 && rows.length >= maxBoxes) {
       setToast({
         message: t("ops.trip.box_limit_exceeded", { max: maxBoxes }),
@@ -473,8 +418,8 @@ export default function StepPickup({
       }
     }
     const nextRow = makeRow(rows.length + 1, appliedDefaultBoxSize);
-    if (options?.focusBirds) {
-      pendingBirdsFocusUidRef.current = nextRow.uid;
+    if (options?.focusWeight) {
+      pendingWeightFocusUidRef.current = nextRow.uid;
     }
     setRows((prev) => [...prev, nextRow]);
     return true;
@@ -509,13 +454,21 @@ export default function StepPickup({
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
   };
 
-  /** Tab order: Birds → Weight → Add Box → (Tab/Enter adds) → Birds of new box. */
+  /** Tab order: Weight → Add Box → (Tab/Enter adds) → Weight of new box.
+   * Birds are pre-filled from Default Box Size, so they are skipped in the tab
+   * cycle (still clickable to edit). */
   const handleBirdsKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    _uid: string
+    uid: string
   ) => {
     blockScrollAndArrows(e);
-    // Default Tab moves to Weight in the same cell group (next focusable).
+    // If the user clicked into Birds, Tab still jumps to this row's Weight.
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      const weightEl = weightInputRefs.current.get(uid);
+      weightEl?.focus();
+      weightEl?.select();
+    }
   };
 
   const handleWeightKeyDown = (
@@ -540,12 +493,12 @@ export default function StepPickup({
   const handleAddBoxKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      addRow({ focusBirds: true });
+      addRow({ focusWeight: true });
       return;
     }
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      addRow({ focusBirds: true });
+      addRow({ focusWeight: true });
     }
   };
 
@@ -689,29 +642,34 @@ export default function StepPickup({
 
   // ─── Manual Save ────────────────────────────────────────────────
   const handleSaveProgress = async () => {
-    if (!savePickupProgress) return;
+    if (!savePickupProgress || isSaving) return;
     setIsSaving(true);
-    const boxDetails = getBoxDetails();
-    const success = await savePickupProgress({
-      boxDetails,
-      removedBoxNos,
-      ...photoFields(),
-    } as Partial<Trip>);
-    setToast(success
-      ? { message: t("ops.trip.progress_saved"), type: "success" }
-      : { message: t("ops.trip.failed_save_pickup"), type: "error" });
-    if (success) {
-      setSavedPhotoKeys(photos.map((photo) => photo.key));
-      setRemovedBoxNos([]);
-      setLastSavedFingerprint(
-        JSON.stringify({
-          boxes: boxDetails,
-          removedBoxNos: [],
-          photoKeys: photos.map((p) => p.key),
-        })
+    try {
+      const boxDetails = getBoxDetails();
+      const success = await withMinSaveDuration(() =>
+        savePickupProgress({
+          boxDetails,
+          removedBoxNos,
+          ...photoFields(),
+        } as Partial<Trip>)
       );
+      if (success) {
+        showNotification(t("ops.trip.progress_saved"), "success");
+        setSavedPhotoKeys(photos.map((photo) => photo.key));
+        setRemovedBoxNos([]);
+        setLastSavedFingerprint(
+          JSON.stringify({
+            boxes: boxDetails,
+            removedBoxNos: [],
+            photoKeys: photos.map((p) => p.key),
+          })
+        );
+      } else {
+        showNotification(t("ops.trip.failed_save_pickup"), "error");
+      }
+    } finally {
+      setIsSaving(false);
     }
-    setIsSaving(false);
   };
 
   // Bottom Cancel → leave wizard (Create New Trip). Close → locked submitted view.
@@ -823,14 +781,16 @@ export default function StepPickup({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
-            <StepCloseButton
-              onClose={() => {
-                if (onCancel) onCancel();
-                else clearForm?.();
-              }}
-              animated
-            />
+            {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
+            {!hideWizardClose && (
+              <StepCloseButton
+                onClose={() => {
+                  if (onCancel) onCancel();
+                  else clearForm?.();
+                }}
+                animated
+              />
+            )}
             {canEdit && (
               <button
                 type="button"
@@ -1231,7 +1191,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               ref={addBoxButtonRef}
-                              onClick={() => addRow({ focusBirds: true })}
+                              onClick={() => addRow({ focusWeight: true })}
                               onKeyDown={handleAddBoxKeyDown}
                               className="w-full h-8 text-[11px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
@@ -1246,24 +1206,26 @@ export default function StepPickup({
                         <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-[13px] bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}>{row.boxNo}</td>
                         <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <input
-                            ref={(el) => {
-                              if (el) birdsInputRefs.current.set(row.uid, el);
-                              else birdsInputRefs.current.delete(row.uid);
-                            }}
                             type="number"
                             step="1"
                             min="0"
+                            tabIndex={-1}
                             value={row.birds || ""}
                             onChange={(e) => updateRow(row.uid, "birds", parseInt(e.target.value) || 0)}
                             onWheel={(e) => e.currentTarget.blur()}
                             onKeyDown={(e) => handleBirdsKeyDown(e, row.uid)}
                             placeholder="0"
                             className="mini-input hide-spinner"
+                            title={t("ops.trip.birds_click_to_edit")}
                           />
                         </td>
                         <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <div className="flex items-center gap-0.5">
                             <input
+                              ref={(el) => {
+                                if (el) weightInputRefs.current.set(row.uid, el);
+                                else weightInputRefs.current.delete(row.uid);
+                              }}
                               type="number"
                               step="0.01"
                               min="0"
@@ -1347,11 +1309,9 @@ export default function StepPickup({
           />
         </div>
 
-        <WizardStepNotice
+        <WizardActionBar
           notice={toast ? { type: toast.type, message: toast.message } : null}
           dirty={hasUnsavedChanges}
-        />
-        <WizardActionBar
           onCancel={handleCancel}
           onSave={savePickupProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
@@ -1363,7 +1323,7 @@ export default function StepPickup({
       </div>
 
       {/* Confirmation Modal */}
-      <ConfirmationModal
+      <TripStepConfirmDialog
         isOpen={confirmation.isOpen}
         title={confirmation.title}
         message={confirmation.message}

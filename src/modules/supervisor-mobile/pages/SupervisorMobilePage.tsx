@@ -15,7 +15,7 @@ import StepFarm from "../../operations/vehicle-trips/components/StepFarm";
 import StepPickup from "../../operations/vehicle-trips/components/StepPickup";
 import StepDeliveries from "../../operations/vehicle-trips/components/StepDeliveries";
 import StepEnd from "../../operations/vehicle-trips/components/Step_5/StepEnd";
-import TripWizardStepper from "../../operations/vehicle-trips/components/TripWizardStepper";
+import TripWizardStepper from "../../operations/vehicle-trips/components/TripWizardStepper.tsx";
 import TripFinalKPI from "../../operations/vehicle-trips/components/TripFinalKPI";
 import { useTripEntry } from "../../operations/vehicle-trips/hooks/useTripEntry";
 import {

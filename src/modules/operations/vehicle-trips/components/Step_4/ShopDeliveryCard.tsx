@@ -121,6 +121,12 @@ export default function ShopDeliveryCard({
   const manyBoxes = selectedBoxes.length > 30;
   const mortalityCount = row.mortality ?? 0;
   const mortKg = row.mortKg ?? 0;
+  const farmWeight = Number(row.farmWeight || 0);
+  const deliveryWeight = Number(row.weight || 0);
+  const weightLoss =
+    isWeightMode && farmWeight > 0
+      ? Math.max(0, Number((farmWeight - deliveryWeight).toFixed(2)))
+      : 0;
   const display = (value: string | number | null | undefined) => {
     if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
     return localizeTripViewText(String(value), language);
@@ -192,7 +198,7 @@ export default function ShopDeliveryCard({
           </div>
         </div>
 
-        {/* KPI trio */}
+        {/* KPI trio — weight column is delivery weight in weight mode */}
         <div className="grid grid-cols-3 gap-1.5 bg-slate-50/70 p-1.5 rounded-lg border border-slate-100">
           <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
             <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
@@ -208,7 +214,8 @@ export default function ShopDeliveryCard({
           </div>
           <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
             <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
-              <Scale size={10} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
+              <Scale size={10} className="text-emerald-500 stroke-[2]" />{" "}
+              {isWeightMode ? t("ops.trip.delivered_weight_short") : t("common.weight")}
             </span>
             <span className="text-[13px] font-bold text-slate-800">
               {row.weight ? `${Number(row.weight).toFixed(2)} ${t("common.kg")}` : t("ops.trip.not_entered")}
@@ -216,11 +223,36 @@ export default function ShopDeliveryCard({
           </div>
         </div>
 
-        {(mortalityCount > 0 || mortKg > 0) && (
+        {/* Box mode: mortality birds + auto-derived kg (avg farm weight) */}
+        {!isWeightMode && (mortalityCount > 0 || mortKg > 0) && (
           <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
-            <span className="text-rose-400 font-semibold">{t("operations.mortality_count")}</span>
-            <span className="text-rose-500 font-bold">
-              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} {t("common.kg")}
+            <span className="text-rose-400 font-semibold inline-flex items-center gap-1">
+              <Box size={11} className="text-rose-400 stroke-[2]" />
+              {t("ops.trip.mortality")}
+            </span>
+            <span className="text-rose-500 font-bold tabular-nums">
+              {mortalityCount} {t("common.birds")}
+              <span className="text-rose-300 font-medium"> · </span>
+              {mortKg ? Number(mortKg).toFixed(2) : "0.00"} {t("common.kg")}
+            </span>
+          </div>
+        )}
+
+        {/* Weight mode: mortality birds (+ optional entered mort kg when present) */}
+        {isWeightMode && (mortalityCount > 0 || mortKg > 0) && (
+          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
+            <span className="text-rose-400 font-semibold inline-flex items-center gap-1">
+              <Scale size={11} className="text-rose-400 stroke-[2]" />
+              {t("ops.trip.mortality")}
+            </span>
+            <span className="text-rose-500 font-bold tabular-nums">
+              {mortalityCount} {t("common.birds")}
+              {mortKg > 0 ? (
+                <>
+                  <span className="text-rose-300 font-medium"> · </span>
+                  {Number(mortKg).toFixed(2)} {t("common.kg")}
+                </>
+              ) : null}
             </span>
           </div>
         )}
@@ -249,15 +281,30 @@ export default function ShopDeliveryCard({
           </div>
         )}
 
-        {row.remarks ? (
-          <p className="text-[10px] text-slate-500 px-0.5 truncate">
-            <span className="font-semibold text-slate-400 uppercase text-[9px]">{t("common.remarks")}: </span>
-            {row.remarks}
-          </p>
-        ) : null}
+        {/* Weight Loss first, then Remarks (weight mode) */}
+        {(row.remarks || isWeightMode) && (
+          <div
+            className={`flex items-center gap-2 text-[10px] ${
+              isWeightMode ? "justify-between" : ""
+            }`}
+          >
+            {isWeightMode && (
+              <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-50/70 text-amber-600 border border-amber-100 font-bold tabular-nums text-[10px]">
+                {t("ops.trip.kpi_weight_loss")}: {weightLoss.toFixed(2)} {t("common.kg")}
+              </span>
+            )}
+            {row.remarks ? (
+              <p className="text-slate-500 px-0.5 truncate min-w-0 flex-1 text-right sm:text-left">
+                <span className="font-semibold text-slate-400 uppercase text-[9px]">{t("common.remarks")}: </span>
+                {row.remarks}
+              </p>
+            ) : (
+              <span className="flex-1" />
+            )}
+          </div>
+        )}
 
-        {/* Footer — mortality + bird type take the old "time" slot (left),
-            captured time moves to the right */}
+        {/* Footer — bird type left, captured time right */}
         <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {mortalityCount > 0 && (

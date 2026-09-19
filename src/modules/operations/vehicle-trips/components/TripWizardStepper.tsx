@@ -2,14 +2,10 @@ import { Fragment } from "react";
 import { Check, Lock, Play, MapPin, Package, Truck, Wallet } from "lucide-react";
 import { TRIP_STEP_KEYS } from "../../../../shared/trip/workflow";
 import { useI18n } from "../../../../i18n";
-
-export type TripWizardCompletedMask = {
-  start: boolean;
-  farm: boolean;
-  pickup: boolean;
-  delivery: boolean;
-  end?: boolean;
-};
+import {
+  resolveStepperCompletion,
+  type TripWizardCompletedMask,
+} from "./stepperCompletion";
 
 interface Props {
   /** Index of the currently selected / viewed step. */
@@ -28,14 +24,6 @@ interface Props {
 }
 
 const STEP_ICONS = [Play, MapPin, Package, Truck, Wallet];
-
-export function resolveStepperCompletion(completedMask: TripWizardCompletedMask): boolean[] {
-  return TRIP_STEP_KEYS.map((key) => {
-    if (key === "expenses") return Boolean(completedMask.end);
-    const maskKey = (key === "deliveries" ? "delivery" : key) as keyof TripWizardCompletedMask;
-    return Boolean(completedMask[maskKey]);
-  });
-}
 
 /**
  * Read-only 5-step trip wizard for the Trip View.
@@ -111,7 +99,6 @@ export default function TripWizardStepper({
             {isCompleted && (
               <span
                 className={`hidden md:inline text-[9px] font-semibold ${
-
                   isActive ? "text-emerald-50/90" : "text-emerald-600"
                 }`}
               >

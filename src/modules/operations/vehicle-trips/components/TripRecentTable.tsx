@@ -315,16 +315,7 @@ function TripRecentTable({
 
   return (
     <>
-      {/* Search — OUTSIDE the table card, sitting on top of the Recent Trip
-          Activity header. Everything inside the card is unchanged. */}
-      <div className="mt-8">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
-        </div>
-      </div>
-
-      <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-3 transition-all duration-300">
+      <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex flex-wrap items-center gap-3">
@@ -377,6 +368,26 @@ function TripRecentTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            {/* Search beside Edit — magnifying-glass logo outside the input */}
+            <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-initial">
+              <span
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm"
+                aria-hidden="true"
+              >
+                <Search size={14} />
+              </span>
+              <input
+                type="text"
+                placeholder={t("ops.trip.search_trips_short")}
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                aria-label={t("ops.trip.search_trips_short")}
+                className="h-8 w-full sm:w-44 md:w-52 min-w-0 px-2.5 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all shadow-sm"
+              />
+            </div>
             <div className="flex items-center gap-1">
               <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
                 <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>

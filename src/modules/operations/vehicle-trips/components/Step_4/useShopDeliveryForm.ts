@@ -209,13 +209,12 @@ export function useShopDeliveryForm(
   const deliveredBirds = mode === "box" ? Math.max(0, farmBirds - formData.mortality) : weightModeTotals.birds;
   const deliveredWeight = mode === "box" ? Math.max(0, farmWeight - mortKg) : weightModeTotals.weight;
 
-  // ─── Weight Loss ──────────────────────────────────────────────
+  // ─── Weight Loss (weight mode only) ─────────────────────────────
+  // Farm weight of selected boxes − entered delivery weight.
   const weightLoss = useMemo<number>(() => {
     if (mode !== "weight") return 0;
-    const totalDeliveredWeight = weightModeTotals.weight;
-    const totalMortalityWeight = formData.mortWeight || 0;
-    return Math.max(0, farmWeight - (totalDeliveredWeight + totalMortalityWeight));
-  }, [mode, farmWeight, weightModeTotals.weight, formData.mortWeight]);
+    return Math.max(0, Number((farmWeight - weightModeTotals.weight).toFixed(2)));
+  }, [mode, farmWeight, weightModeTotals.weight]);
 
   // ─── Derived validation (live — recomputed from current state) ──
   const validationErrors = useMemo<ValidationErrors>(

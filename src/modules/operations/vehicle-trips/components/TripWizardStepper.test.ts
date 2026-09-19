@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveStepperCompletion } from "./TripWizardStepper";
+import { resolveStepperCompletion } from "./stepperCompletion";
 
 test("Step 5 uses the same completed mask as Steps 1–4", () => {
   const incompleteEnd = resolveStepperCompletion({
