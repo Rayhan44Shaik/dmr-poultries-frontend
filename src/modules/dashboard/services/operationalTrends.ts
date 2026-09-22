@@ -172,6 +172,7 @@ export async function fetchTrendBirds(
   const { data } = await apiGet<Record<string, unknown>>(BASE, {
     params,
     signal,
+    quiet404: true,
   });
   const kpis = (data as { kpis?: Record<string, unknown> } | null)?.kpis ?? {};
 

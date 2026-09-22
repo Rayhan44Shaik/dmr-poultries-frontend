@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, X } from "lucide-react";
 
 // --- Components ---
 import TripRecentTable from "../components/TripRecentTable";
@@ -114,6 +114,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     loadTripFromApi,
     clearTrip,
     updateStartTrip,
+    selectLeg,
+    addAnotherLoad,
+    closeEmptyLoad,
     registerStep1SuccessCallback,
     registerStep2SuccessCallback,
     registerStep3SuccessCallback,
@@ -347,9 +350,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
-  // After ANY step submit: close the wizard and show "Create New Trip".
-  // Resume the same trip from Recent Trip Activity when the next step is needed.
-  // Success toast is emitted centrally in useTripEntry.
+  // After Step 1: close wizard (resume later). After Loads 2–4: stay on the
+  // same Draft trip so another load or shared expenses can continue.
   useEffect(() => {
     registerStep1SuccessCallback(() => {
       clearForm();
@@ -358,21 +360,27 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     registerStep2SuccessCallback(() => {
-      clearForm();
+      setEntryScreen("form");
+      setViewStepIndex(2);
+      setEditingSubmittedStep(null);
     });
-  }, [registerStep2SuccessCallback, clearForm]);
+  }, [registerStep2SuccessCallback]);
 
   useEffect(() => {
     registerStep3SuccessCallback(() => {
-      clearForm();
+      setEntryScreen("form");
+      setViewStepIndex(3);
+      setEditingSubmittedStep(null);
     });
-  }, [registerStep3SuccessCallback, clearForm]);
+  }, [registerStep3SuccessCallback]);
 
   useEffect(() => {
     registerStep4SuccessCallback(() => {
-      clearForm();
+      setEntryScreen("form");
+      setViewStepIndex(4);
+      setEditingSubmittedStep(null);
     });
-  }, [registerStep4SuccessCallback, clearForm]);
+  }, [registerStep4SuccessCallback]);
 
   /**
    * Common edit navigation (all steps 1–5):
@@ -709,6 +717,94 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                 );
               }}
             />
+
+            {trip.id > 0 && trip.startStepSubmitted && effectiveViewStepIndex >= 1 && effectiveViewStepIndex <= 3 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Trip loads">
+                <div className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm">
+                {(trip.legs?.length
+                  ? trip.legs
+                  : [{ legIndex: 1, farmStepSubmitted: trip.farmStepSubmitted, pickupStepSubmitted: trip.pickupStepSubmitted }]
+                ).map((leg) => {
+                  const idx = Number(leg.legIndex);
+                  const active = Number(trip.activeLegIndex ?? 1) === idx;
+                  const stepAvailable =
+                    effectiveViewStepIndex === 1 ||
+                    (effectiveViewStepIndex === 2 && Boolean(leg.farmStepSubmitted)) ||
+                    (effectiveViewStepIndex === 3 && Boolean(leg.pickupStepSubmitted));
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        selectLeg(idx);
+                        setViewStepIndex(effectiveViewStepIndex);
+                        setStepRemountNonce((n) => n + 1);
+                      }}
+                      disabled={!stepAvailable}
+                      aria-pressed={active}
+                      className={`inline-flex items-center rounded-md px-5 py-1.5 text-xs font-semibold transition-all ${
+                        active
+                          ? "bg-blue-50/80 text-blue-600 shadow-sm"
+                          : stepAvailable
+                            ? "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
+                            : "cursor-not-allowed bg-transparent text-slate-300"
+                      }`}
+                    >
+                      Load {idx}
+                    </button>
+                  );
+                })}
+                </div>
+                {Number(trip.activeLegIndex ?? 1) > 1 &&
+                  !trip.farmStepSubmitted &&
+                  !trip.pickupStepSubmitted &&
+                  !trip.deliveryStepSubmitted && (
+                    <button
+                      type="button"
+                      disabled={headerLoading}
+                      onClick={async () => {
+                        const closed = await closeEmptyLoad();
+                        if (closed) {
+                          setViewStepIndex(3);
+                          setStepRemountNonce((n) => n + 1);
+                        }
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-rose-200 bg-rose-50/70 text-rose-500 transition hover:bg-rose-100 disabled:opacity-50"
+                      aria-label={`Close Load ${Number(trip.activeLegIndex)}`}
+                      title={`Close Load ${Number(trip.activeLegIndex)}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                {Boolean(
+                  (
+                    trip.legs?.find(
+                      (leg) => Number(leg.legIndex) === Number(trip.legCount ?? trip.activeLegIndex ?? 1)
+                    )?.deliveryStepSubmitted ?? trip.deliveryStepSubmitted
+                  )
+                ) &&
+                  Number(trip.legCount ?? 1) < 4 &&
+                  Number(trip.activeLegIndex ?? 1) === Number(trip.legCount ?? 1) && (
+                    <button
+                      type="button"
+                      disabled={headerLoading}
+                      onClick={async () => {
+                        const ok = await addAnotherLoad();
+                        if (ok) {
+                          setViewStepIndex(1);
+                          setStepRemountNonce((n) => n + 1);
+                        }
+                      }}
+                      className="rounded-xl px-4 py-2 text-xs font-bold border border-dashed border-indigo-300 bg-white text-indigo-700 hover:border-indigo-500 hover:bg-indigo-50 disabled:opacity-50 transition-all"
+                    >
+                      + Add another load
+                    </button>
+                  )}
+                <span className="text-xs text-slate-500 ml-1">
+                  Same vehicle &amp; crew · shared diesel/expenses sheet
+                </span>
+              </div>
+            )}
 
             {editingSubmittedStep != null && editingSubmittedStep === effectiveViewStepIndex && (
               <WizardStepNotice

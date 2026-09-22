@@ -57,6 +57,50 @@ test("Part B: first incomplete step is reported (0-based)", () => {
   );
 });
 
+test("multi-load: resume stays on incomplete load, not Step 5", () => {
+  const trip = {
+    ...flags({
+      startStepSubmitted: true,
+      farmStepSubmitted: false,
+      pickupStepSubmitted: false,
+      deliveryStepSubmitted: false,
+    }),
+    legs: [
+      {
+        id: 1,
+        tripId: 72,
+        legIndex: 1,
+        sourceFarmId: 2,
+        sourceFarm: "Sneha",
+        destMeter: 100,
+        farmStepSubmitted: true,
+        pickupStepSubmitted: true,
+        deliveryStepSubmitted: true,
+        dcWeight: 1,
+        totalBirds: 1,
+        boxes: 1,
+        avgWeight: 1,
+      },
+      {
+        id: 2,
+        tripId: 72,
+        legIndex: 2,
+        sourceFarmId: null,
+        sourceFarm: null,
+        destMeter: null,
+        farmStepSubmitted: false,
+        pickupStepSubmitted: false,
+        deliveryStepSubmitted: false,
+        dcWeight: 0,
+        totalBirds: 0,
+        boxes: 0,
+        avgWeight: 0,
+      },
+    ],
+  };
+  assert.equal(getNextIncompleteTripStep(trip), 1);
+});
+
 test("Part M: status control map — Draft→Pending; Pending→Completed; no Pending→Draft", () => {
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Draft, ["Pending"]);
   // Pending may be approved to Completed on Recent Trip Activity.

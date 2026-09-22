@@ -111,9 +111,7 @@ const SearchableSelect = ({
 
   return (
     <div className="relative" ref={ref}>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
-        {label}
-      </label>
+      {label ? <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label> : null}
       <button
         type="button"
         onClick={() => {

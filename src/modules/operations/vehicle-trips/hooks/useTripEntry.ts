@@ -127,13 +127,54 @@ export function useTripEntry(
     setHeaderLoading(true);
     try {
       const loaded = await loadTripById(id);
-      setTrip(loaded);
-      setSavedTrip(loaded);
-      tripRef.current = loaded;
-      syncEndStep(loaded);
+      const resumeLeg = Math.max(
+        1,
+        Number(
+          loaded.activeLegIndex ??
+            loaded.legs?.find((leg) => !leg.deliveryStepSubmitted)?.legIndex ??
+            1
+        )
+      );
+      const leg = loaded.legs?.find((l) => l.legIndex === resumeLeg);
+      const withActive: Trip = leg
+        ? {
+            ...loaded,
+            activeLegIndex: resumeLeg,
+            sourceFarmId: Number(leg.sourceFarmId ?? loaded.sourceFarmId ?? 0),
+            sourceFarm: String(leg.sourceFarm ?? loaded.sourceFarm ?? ""),
+            destMeter: Number(leg.destMeter ?? loaded.destMeter ?? 0),
+            pickupTolls: Number(leg.pickupTolls ?? loaded.pickupTolls ?? 0),
+            farmAddress: leg.farmAddress ?? loaded.farmAddress ?? "",
+            avgBirdWeight: Number(leg.avgBirdWeight ?? loaded.avgBirdWeight ?? 0),
+            birdTypeId: Number(leg.farmBirdTypeId ?? loaded.birdTypeId ?? 0),
+            birdType: String(leg.farmBirdType ?? loaded.birdType ?? ""),
+            farmGpsLat: leg.farmGpsLat ?? loaded.farmGpsLat ?? null,
+            farmGpsLon: leg.farmGpsLon ?? loaded.farmGpsLon ?? null,
+            farmGpsAccuracy: leg.farmGpsAccuracy ?? loaded.farmGpsAccuracy ?? null,
+            farmGpsTime: leg.farmGpsTime ?? loaded.farmGpsTime ?? null,
+            farmStepSubmitted: Boolean(leg.farmStepSubmitted),
+            farmStepSubmittedAt: leg.farmStepSubmittedAt ?? null,
+            reachedTime: leg.reachedTime ?? loaded.reachedTime ?? "",
+            dcWeight: Number(leg.dcWeight ?? loaded.dcWeight ?? 0),
+            totalBirds: Number(leg.totalBirds ?? loaded.totalBirds ?? 0),
+            boxes: Number(leg.boxes ?? loaded.boxes ?? 0),
+            avgWeight: Number(leg.avgWeight ?? loaded.avgWeight ?? 0),
+            pickupLoadTime: leg.pickupLoadTime ?? loaded.pickupLoadTime ?? "",
+            dcPhotoKey: leg.dcPhotoKey ?? loaded.dcPhotoKey,
+            pickupStepSubmitted: Boolean(leg.pickupStepSubmitted),
+            pickupStepSubmittedAt: leg.pickupStepSubmittedAt ?? null,
+            deliveryStepSubmitted: Boolean(leg.deliveryStepSubmitted),
+            boxDetails: leg.boxDetails ?? loaded.boxDetails ?? [],
+            deliveries: (leg.deliveries as Trip["deliveries"]) ?? loaded.deliveries ?? [],
+          }
+        : { ...loaded, activeLegIndex: resumeLeg };
+      setTrip(withActive);
+      setSavedTrip(withActive);
+      tripRef.current = withActive;
+      syncEndStep(withActive);
       setIsEditing(true);
-      onTripIdAssignedRef.current?.(loaded.id);
-      return loaded;
+      onTripIdAssignedRef.current?.(withActive.id);
+      return withActive;
     } catch (error) {
       notifyRef.current?.(handleApiError(error), "error");
       return null;
@@ -589,6 +630,135 @@ export function useTripEntry(
     setEndStepSubmitted(false);
   };
 
+  /** Overlay a load's Farm/Pickup/Delivery fields onto the working trip. */
+  const selectLeg = useCallback((legIndex: number) => {
+    setTrip((prev) => {
+      const leg = prev.legs?.find((l) => l.legIndex === legIndex);
+      if (!leg) {
+        const next = { ...prev, activeLegIndex: legIndex };
+        tripRef.current = next;
+        return next;
+      }
+      const next: Trip = {
+        ...prev,
+        activeLegIndex: legIndex,
+        sourceFarmId: Number(leg.sourceFarmId ?? 0),
+        sourceFarm: String(leg.sourceFarm ?? ""),
+        destMeter: Number(leg.destMeter ?? 0),
+        pickupTolls: Number(leg.pickupTolls ?? 0),
+        farmAddress: leg.farmAddress ?? "",
+        avgBirdWeight: Number(leg.avgBirdWeight ?? 0),
+        birdTypeId: Number(leg.farmBirdTypeId ?? prev.birdTypeId ?? 0),
+        birdType: String(leg.farmBirdType ?? prev.birdType ?? ""),
+        farmGpsLat: leg.farmGpsLat ?? null,
+        farmGpsLon: leg.farmGpsLon ?? null,
+        farmGpsAccuracy: leg.farmGpsAccuracy ?? null,
+        farmGpsTime: leg.farmGpsTime ?? null,
+        farmStepSubmitted: Boolean(leg.farmStepSubmitted),
+        farmStepSubmittedAt: leg.farmStepSubmittedAt ?? null,
+        reachedTime: leg.reachedTime ?? "",
+        dcWeight: Number(leg.dcWeight ?? 0),
+        totalBirds: Number(leg.totalBirds ?? 0),
+        boxes: Number(leg.boxes ?? 0),
+        avgWeight: Number(leg.avgWeight ?? 0),
+        pickupLoadTime: leg.pickupLoadTime ?? "",
+        dcPhotoKey: leg.dcPhotoKey ?? undefined,
+        pickupStepSubmitted: Boolean(leg.pickupStepSubmitted),
+        pickupStepSubmittedAt: leg.pickupStepSubmittedAt ?? null,
+        deliveryStepSubmitted: Boolean(leg.deliveryStepSubmitted),
+        boxDetails: leg.boxDetails ?? [],
+        deliveries: (leg.deliveries as Trip["deliveries"]) ?? [],
+      };
+      tripRef.current = next;
+      return next;
+    });
+    const tripId = tripRef.current.id;
+    if (tripId > 0) {
+      void loadTripById(tripId, legIndex)
+        .then((loaded) => {
+          setTrip(loaded);
+          setSavedTrip(loaded);
+          tripRef.current = loaded;
+        })
+        .catch((error) => notifyRef.current?.(handleApiError(error), "error"));
+    }
+  }, []);
+
+  const addAnotherLoad = useCallback(async (): Promise<boolean> => {
+    const current = tripRef.current;
+    if (!current.id) {
+      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
+      return false;
+    }
+    const lockKey = "add:leg";
+    if (!acquireOperationLock(lockKey)) return false;
+    setHeaderLoading(true);
+    try {
+      const { addTripLeg } = await import("../services/tripHeaderApiService");
+      const updated = await addTripLeg(current.id);
+      applySavedTrip(updated);
+      const nextIndex = Number(updated.activeLegIndex ?? updated.legCount ?? 1);
+      // Overlay the new empty load onto the working copy.
+      const leg = updated.legs?.find((l) => l.legIndex === nextIndex);
+      if (leg) {
+        const overlaid: Trip = {
+          ...updated,
+          activeLegIndex: nextIndex,
+          sourceFarmId: 0,
+          sourceFarm: "",
+          destMeter: 0,
+          pickupTolls: 0,
+          farmAddress: "",
+          avgBirdWeight: 0,
+          birdTypeId: 0,
+          birdType: "",
+          farmStepSubmitted: false,
+          pickupStepSubmitted: false,
+          deliveryStepSubmitted: false,
+          boxDetails: [],
+          deliveries: [],
+          dcWeight: 0,
+          totalBirds: 0,
+          boxes: 0,
+        };
+        setTrip(overlaid);
+        setSavedTrip(overlaid);
+        tripRef.current = overlaid;
+      }
+      notifyRef.current?.(`Load ${nextIndex} started — same vehicle & crew`, "success");
+      return true;
+    } catch (error) {
+      notifyRef.current?.(handleApiError(error), "error");
+      return false;
+    } finally {
+      releaseOperationLock(lockKey);
+      setHeaderLoading(false);
+    }
+  }, []);
+
+  const closeEmptyLoad = useCallback(async (): Promise<boolean> => {
+    const current = tripRef.current;
+    const legIndex = Number(current.activeLegIndex ?? current.legCount ?? 1);
+    if (!current.id || legIndex <= 1) return false;
+    const lockKey = "remove:leg";
+    if (!acquireOperationLock(lockKey)) return false;
+    setHeaderLoading(true);
+    try {
+      const { removeEmptyTripLeg } = await import("../services/tripHeaderApiService");
+      const updated = await removeEmptyTripLeg(current.id, legIndex);
+      applySavedTrip(updated);
+      notifyRef.current?.(`Load ${legIndex} closed`, "success");
+      onTripsChangedRef.current?.();
+      return true;
+    } catch (error) {
+      notifyRef.current?.(handleApiError(error), "error");
+      return false;
+    } finally {
+      releaseOperationLock(lockKey);
+      setHeaderLoading(false);
+    }
+  }, []);
+
   return {
     trip,
     savedTrip,
@@ -618,6 +788,9 @@ export function useTripEntry(
     clearTrip,
     setStartTrip,
     updateStartTrip,
+    selectLeg,
+    addAnotherLoad,
+    closeEmptyLoad,
     registerTripIdCallback,
     registerStep1SuccessCallback,
     registerStep2SuccessCallback,

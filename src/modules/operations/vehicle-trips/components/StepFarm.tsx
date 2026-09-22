@@ -204,12 +204,20 @@ export default function StepFarm({
     clearFieldError("birdType");
   };
 
+  const activeLoadIndex = Math.max(1, Number(trip.activeLegIndex ?? 1));
+  const previousMeterFloor = Math.max(
+    Number(trip.openingMeter ?? 0),
+    ...(trip.legs ?? [])
+      .filter((leg) => Number(leg.legIndex) < activeLoadIndex)
+      .map((leg) => Number(leg.destMeter ?? 0)),
+    ...(trip.dieselEntries ?? []).map((entry) => Number(entry.meter ?? 0))
+  );
+
   const handleDestMeterChange = (value: string) => {
     const num = value === "" ? 0 : Number(value);
     updateTrip({ destMeter: num });
-    const prev = Number(trip.openingMeter ?? 0);
-    const invalid = isMeterInvalid(num, prev) && num > 0;
-    setDestMeterError(invalid ? meterMustBeGreaterThan(prev) : null);
+    const invalid = isMeterInvalid(num, previousMeterFloor) && num > 0;
+    setDestMeterError(invalid ? meterMustBeGreaterThan(previousMeterFloor) : null);
     clearFieldError("destMeter");
   };
 
@@ -605,7 +613,10 @@ export default function StepFarm({
               </div>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">
-                {t("ops.trip.start_meter")}: <span className="font-semibold text-slate-600">{trip.openingMeter ?? t("ops.trip.not_entered")} {t("common.km")}</span>
+                {activeLoadIndex > 1 ? t("ops.trip.last_entered_meter") : t("ops.trip.start_meter")}:{" "}
+                <span className="font-semibold text-slate-600">
+                  {previousMeterFloor || t("ops.trip.not_entered")} {t("common.km")}
+                </span>
               </p>
             )}
           </div>

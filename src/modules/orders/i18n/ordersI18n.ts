@@ -83,8 +83,7 @@ const EN: Record<string, string> = {
   "orders.collection_saved_short": "Saved",
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
-  "orders.assignment_empty":
-    "No collected orders awaiting assignment. Save a collection in Order Collection first.",
+  "orders.assignment_empty": "No pending orders found.",
   "orders.col_order_no": "Order No",
   "orders.col_date": "Date",
   "orders.col_shops": "Shops",
@@ -545,8 +544,7 @@ const TE: Record<string, string> = {
   "orders.collection_saved_short": "నమోదు అయినది",
 
   // Tab 2
-  "orders.assignment_empty":
-    "అసైన్‌మెంట్‌కు వేచి ఉన్న సేకరించిన ఆర్డర్లు లేవు. ముందు ఆర్డర్ సేకరణను సేవ్ చేయండి.",
+  "orders.assignment_empty": "పెండింగ్ ఆర్డర్లు ఏవీ కనుగొనబడలేదు.",
   "orders.col_order_no": "ఆర్డర్ నంబర్",
   "orders.col_date": "తేదీ",
   "orders.col_shops": "షాప్‌లు",

@@ -31,6 +31,20 @@ export function isTripWizardComplete(
 
 export function getNextIncompleteTripStep(trip: TripStepFlags): number {
   if (!trip.startStepSubmitted) return 0;
+
+  // Multi-load: resume at the first load that has not finished deliveries —
+  // never treat Load 1 completion as "ready for Step 5" while Load 2/3 exists.
+  const legs = (trip as Trip).legs;
+  if (Array.isArray(legs) && legs.length > 0) {
+    const incomplete = legs.find((leg) => !leg.deliveryStepSubmitted);
+    if (incomplete) {
+      if (!incomplete.farmStepSubmitted) return 1;
+      if (!incomplete.pickupStepSubmitted) return 2;
+      return 3;
+    }
+    return 4;
+  }
+
   if (!trip.farmStepSubmitted) return 1;
   if (!trip.pickupStepSubmitted) return 2;
   if (!trip.deliveryStepSubmitted) return 3;

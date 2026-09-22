@@ -289,15 +289,17 @@ export default function UnLoadingTable({
   // Background autosave for Step 4 — same silent pattern as Step 3 Pickup:
   // debounce after edits settle, persist without header flash / remount.
   const deliveriesDraftFingerprint = useMemo(
-    () => JSON.stringify(safeRows),
-    [safeRows]
+    () => JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: safeRows }),
+    [safeTrip?.activeLegIndex, safeRows]
   );
   const [lastSavedDeliveriesFingerprint, setLastSavedDeliveriesFingerprint] = useState(() =>
-    JSON.stringify(persistedRows ?? [])
+    JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: persistedRows ?? [] })
   );
   useEffect(() => {
-    setLastSavedDeliveriesFingerprint(JSON.stringify(persistedRows ?? []));
-  }, [persistedRows]);
+    setLastSavedDeliveriesFingerprint(
+      JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: persistedRows ?? [] })
+    );
+  }, [safeTrip?.activeLegIndex, persistedRows]);
   const hasUnsavedChanges = deliveriesDraftFingerprint !== lastSavedDeliveriesFingerprint;
 
   // Auto-clear notices (Progress saved / shop saved) after 5 seconds.
@@ -315,7 +317,7 @@ export default function UnLoadingTable({
     window.clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = window.setTimeout(() => {
       if (autosaveInFlightRef.current) return;
-      const fingerprint = JSON.stringify(safeRows);
+      const fingerprint = JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: safeRows });
       if (fingerprint === lastSavedDeliveriesFingerprint) return;
       autosaveInFlightRef.current = true;
       void (async () => {
@@ -666,6 +668,7 @@ export default function UnLoadingTable({
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
+      subShopName: row.subShopName || "",
       birdTypeId: row.birdTypeId || tripBirdTypeId || 0,
       birdType: row.birdType || tripBirdType || "",
       // Keep assigned boxes from Order Assignment as a starting selection.
@@ -792,6 +795,7 @@ export default function UnLoadingTable({
       serialNo: editingId ? (safeRows.find((r) => r.id === editingId)?.serialNo || maxSerial + 1) : maxSerial + 1,
       shopId: formData.shopId,
       shopName: formData.shopName,
+      subShopName: formData.subShopName.trim(),
       birdTypeId: formData.birdTypeId,
       birdType: formData.birdType,
       boxNo: formData.selectedBoxIds.length,
@@ -1274,7 +1278,10 @@ export default function UnLoadingTable({
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                <div className="grid min-w-[1100px] grid-cols-[3rem_3.5rem_minmax(12rem,1.5fr)_repeat(5,minmax(5.5rem,1fr))_minmax(11rem,1.3fr)_8rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  <span className="text-center">S.No</span><span className="text-center">Mode</span><span>Shop / Sub Shop / Remarks</span><span className="text-center">Boxes</span><span className="text-center">Birds</span><span className="text-center">Weight (kg)</span><span className="text-center">W.L (kg)</span><span className="text-center">Mortality</span><span className="text-center">Time</span><span className="text-right">Actions</span>
+                </div>
                 {currentRows.map((row) => {
                   const emailStatus = emailEffectiveStatus?.(row.id) ?? "pending";
                   const whatsappStatus = whatsappEffectiveStatus?.(row.id) ?? "pending";

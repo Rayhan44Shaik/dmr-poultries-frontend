@@ -63,6 +63,7 @@ interface ApiFuel {
   liters: number;
   amount: number;
   pumpName: string;
+  bunkAddress?: string | null;
   remarks?: string | null;
   gpsLat?: number | null;
   gpsLon?: number | null;
@@ -104,6 +105,7 @@ function mapRow(row: ApiFuel): FuelExpense {
     rate: Number(row.fuelRate ?? 0),
     litres: Number(row.liters ?? 0),
     petrolBunk: row.pumpName ?? "",
+    gpsAddress: row.bunkAddress ?? "",
     remarks: row.remarks ?? undefined,
     gpsLat: row.gpsLat ?? null,
     gpsLon: row.gpsLon ?? null,
@@ -171,7 +173,7 @@ function toBody(draft: FuelExpenseDraft | Partial<FuelExpense>) {
     fuelRate: draft.rate,
     liters: draft.litres,
     pumpName: draft.petrolBunk,
-    remarks: draft.remarks ?? null,
+    bunkAddress: draft.gpsAddress ?? null,
     imageData: draft.image ?? null,
     imageName: draft.imageName ?? null,
     gpsLat: draft.gpsLat ?? null,

@@ -12,6 +12,9 @@ export type ShopDeliveryWithExtra = ShopDelivery & {
   autoCaptureTime?: string;
 };
 
+const roundWeight = (value: number): number =>
+  Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 100) / 100 : 0;
+
 export type ValidationErrors = {
   birdsExceed: boolean;
   birdsMismatch: boolean;
@@ -25,6 +28,7 @@ export type ValidationErrors = {
 export type ShopDeliveryFormState = {
   shopId: number;
   shopName: string;
+  subShopName: string;
   birdTypeId: number;
   birdType: string;
   selectedBoxIds: number[];
@@ -39,6 +43,7 @@ export type ShopDeliveryFormState = {
 export const EMPTY_DELIVERY_FORM: ShopDeliveryFormState = {
   shopId: 0,
   shopName: "",
+  subShopName: "",
   birdTypeId: 0,
   birdType: "",
   selectedBoxIds: [],
@@ -182,7 +187,7 @@ export function useShopDeliveryForm(
 
   const farmWeight = useMemo<number>(() => {
     const selected = availableBoxDetails.filter((b: BoxDetail) => formData.selectedBoxIds.includes(b.boxNo));
-    return selected.reduce((sum: number, b: BoxDetail) => sum + b.weight, 0);
+    return roundWeight(selected.reduce((sum: number, b: BoxDetail) => sum + Number(b.weight || 0), 0));
   }, [availableBoxDetails, formData.selectedBoxIds]);
 
   const boxCount = formData.selectedBoxIds.length;
@@ -198,7 +203,7 @@ export function useShopDeliveryForm(
   const mortKg = useMemo<number>(() => {
     if (mode === "box") {
       if (farmBirds > 0 && formData.mortality > 0) {
-        return (farmWeight / farmBirds) * formData.mortality;
+        return roundWeight((farmWeight / farmBirds) * formData.mortality);
       }
       return 0;
     } else {
@@ -207,7 +212,7 @@ export function useShopDeliveryForm(
   }, [mode, farmBirds, farmWeight, formData.mortality, formData.mortWeight]);
 
   const deliveredBirds = mode === "box" ? Math.max(0, farmBirds - formData.mortality) : weightModeTotals.birds;
-  const deliveredWeight = mode === "box" ? Math.max(0, farmWeight - mortKg) : weightModeTotals.weight;
+  const deliveredWeight = mode === "box" ? roundWeight(Math.max(0, farmWeight - mortKg)) : roundWeight(weightModeTotals.weight);
 
   // ─── Weight Loss (weight mode only) ─────────────────────────────
   // Farm weight of selected boxes − entered delivery weight.

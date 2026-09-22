@@ -57,6 +57,31 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   const deliverySubmitted = Boolean(trip.deliveryStepSubmitted);
   const expensesSubmitted = Boolean(tripRecord.expensesStepSubmitted || tripRecord.endStepSubmitted);
 
+  const completedLoads = (trip.legs ?? [])
+    .filter((leg) => leg.deliveryStepSubmitted)
+    .map((leg) => {
+      const rows = leg.deliveries ?? [];
+      const birds = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
+      const weight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
+      const mortality = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
+      const mortalityKg = rows.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
+      return {
+        load: Number(leg.legIndex),
+        dcWeight: Number(leg.dcWeight || 0),
+        pickupBirds: Number(leg.totalBirds || 0),
+        birds,
+        weight,
+        mortality,
+        mortalityKg,
+        weightLoss: Math.max(0, Number(leg.dcWeight || 0) - weight - mortalityKg),
+      };
+    });
+  const hasMultipleLoads = completedLoads.length > 1;
+  const loadSub = (field: keyof Omit<(typeof completedLoads)[number], "load">, unit = "") =>
+    hasMultipleLoads
+      ? completedLoads.map((load) => `L${load.load}: ${Number(load[field]).toFixed(field === "birds" || field === "pickupBirds" || field === "mortality" ? 0 : 2)}${unit}`).join(" · ")
+      : "";
+
   const persistedDeliveries = deliverySubmitted
     ? (Array.isArray(deliveries) && deliveries.length ? deliveries : trip.deliveries || [])
     : [];
@@ -118,14 +143,14 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     return computedExpenses > 0 ? computedExpenses : Number(tripRecord.totalExpenses || 0);
   })();
 
-  const dcWeight = pickupSubmitted ? kpiNumber(trip.dcWeight) : null;
-  const totalBirds = pickupSubmitted ? kpiNumber(trip.totalBirds) : null;
-  const deliveryWeight = deliverySubmitted ? kpiNumber(deliveryTotals.totalWeight) : null;
-  const deliveryBirds = deliverySubmitted ? kpiNumber(deliveryTotals.totalBirds) : null;
-  const mortalityCount = deliverySubmitted ? kpiNumber(deliveryTotals.totalMortality) : null;
-  const mortalityKg = deliverySubmitted ? kpiNumber(mortalityWeight) : null;
+  const dcWeight = completedLoads.length ? completedLoads.reduce((s, l) => s + l.dcWeight, 0) : pickupSubmitted ? kpiNumber(trip.dcWeight) : null;
+  const totalBirds = completedLoads.length ? completedLoads.reduce((s, l) => s + l.pickupBirds, 0) : pickupSubmitted ? kpiNumber(trip.totalBirds) : null;
+  const deliveryWeight = completedLoads.length ? completedLoads.reduce((s, l) => s + l.weight, 0) : deliverySubmitted ? kpiNumber(deliveryTotals.totalWeight) : null;
+  const deliveryBirds = completedLoads.length ? completedLoads.reduce((s, l) => s + l.birds, 0) : deliverySubmitted ? kpiNumber(deliveryTotals.totalBirds) : null;
+  const mortalityCount = completedLoads.length ? completedLoads.reduce((s, l) => s + l.mortality, 0) : deliverySubmitted ? kpiNumber(deliveryTotals.totalMortality) : null;
+  const mortalityKg = completedLoads.length ? completedLoads.reduce((s, l) => s + l.mortalityKg, 0) : deliverySubmitted ? kpiNumber(mortalityWeight) : null;
   const weightLossValue =
-    pickupSubmitted && deliverySubmitted ? kpiNumber(weightLoss) : null;
+    completedLoads.length ? completedLoads.reduce((s, l) => s + l.weightLoss, 0) : pickupSubmitted && deliverySubmitted ? kpiNumber(weightLoss) : null;
   const pickupDistValue = farmSubmitted && trip.startStepSubmitted ? kpiNumber(pickupDist) : null;
   const deliveryDistValue = expensesSubmitted ? kpiNumber(deliveryDist) : null;
   const totalDistValue = expensesSubmitted ? kpiNumber(totalDist) : null;
@@ -136,48 +161,52 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       ? null
       : (pickupTollsValue ?? 0) + (deliveryTollsValue ?? 0);
   const mileageValue = expensesSubmitted ? kpiNumber(mileage) : null;
-  const expensesValue = expensesSubmitted ? kpiNumber(totalExpenses) : null;
+  const dieselExpense = (trip.dieselEntries ?? []).reduce(
+    (sum, row) => sum + Number(row.amount ?? (Number(row.litres || 0) * Number(row.rate || 0))),
+    0
+  );
+  const expensesValue = expensesSubmitted ? kpiNumber(totalExpenses + dieselExpense) : null;
 
   const row1Cards = [
     {
       label: translate("ops.trip.kpi_dc_weight"),
       value: formatKg(dcWeight, translate("common.kg")),
-      sub: translate("ops.trip.load_from_farm"),
+      sub: loadSub("dcWeight", ` ${translate("common.kg")}`) || translate("ops.trip.load_from_farm"),
       bg: "bg-blue-50/70",
       icon: <Weight size={18} className="text-blue-500" />,
     },
     {
       label: translate("ops.trip.kpi_total_birds"),
       value: formatCount(totalBirds),
-      sub: translate("ops.trip.picked_from_farm"),
+      sub: loadSub("pickupBirds") || translate("ops.trip.picked_from_farm"),
       bg: "bg-green-50/70",
       icon: <Bird size={18} className="text-green-500" />,
     },
     {
       label: translate("ops.trip.kpi_delivery_weight"),
       value: formatKg(deliveryWeight, translate("common.kg")),
-      sub: deliverySubmitted ? translate("ops.trip.shop_deliveries_count", { count: persistedDeliveries.length }) : translate("ops.trip.not_submitted"),
+      sub: loadSub("weight", ` ${translate("common.kg")}`) || (deliverySubmitted ? translate("ops.trip.shop_deliveries_count", { count: persistedDeliveries.length }) : translate("ops.trip.not_submitted")),
       bg: "bg-slate-50",
       icon: <ShoppingBag size={18} className="text-slate-700" />,
     },
     {
       label: translate("ops.trip.kpi_delivery_birds"),
       value: formatCount(deliveryBirds),
-      sub: translate("ops.trip.total_to_shops"),
+      sub: loadSub("birds") || translate("ops.trip.total_to_shops"),
       bg: "bg-cyan-50/70",
       icon: <Bird size={18} className="text-cyan-500" />,
     },
     {
       label: translate("operations.total_mortality"),
       value: mortalityCount == null ? "—" : `${mortalityCount} ${translate("common.birds")}`,
-      sub: mortalityKg == null ? translate("ops.trip.not_submitted") : `${mortalityKg.toFixed(2)} ${translate("common.kg")} ${translate("common.total")}`,
+      sub: loadSub("mortality") || (mortalityKg == null ? translate("ops.trip.not_submitted") : `${mortalityKg.toFixed(2)} ${translate("common.kg")} ${translate("common.total")}`),
       bg: "bg-red-50/70",
       icon: <HeartPulse size={18} className="text-red-500" />,
     },
     {
       label: translate("ops.trip.kpi_weight_loss"),
       value: formatKg(weightLossValue, translate("common.kg")),
-      sub: translate("ops.trip.dc_del_mort"),
+      sub: loadSub("weightLoss", ` ${translate("common.kg")}`) || translate("ops.trip.dc_del_mort"),
       bg: "bg-amber-50/70",
       icon: <TrendingDown size={18} className="text-amber-500" />,
     },
@@ -225,7 +254,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     {
       label: translate("ops.trip.kpi_expenses"),
       value: expensesValue == null ? "—" : `₹${expensesValue.toFixed(0)}`,
-      sub: translate("ops.trip.total_trip_spends"),
+      sub: dieselExpense > 0 ? `${translate("ops.trip.total_trip_spends")} · Diesel ₹${dieselExpense.toFixed(0)}` : translate("ops.trip.total_trip_spends"),
       bg: "bg-orange-50/70",
       icon: <Receipt size={18} className="text-orange-500" />,
     },
@@ -256,7 +285,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               <div className="text-[21px] font-bold text-slate-900 truncate">
                 {card.value}
               </div>
-              <div className="text-[13px] text-slate-500 font-medium mt-1.5 truncate">
+              <div className="text-[12px] text-slate-500 font-medium mt-1.5 whitespace-normal leading-snug">
                 {card.sub}
               </div>
             </div>
@@ -283,7 +312,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               <div className="text-[21px] font-bold text-slate-900 truncate">
                 {card.value}
               </div>
-              <div className="text-[13px] text-slate-500 font-medium mt-1.5 truncate">
+              <div className="text-[12px] text-slate-500 font-medium mt-1.5 whitespace-normal leading-snug">
                 {card.sub}
               </div>
             </div>

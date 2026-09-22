@@ -43,6 +43,18 @@ function sortMaintenanceRecords(
 const meterDateKey = (event: VehicleMeterEvent) =>
   String(event.eventDate || event.eventInstant || "").slice(0, 10);
 
+/**
+ * The history feed is a submitted-record view. Trip start/end rows and fuel
+ * rows linked to a trip must never leak Draft/Pending workflow data into it.
+ * Standalone fuel bills remain valid timeline events and have no tripStatus.
+ */
+const isSubmittedTripMeterEvent = (event: VehicleMeterEvent) =>
+  event.sourceType === "TRIP_START" || event.sourceType === "TRIP_END"
+    ? event.tripStatus === "Approved" || event.tripStatus === "Completed"
+    : event.sourceType === "FUEL"
+      ? event.tripStatus == null || event.tripStatus === "Approved" || event.tripStatus === "Completed"
+      : true;
+
 const withinDateRange = (
   date: string,
   fromDate: string,
@@ -53,7 +65,7 @@ const withinDateRange = (
   (!toDate || date <= toDate);
 
 /**
- * Sum only completed trips whose start and end readings are inside the active
+ * Sum only approved/completed trips whose start and end readings are inside the active
  * calendar range. This avoids inventing partial-trip mileage at a range edge
  * and keeps the KPI equal to the trip distances shown in the timeline.
  */
@@ -187,7 +199,11 @@ const MaintenanceHistoryPage = ({
             setMeterEvents(
               lists
                 .flat()
-                .filter((event) => event.sourceType !== "MAINTENANCE"),
+                .filter(
+                  (event) =>
+                    event.sourceType !== "MAINTENANCE" &&
+                    isSubmittedTripMeterEvent(event),
+                ),
             );
           }
         })
@@ -202,7 +218,9 @@ const MaintenanceHistoryPage = ({
           if (!cancelled) {
             setMeterEvents(
               (response.data || []).filter(
-                (event) => event.sourceType !== "MAINTENANCE",
+                (event) =>
+                  event.sourceType !== "MAINTENANCE" &&
+                  isSubmittedTripMeterEvent(event),
               ),
             );
           }
@@ -319,9 +337,14 @@ const MaintenanceHistoryPage = ({
         <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
           <History className="h-4 w-4" />
         </div>
-        <h2 className="text-base font-bold tracking-tight text-slate-800">
-          {t("fleet.maintenance_history.approved_timeline")}
-        </h2>
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-slate-800">
+            {t("fleet.maintenance_history.approved_timeline")}
+          </h2>
+          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+            Completed trips and approved maintenance, in chronological order
+          </p>
+        </div>
       </div>
     </div>
   );

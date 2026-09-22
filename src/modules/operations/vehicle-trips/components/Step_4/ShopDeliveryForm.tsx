@@ -600,12 +600,12 @@ export default function ShopDeliveryForm({
             </div>
         )}
 
-        {/* Weight Loss first (wider), then Remarks — weight mode only */}
+        {/* Weight loss, optional sub-shop and remarks stay on one row. */}
         <div
           className={`grid gap-3 ${
             mode === "weight"
-              ? "grid-cols-1 sm:grid-cols-[minmax(16rem,1.35fr)_minmax(0,1fr)]"
-              : "grid-cols-1"
+              ? "grid-cols-1 lg:grid-cols-[minmax(13rem,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]"
+              : "grid-cols-1 sm:grid-cols-2"
           }`}
         >
           {mode === "weight" && (
@@ -623,6 +623,18 @@ export default function ShopDeliveryForm({
               </div>
             </div>
           )}
+          <div>
+            <FormLabel icon={Store} tone="bg-blue-50/70 text-blue-500">
+              Sub Shop Name
+            </FormLabel>
+            <input
+              value={formData.subShopName || ""}
+              onChange={(e) => handleFormChange("subShopName", e.target.value)}
+              placeholder="Optional sub shop name"
+              maxLength={200}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
+            />
+          </div>
           <div>
             <FormLabel icon={MessageSquare} tone="bg-violet-50/70 text-violet-500">
               {t("common.remarks")}

@@ -34,6 +34,7 @@ export interface FuelExpense {
   rate: number;
   litres: number;
   petrolBunk: string;
+  gpsAddress?: string;
   remarks?: string;
   gpsLat?: number | null;
   gpsLon?: number | null;

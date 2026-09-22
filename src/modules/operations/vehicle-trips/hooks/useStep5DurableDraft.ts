@@ -125,7 +125,8 @@ export function useStep5DurableDraft({
         // advanced past the draft's base, re-base so the next save is clean —
         // the user's Step 5 edits still supersede (whole-sheet unit).
         setRestoredFields(draft.fields);
-        void runFlush();
+        // Restoration is local-only. Do not auto-submit an incomplete diesel
+        // row on mount; the user reviews and explicitly saves/submits it.
       } else {
         setRestoredFields(null);
         // A non-dirty draft that the server has moved past is obsolete.

@@ -1,22 +1,24 @@
 // src/modules/operations/fuel-expenses/components/FuelEntryForm.tsx
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
-import Select from "react-select";
 import { MapPin, Upload, X, Loader2, Fuel } from "lucide-react";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { opsReactSelectStyles } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
+import { DatePicker } from "../../../../components/common/DatePicker";
+import { amountInWords } from "../../collections/utils/amountInWords";
+import SearchableSelect from "../../../../components/common/SearchableSelect";
+import { compressImageFile } from "../../../../utils/compressImage";
 
 interface Props {
   onSave: (data: FuelExpenseDraft) => void;
   onUpdate: (id: string, updates: Partial<FuelExpense>) => void;
   editingId?: string | null;
   initialData?: FuelExpense | null;
-  vehicles: any[];
-  drivers: any[];
+  vehicles: Array<{ id: number; status?: string; vehicleNumber: string }>;
+  drivers: Array<{ id: number; employeeName: string }>;
   onCancel?: () => void;
 }
 
@@ -48,7 +50,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [rate, setRate] = useState<number>(0);
   const [litres, setLitres] = useState<number>(0);
   const [petrolBunk, setPetrolBunk] = useState("");
-  const [remarks, setRemarks] = useState("");
+  const [gpsAddress, setGpsAddress] = useState("");
   const [image, setImage] = useState<string>("");
   const [gpsLat, setGpsLat] = useState<number | null>(null);
   const [gpsLon, setGpsLon] = useState<number | null>(null);
@@ -58,6 +60,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [imageName, setImageName] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [isCompressingImage, setIsCompressingImage] = useState(false);
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
 
@@ -74,7 +77,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setRate(initialData.rate);
       setLitres(initialData.litres);
       setPetrolBunk(initialData.petrolBunk);
-      setRemarks(initialData.remarks || "");
+      setGpsAddress(initialData.gpsAddress || "");
       setImage(initialData.image || "");
       setImageName(initialData.imageName || "");
       setGpsLat(initialData.gpsLat ?? null);
@@ -104,7 +107,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setRate(0);
     setLitres(0);
     setPetrolBunk("");
-    setRemarks("");
+    setGpsAddress("");
     setImage("");
     setImageName("");
     setGpsLat(null);
@@ -121,19 +124,17 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   }));
 
   const vehicleOptions = activeVehicles.map((v) => ({
-    value: v.id,
+    value: String(v.id),
     label: localizeTripViewText(formatVehicleNumber(v.vehicleNumber), language),
   }));
 
   const driverOptions = drivers.map((d) => ({
-    value: d.id,
+    value: String(d.id),
     label: localizeTripViewText(d.employeeName, language),
   }));
 
-  const selectStyles = opsReactSelectStyles();
-
-  const handleVehicleChange = (selected: any) => {
-    const v = activeVehicles.find((x) => x.id === selected?.value);
+  const handleVehicleChange = (selectedValue: string) => {
+    const v = activeVehicles.find((x) => String(x.id) === selectedValue);
     if (v) {
       setVehicleId(v.id);
       setVehicleNo(v.vehicleNumber);
@@ -144,7 +145,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     setFileError(null);
     if (!file) return;
@@ -152,20 +153,24 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setFileError(language === "te" ? "బిల్లు ఫోటో ఖాళీగా ఉంది." : "Bill photo is empty.");
       return;
     }
-    if (file.size > 1_048_576) {
-      setFileError(language === "te" ? "బిల్లు ఫోటో 1 MB కంటే ఎక్కువ ఉంది." : "Bill photo exceeds 1 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setFileError(language === "te" ? "బిల్లు ఫోటో 10 MB కంటే ఎక్కువ ఉంది." : "Bill photo exceeds 10 MB.");
       return;
     }
     if (!/^image\/(jpeg|jpg|png)$/i.test(file.type)) {
       setFileError(language === "te" ? "బిల్లు ఫోటో JPEG లేదా PNG చిత్రంగా ఉండాలి." : "Bill photo must be a JPEG or PNG image.");
       return;
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImage(reader.result as string);
+    setIsCompressingImage(true);
+    try {
+      const compressed = await compressImageFile(file, { maxBytes: 100 * 1024, maxDimension: 1600, minDimension: 640 });
+      setImage(compressed.dataUrl);
       setImageName(file.name);
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setFileError(language === "te" ? "బిల్లు ఫోటోను ప్రాసెస్ చేయడం విఫలమైంది." : "Failed to process the bill image.");
+    } finally {
+      setIsCompressingImage(false);
+    }
   };
 
   const removeImage = () => {
@@ -197,7 +202,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           );
           const data = await response.json();
           if (data && data.display_name) {
-            setPetrolBunk(data.display_name);
+            setGpsAddress(data.display_name);
           }
         } catch {
           /* keep coordinates even if reverse geocode fails */
@@ -221,9 +226,9 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   };
 
   const handleSubmit = () => {
-    if (!date || !vehicleId || litres <= 0 || rate <= 0) {
+    if (!date || !vehicleId || !driverId || meterReading <= 0 || litres <= 0 || rate <= 0 || !petrolBunk.trim() || gpsLat == null || gpsLon == null || !gpsAddress.trim() || !image) {
       showNotification(
-        language === "te" ? "దయచేసి తేదీ, వాహనం, లీటర్లు మరియు రేటును పూరించండి." : "Please fill date, vehicle, litres, and rate.",
+        language === "te" ? "దయచేసి అవసరమైన అన్ని ఇంధన బిల్లు వివరాలను పూరించండి." : "Please complete all required fuel bill details, GPS, and bill upload.",
         "error"
       );
       return;
@@ -244,7 +249,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       rate,
       litres,
       petrolBunk,
-      remarks,
+      gpsAddress,
       image,
       imageName,
       gpsLat,
@@ -299,11 +304,15 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <label className="text-xs font-semibold text-slate-600 block mb-1">
               {t("common.date")} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="date"
+            <DatePicker
+              id="manual-fuel-date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+              onChange={setDate}
+              placeholder={t("placeholder.enter_date")}
+              required
+              hideClear
+              language={language}
+              className="w-full"
             />
           </div>
 
@@ -312,13 +321,15 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <label className="text-xs font-semibold text-slate-600 block mb-1">
               {t("common.vehicle")} <span className="text-red-500">*</span>
             </label>
-            <Select
+            <SearchableSelect
+              label=""
               options={vehicleOptions}
-              value={vehicleOptions.find((opt) => opt.value === vehicleId) || null}
+              value={vehicleId ? String(vehicleId) : ""}
               onChange={handleVehicleChange}
-              isSearchable
               placeholder={t("ops.fuel.select_vehicle")}
-              styles={selectStyles}
+              searchable
+              allowClear={false}
+              widthClass="w-full"
             />
           </div>
 
@@ -327,19 +338,21 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <label className="text-xs font-semibold text-slate-600 block mb-1">
               {t("common.driver")} <span className="text-red-500">*</span>
             </label>
-            <Select
+            <SearchableSelect
+              label=""
               options={driverOptions}
-              value={driverOptions.find((opt) => opt.value === driverId) || null}
-              onChange={(selected) => {
-                const d = drivers.find((x) => x.id === selected?.value);
+              value={driverId ? String(driverId) : ""}
+              onChange={(selectedValue) => {
+                const d = drivers.find((x) => String(x.id) === selectedValue);
                 if (d) {
                   setDriverId(d.id);
                   setDriverName(d.employeeName);
                 }
               }}
-              isSearchable
               placeholder={t("ops.fuel.select_driver")}
-              styles={selectStyles}
+              searchable
+              allowClear={false}
+              widthClass="w-full"
             />
           </div>
 
@@ -404,26 +417,24 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               readOnly
               className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
             />
+            <div className="mt-1 min-h-4 text-[11px] font-medium italic text-emerald-700">{amountInWords(amount, language)}</div>
           </div>
 
-          {/* Petrol Bunk with GPS button */}
-          <div className="lg:col-span-2">
-            <label className="text-xs font-semibold text-slate-600 block mb-1">
-              {t("ops.fuel.petrol_bunk")} <span className="text-red-500">*</span>
-            </label>
+          {/* Bunk City */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">{t("ops.fuel.bunk_city")} <span className="text-red-500">*</span></label>
+            <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder={t("ops.fuel.enter_bunk")} />
+          </div>
+
+          {/* GPS */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">GPS <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={petrolBunk}
-                onChange={(e) => setPetrolBunk(e.target.value)}
-                className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
-                placeholder={t("ops.fuel.enter_bunk")}
-              />
               <button
                 type="button"
                 onClick={fetchGPSLocation}
                 disabled={isFetchingLocation}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60 cursor-pointer"
+                className="flex w-full items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60 cursor-pointer"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">GPS</span>
@@ -439,21 +450,23 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               </div>
             )}
             {gpsError && <div className="text-[10px] text-red-600 mt-1">{gpsError}</div>}
+            {gpsAddress && <div className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium leading-4 text-emerald-700">{gpsAddress}</div>}
           </div>
 
           {/* Image Upload */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              {t("ops.fuel.receipt_document")}
+              {t("ops.fuel.receipt_document")} <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-2">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
+                disabled={isCompressingImage}
                 className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition cursor-pointer"
               >
-                <Upload size={16} className="inline mr-1" /> {t("ops.fuel.upload")}
+                {isCompressingImage ? <Loader2 size={16} className="mr-1 inline animate-spin" /> : <Upload size={16} className="inline mr-1" />} {isCompressingImage ? "Compressing..." : t("ops.fuel.upload")}
               </button>
               {image && (
                 <button type="button" onClick={removeImage} className="text-red-500 hover:text-red-700 cursor-pointer">
@@ -469,19 +482,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             )}
           </div>
 
-          {/* Remarks */}
-          <div className="lg:col-span-2">
-            <label className="text-xs font-semibold text-slate-600 block mb-1">
-              {t("ops.fuel.remarks_operator_notes")}
-            </label>
-            <input
-              type="text"
-              value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
-              placeholder={t("ops.fuel.enter_remarks")}
-            />
-          </div>
         </div>
 
         <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">

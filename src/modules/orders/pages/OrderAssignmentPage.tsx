@@ -890,7 +890,6 @@ function OrderAssignmentPage({
         ) : !collection ? (
           <OrdersEmptyState
             title={to("orders.assignment_empty")}
-            hint={to("orders.select_order")}
           />
         ) : (
           <div className="relative" aria-busy={refreshing}>

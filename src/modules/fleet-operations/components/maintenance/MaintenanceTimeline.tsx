@@ -14,10 +14,13 @@ export interface VehicleMeterEvent {
   sourceType: 'TRIP_START' | 'TRIP_END' | 'FUEL' | 'MAINTENANCE';
   recordId: string;
   ref: string;
+  tripId?: string;
   meter: number;
   eventDate: string;
   eventInstant: string;
   diffFromPrevious: number | null;
+  /** Present for trip-bound rows; only Approved/Completed trips belong in this feed. */
+  tripStatus?: string;
 }
 
 interface MaintenanceTimelineProps {
@@ -86,6 +89,7 @@ type TimelineRow =
   | { kind: 'meter'; time: number; data: VehicleMeterEvent };
 
 interface TripGroup {
+  id: string;
   ref: string;
   vehicleId: number;
   startEvent?: VehicleMeterEvent;
@@ -139,20 +143,32 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
       .sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
   }, [events]);
 
-  // Consolidate Trip Start + Trip End (same `ref`/trip_no) into ONE card, and
-  // attribute each Fuel bill to the trip whose time window contains it. Fuels
-  // that fall outside any trip window remain as standalone rows so no data is
-  // lost. Mileage shown is the distance covered (end − start) in KM — fuel
-  // litres are not exposed by the read-only meter view, so km/litre is N/A here.
+  // Consolidate Trip Start + Trip End (same trip record) and every trip-linked
+  // Fuel bill into ONE card. Standalone fuels remain separate rows. Mileage
+  // shown is the distance covered (end − start) in KM — fuel litres are not
+  // exposed by the read-only meter view, so km/litre is N/A here.
   const { tripRows, orphanFuelRows } = useMemo(() => {
     const starts = new Map<string, VehicleMeterEvent>();
     const ends = new Map<string, VehicleMeterEvent>();
     const fuels: VehicleMeterEvent[] = [];
+    const visibleTripStatus = (status?: string) => {
+      const normalized = String(status || '').trim().toLowerCase();
+      return normalized === 'approved' || normalized === 'completed';
+    };
     (meterEvents || [])
-      .filter((m) => m.sourceType !== 'MAINTENANCE')
+      .filter((m) => {
+        if (m.sourceType === 'MAINTENANCE') return false;
+        if (m.sourceType === 'TRIP_START' || m.sourceType === 'TRIP_END') {
+          return visibleTripStatus(m.tripStatus);
+        }
+        // Standalone fuel bills are valid history events. Trip fuel rows carry
+        // tripStatus from the backend and must belong to an approved/completed trip.
+        return m.sourceType !== 'FUEL' || m.tripStatus == null || visibleTripStatus(m.tripStatus);
+      })
       .forEach((m) => {
-        if (m.sourceType === 'TRIP_START') starts.set(m.ref, m);
-        else if (m.sourceType === 'TRIP_END') ends.set(m.ref, m);
+        const tripKey = `${m.vehicleId}:${m.recordId}`;
+        if (m.sourceType === 'TRIP_START') starts.set(tripKey, m);
+        else if (m.sourceType === 'TRIP_END') ends.set(tripKey, m);
         else if (m.sourceType === 'FUEL') fuels.push(m);
       });
 
@@ -160,18 +176,28 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
     const consumed = new Set<string>();
     const tripGroups: TripGroup[] = [];
 
-    refs.forEach((ref) => {
-      const s = starts.get(ref);
-      const e = ends.get(ref);
+    refs.forEach((id) => {
+      const s = starts.get(id);
+      const e = ends.get(id);
       const startT = s ? safeDate(s.eventInstant || s.eventDate).getTime() : -Infinity;
       const endT = e ? safeDate(e.eventInstant || e.eventDate).getTime() : Infinity;
+      const tripRecordId = s?.recordId || e?.recordId;
       const tripFuels = fuels.filter((f) => {
+        // The backend supplies tripId for trip fuel. This exact relationship is
+        // authoritative and prevents one trip's fuel from leaking into another.
+        if (f.tripId && f.tripId === tripRecordId) {
+          consumed.add(f.recordId);
+          return true;
+        }
+        // Keep compatibility with older API responses, but only use the time
+        // window for rows that are explicitly trip-linked (tripId absent there).
+        if (f.tripId || !tripRecordId) return false;
         const t = safeDate(f.eventInstant || f.eventDate).getTime();
         const inside = t >= startT && t <= endT;
         if (inside) consumed.add(f.recordId);
         return inside;
       });
-      tripGroups.push({ ref, vehicleId: (s || e)!.vehicleId, startEvent: s, endEvent: e, fuels: tripFuels });
+      tripGroups.push({ id, ref: (s || e)!.ref, vehicleId: (s || e)!.vehicleId, startEvent: s, endEvent: e, fuels: tripFuels });
     });
 
     const orphanFuels = fuels.filter((f) => !consumed.has(f.recordId));
@@ -261,14 +287,14 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
             const tripDate = trip.startEvent?.eventDate || trip.endEvent?.eventDate || '';
             return (
               <div
-                key={`trip-${trip.ref}`}
+                key={`trip-${trip.id}`}
                 className={`relative pl-14 animate-fade-in-up ${isLast ? 'pb-1' : 'pb-6'}`}
                 style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
               >
                 <div className="absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm border-slate-200 bg-slate-50 text-slate-500">
                   <Route className="w-3.5 h-3.5" />
                 </div>
-                <div className="bg-white hover:bg-slate-50/50 border border-slate-200/70 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+                <div className="bg-gradient-to-br from-white via-white to-slate-50/70 hover:from-emerald-50/20 hover:to-white border border-slate-200/70 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-bold text-gray-900 text-sm tracking-wide">Trip</h4>
@@ -276,9 +302,12 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                         {trip.ref}
                       </span>
                       <VehicleRegistration value={tripVehicleNo} />
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                        {String(trip.startEvent?.tripStatus || trip.endEvent?.tripStatus || 'Completed')}
+                      </span>
                     </div>
                     <div className="text-right shrink-0">
-                      <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm">
+                      <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-bold text-emerald-700 shadow-sm">
                         {distance != null ? `${distance.toLocaleString('en-IN')} KM` : '—'}
                       </span>
                     </div>
@@ -305,6 +334,16 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                       Fuels: <span className="font-bold text-gray-700">{trip.fuels.length}</span>
                     </span>
                   </div>
+                  {trip.fuels.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5 border-t border-slate-100 pt-2">
+                      {trip.fuels.map((fuel) => (
+                        <span key={fuel.recordId} className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600">
+                          <Fuel className="h-3 w-3 text-slate-400" />
+                          {fuel.ref || 'Fuel'} · {fuel.meter.toLocaleString('en-IN')} KM
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             );

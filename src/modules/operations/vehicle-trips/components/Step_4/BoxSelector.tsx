@@ -32,7 +32,7 @@ export default function BoxSelector({
   const filteredBoxes = useMemo<BoxDetail[]>(() => {
     if (!searchQuery.trim()) return availableBoxes;
     return availableBoxes.filter((b: BoxDetail) =>
-      String(b.boxNo).includes(searchQuery.trim())
+      String(b.boxNo) === searchQuery.trim()
     );
   }, [availableBoxes, searchQuery]);
 
@@ -145,14 +145,9 @@ export default function BoxSelector({
                     onChange={() => toggleBox(box.boxNo)}
                     className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500 shrink-0"
                   />
-                  <span className="text-xs font-medium text-slate-700 flex-1 flex items-center gap-2 flex-wrap">
-                    <span className="bg-blue-50/80 text-blue-500 px-2 py-0.5 rounded text-[10px] font-bold">
+                  <span className="flex-1 text-xs font-medium text-slate-700">
+                    <span className="inline-flex min-w-10 items-center justify-center rounded-md bg-blue-50/80 px-2 py-1 text-xs font-bold text-blue-600">
                       {box.boxNo}
-                    </span>
-                    <span className="text-slate-600">{box.birds} {t("common.birds")}</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-slate-600">
-                      {box.weight.toFixed(2)} kg
                     </span>
                   </span>
                 </label>

@@ -182,6 +182,9 @@ export function uniqueTripsById(trips: Trip[]): Trip[] {
 /** Map backend trip JSON onto the frontend Trip model. */
 export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
   const defaults: Trip = existing ?? createEmptyTrip({ tripDate: "" });
+  const rawLoadSummaries = Array.isArray(raw.loadSummaries ?? raw.load_summaries)
+    ? (raw.loadSummaries ?? raw.load_summaries) as Array<Record<string, unknown>>
+    : defaults.loadSummaries ?? [];
 
   return {
     ...defaults,
@@ -224,6 +227,22 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     ) || defaults.submittedAtTimestamp,
     mileageKmL: numOrNull(raw.mileageKmL ?? raw.mileage_km_l),
     dieselEntries: mapDieselEntriesForDisplay(raw.dieselEntries, defaults.dieselEntries),
+    legCount: Math.max(1, num(raw.legCount ?? raw.leg_count, defaults.legCount ?? 1)),
+    activeLegIndex: Math.max(
+      1,
+      num(raw.activeLegIndex ?? defaults.activeLegIndex ?? 1, 1)
+    ),
+    legs: Array.isArray(raw.legs) ? (raw.legs as Trip["legs"]) : defaults.legs ?? [],
+    submittedLoadCount: Math.max(1, num(raw.submittedLoadCount ?? raw.submitted_load_count, defaults.submittedLoadCount ?? 1)),
+    loadSummaries: rawLoadSummaries.map((load) => {
+      const value = load as Record<string, unknown>;
+      return {
+        load: num(value.load), birds: num(value.birds), weight: num(value.weight),
+        mortality: num(value.mortality),
+        mortalityWeight: num(value.mortalityWeight ?? value.mortality_weight),
+        weightLoss: num(value.weightLoss ?? value.weight_loss), shops: num(value.shops),
+      };
+    }),
     dcWeight: num(raw.dcWeight ?? raw.dc_weight, defaults.dcWeight),
     totalBirds: num(raw.totalBirds ?? raw.total_birds, defaults.totalBirds),
     boxes: num(raw.boxes, defaults.boxes),
@@ -502,6 +521,7 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
         clientKey: d.clientKey || undefined,
         shopId,
         shopName: d.shopName || "",
+        subShopName: d.subShopName?.trim() || "",
         birdTypeId,
         birdType: d.birdType || "",
         birds,
@@ -527,13 +547,15 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
 }
 
 export async function saveTripDeliveries(tripId: number, trip: Partial<Trip>): Promise<Trip> {
-  const { data } = await apiPut<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/deliveries`, toStep4Payload(trip));
+  const body = withLegIndex(trip, { ...toStep4Payload(trip) });
+  const { data } = await apiPut<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/deliveries`, body);
   return mapApiTripToTrip(data, trip as Trip);
 }
 
 /** GET /api/trips/:id — load full trip (Step 1 resume). */
-export async function loadTripById(id: number): Promise<Trip> {
-  const { data } = await apiGet<ApiTripRecord>(`${TRIPS_PATH}/${id}`);
+export async function loadTripById(id: number, legIndex?: number): Promise<Trip> {
+  const suffix = legIndex && legIndex > 0 ? `?legIndex=${Math.trunc(legIndex)}` : "";
+  const { data } = await apiGet<ApiTripRecord>(`${TRIPS_PATH}/${id}${suffix}`);
   return mapApiTripToTrip(data);
 }
 
@@ -663,6 +685,12 @@ export async function fetchNextTripNo(
 
 export type TripWizardStep = "start" | "farm" | "pickup" | "deliveries" | "expenses";
 
+function withLegIndex(trip: Partial<Trip>, body: Record<string, unknown>): Record<string, unknown> {
+  const legIndex = Number(trip.activeLegIndex ?? trip.legCount ?? 1);
+  body.legIndex = Number.isFinite(legIndex) && legIndex >= 1 ? Math.min(4, Math.trunc(legIndex)) : 1;
+  return body;
+}
+
 /**
  * Submit a later wizard step against an existing trip ID.
  * Uses POST /api/trips/:id/steps/:step — one request per submit.
@@ -680,25 +708,25 @@ export async function submitTripStep(
     body.mode = "submit";
   }
   if (step === "farm") {
-    body = {
+    body = withLegIndex(trip, {
       ...toStep2Payload({ ...trip, farmStepSubmitted: true }),
       mode: "submit",
       farmStepSubmitted: true,
-    };
+    });
   }
   if (step === "pickup") {
-    body = {
+    body = withLegIndex(trip, {
       ...toStep3Payload(trip),
       mode: "submit",
       pickupStepSubmitted: true,
       pickupBoxWrite: "replace",
-    };
+    });
   }
   if (step === "deliveries") {
-    body = {
+    body = withLegIndex(trip, {
       ...toStep4Payload(trip),
       mode: "submit",
-    };
+    });
   }
   if (step === "expenses") {
     body = {
@@ -715,6 +743,18 @@ export async function submitTripStep(
     body
   );
   return mapApiTripToTrip(data, trip as Trip);
+}
+
+/** Add Load 2–4 on the same Draft trip (max 4). */
+export async function addTripLeg(tripId: number): Promise<Trip> {
+  const { data } = await apiPost<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/legs`, {});
+  return mapApiTripToTrip(data);
+}
+
+/** Close the latest additional load when no step has been submitted. */
+export async function removeEmptyTripLeg(tripId: number, legIndex: number): Promise<Trip> {
+  const { data } = await apiDelete<ApiTripRecord>(`${TRIPS_PATH}/${tripId}/legs/${legIndex}`);
+  return mapApiTripToTrip(data);
 }
 
 export type Step5SaveOutcome = {
@@ -767,7 +807,7 @@ export async function saveTripStepProgress(
   step: TripWizardStep,
   trip: Partial<Trip>
 ): Promise<Trip> {
-  const body: Record<string, unknown> =
+  let body: Record<string, unknown> =
     step === "farm"
       ? { ...toStep2Payload({ ...trip, farmStepSubmitted: false }), mode: "save" }
       : step === "pickup"
@@ -777,6 +817,9 @@ export async function saveTripStepProgress(
           : step === "expenses"
             ? { ...toStep5Payload(trip as Partial<Trip> & Record<string, unknown>), mode: "save" }
           : { ...trip, mode: "save" };
+  if (step === "farm" || step === "pickup" || step === "deliveries") {
+    body = withLegIndex(trip, body);
+  }
   const { data } = await apiPost<ApiTripRecord>(
     `${TRIPS_PATH}/${tripId}/steps/${step}`,
     body

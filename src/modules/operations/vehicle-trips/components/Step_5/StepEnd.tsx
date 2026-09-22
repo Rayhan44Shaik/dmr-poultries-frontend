@@ -292,7 +292,10 @@ export default function StepEnd({
 
   // ─── Compute Distance & Average ──────────────────────────────────
   const openingMeter = trip.openingMeter || 0;
-  const destMeter = trip.destMeter || 0;
+  const destMeter = Math.max(
+    Number(trip.destMeter || 0),
+    ...(trip.legs ?? []).map((leg) => Number(leg.destMeter ?? 0))
+  );
   const endMeterNum = Number(sheetData.endMeter);
 
   let totalDistanceCovered = 0;

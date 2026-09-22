@@ -10,6 +10,7 @@ import {
   apiPut,
   handleApiError,
 } from "../../../../api";
+import { notifyShopDataChanged } from "../../../../shared/events/shopDataEvents";
 import type { Shop } from "../types/shop";
 
 const SHOPS_PATH = "/masters/shops";
@@ -124,7 +125,9 @@ export async function createShop(input: ShopInput): Promise<Shop> {
     SHOPS_PATH,
     toPayload(input),
   );
-  return mapShop(data);
+  const saved = mapShop(data);
+  notifyShopDataChanged({ shopId: saved.id, shopName: saved.shopName, reason: "created", source: "shop-master" });
+  return saved;
 }
 
 /** POST /api/masters/shops/bulk */
@@ -147,13 +150,16 @@ export async function updateShop(
     `${SHOPS_PATH}/${id}`,
     toPayload({ ...(input as ShopInput), shopNo: input.shopNo }),
   );
-  return mapShop(data);
+  const saved = mapShop(data);
+  notifyShopDataChanged({ shopId: saved.id, shopName: saved.shopName, reason: "updated", source: "shop-master" });
+  return saved;
 }
 
 /** DELETE /api/masters/shops/:id */
 export async function deleteShop(id: number): Promise<void> {
   clearLegacyShopStorage();
   await apiDelete(`${SHOPS_PATH}/${id}`);
+  notifyShopDataChanged({ shopId: id, reason: "deleted", source: "shop-master" });
 }
 
 /** Always re-fetch from PostgreSQL. */

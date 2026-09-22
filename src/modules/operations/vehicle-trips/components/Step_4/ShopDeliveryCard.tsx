@@ -1,336 +1,63 @@
-import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle, Mail, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { Clock3, FileText, Loader2, Mail, Package, Pencil, Scale } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
 import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
-import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
-import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
+import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
-interface Props {
-  row: ShopDeliveryWithExtra;
-  readOnly: boolean;
-  onEdit: (row: ShopDelivery) => void;
-  onPDF: (row: ShopDeliveryWithExtra) => void;
-  communicationEnabled?: boolean;
-  emailStatus?: DeliveryEmailStatusValue;
-  emailSending?: boolean;
-  emailSendCount?: number;
-  emailDisabled?: boolean;
-  emailFailureReason?: string | null;
-  onSendEmail?: (row: ShopDelivery) => void;
-  whatsappStatus?: DeliveryWhatsAppStatusValue;
-  whatsappSending?: boolean;
-  whatsappSendCount?: number;
-  whatsappDisabled?: boolean;
-  whatsappFailureReason?: string | null;
-  onSendWhatsApp?: (row: ShopDelivery) => void;
+interface Props { row: ShopDeliveryWithExtra; readOnly: boolean; onEdit: (row: ShopDelivery) => void; onPDF: (row: ShopDeliveryWithExtra) => void; communicationEnabled?: boolean; emailStatus?: DeliveryEmailStatusValue; emailSending?: boolean; emailSendCount?: number; emailDisabled?: boolean; emailFailureReason?: string | null; onSendEmail?: (row: ShopDelivery) => void; whatsappStatus?: DeliveryWhatsAppStatusValue; whatsappSending?: boolean; whatsappSendCount?: number; whatsappDisabled?: boolean; whatsappFailureReason?: string | null; onSendWhatsApp?: (row: ShopDelivery) => void; }
+
+function CommunicationButton({ kind, busy, count, disabled, onClick, label }: { kind: "mail" | "whatsapp"; busy: boolean; count: number; disabled: boolean; onClick: () => void; label: string }) {
+  const Icon = kind === "mail" ? Mail : WhatsAppIcon;
+  return <button type="button" disabled={disabled || busy} onClick={onClick} aria-label={label} className={`relative rounded-lg border p-1.5 disabled:opacity-50 ${kind === "mail" ? "border-red-100 text-red-500 hover:bg-red-50" : "border-emerald-100 text-emerald-500 hover:bg-emerald-50"}`}>{busy ? <Loader2 size={13} className="animate-spin" /> : <Icon size={13} />}{count > 0 ? <span className="absolute -right-1.5 -top-1.5 rounded-full bg-slate-700 px-1 text-[8px] text-white">{count > 9 ? "9+" : count}</span> : null}</button>;
 }
 
-/** Soft, low-eye-strain tints for box-number chips in the card. */
-const BOX_CHIP_PALETTE = [
-  "bg-slate-100 text-slate-700 border-slate-200",
-  "bg-sky-50/70 text-sky-500 border-sky-100",
-  "bg-indigo-50/70 text-indigo-500 border-indigo-100",
-  "bg-teal-50/70 text-teal-500 border-teal-100",
-  "bg-amber-50/70 text-amber-500 border-amber-100",
-  "bg-rose-50/70 text-rose-500 border-rose-100",
-];
-
-function DeliveryCommunicationButton({
-  channel,
-  status = "pending",
-  sending = false,
-  sendCount = 0,
-  disabled = false,
-  ariaLabel,
-  onClick,
-}: {
-  channel: "mail" | "whatsapp";
-  status?: DeliveryEmailStatusValue | DeliveryWhatsAppStatusValue;
-  sending?: boolean;
-  sendCount?: number;
-  disabled?: boolean;
-  ariaLabel: string;
-  onClick: () => void;
-}) {
-  const isWhatsApp = channel === "whatsapp";
-  const Icon = isWhatsApp ? WhatsAppIcon : Mail;
-  const isSending = sending || status === "sending";
-  const isFailed = status === "failed" && !isSending;
-  const visibleCount = status === "sent" ? Math.max(1, Number(sendCount) || 0) : Math.max(0, Number(sendCount) || 0);
-
-  const className = isFailed
-    ? "bg-red-50/90 hover:bg-red-100 text-red-600 border-red-200"
-    : isWhatsApp
-      ? "bg-[#25D366]/10 hover:bg-[#25D366]/15 text-[#25D366] border-[#25D366]/25"
-      : "bg-red-50/90 hover:bg-red-100 text-red-500 border-red-100";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled || isSending}
-      className={`group relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
-        isSending ? "motion-safe:animate-pulse" : ""
-      }`}
-      aria-label={ariaLabel}
-    >
-      {isSending ? (
-        <Loader2 size={13} className="animate-spin stroke-[2.5]" />
-      ) : (
-        <span className={`inline-flex ${isWhatsApp ? uiActionIconMotionClass.whatsapp : uiActionIconMotionClass.mail}`}>
-          <Icon size={13} className="stroke-[2]" />
-        </span>
-      )}
-      {visibleCount > 0 && (
-        <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white ${
-          isWhatsApp ? "bg-[#25D366]" : "bg-red-500"
-        }`}>
-          {visibleCount > 9 ? "9+" : visibleCount}
-        </span>
-      )}
-    </button>
-  );
+function BoxDetailsTooltip({ boxes, row, emptyLabel }: { boxes: number[]; row: ShopDeliveryWithExtra; emptyLabel: string }) {
+  const boxColors = [
+    "border-blue-200 bg-blue-50 text-blue-700",
+    "border-emerald-200 bg-emerald-50 text-emerald-700",
+    "border-violet-200 bg-violet-50 text-violet-700",
+    "border-amber-200 bg-amber-50 text-amber-700",
+    "border-rose-200 bg-rose-50 text-rose-700",
+    "border-cyan-200 bg-cyan-50 text-cyan-700",
+  ];
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const open = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const estimatedHeight = 92;
+    const top = rect.bottom + estimatedHeight + 12 <= window.innerHeight ? rect.bottom + 8 : rect.top - estimatedHeight - 8;
+    setPosition({ left: Math.max(12, Math.min(window.innerWidth - 332, rect.left + rect.width / 2 - 160)), top: Math.max(8, top) });
+  };
+  return <span className="inline-flex items-center" onMouseLeave={() => setPosition(null)}>
+    <button type="button" aria-label="Show box numbers" onMouseEnter={(event) => open(event.currentTarget)} onFocus={(event) => open(event.currentTarget)} onBlur={() => setPosition(null)} className="rounded-md border-b border-dotted border-slate-400 px-1 py-0.5 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300">{boxes.length || row.boxNo || 0}</button>
+    {position && createPortal(
+      <div role="tooltip" style={{ left: position.left, top: position.top }} className="pointer-events-none fixed z-[9999] w-[320px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
+        <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-800"><Package size={14} className="text-blue-500" />Box numbers</div>
+        {boxes.length ? <div className="flex flex-wrap gap-1.5">{boxes.map((box) => <span key={box} className={`inline-flex min-w-8 items-center justify-center rounded-lg border px-2 py-1 text-xs font-bold ${boxColors[Math.abs(Number(box)) % boxColors.length]}`}>{box}</span>)}</div> : <div className="text-xs font-semibold text-slate-500">{emptyLabel}</div>}
+      </div>, document.body)}
+  </span>;
 }
 
-export default function ShopDeliveryCard({
-  row,
-  readOnly,
-  onEdit,
-  onPDF,
-  communicationEnabled = false,
-  emailStatus = "pending",
-  emailSending = false,
-  emailSendCount = 0,
-  emailDisabled = false,
-  emailFailureReason: _emailFailureReason,
-  onSendEmail,
-  whatsappStatus = "pending",
-  whatsappSending = false,
-  whatsappSendCount = 0,
-  whatsappDisabled = false,
-  whatsappFailureReason: _whatsappFailureReason,
-  onSendWhatsApp,
-}: Props) {
+export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled = false, emailStatus = "pending", emailSending = false, emailSendCount = 0, emailDisabled = false, onSendEmail, whatsappStatus = "pending", whatsappSending = false, whatsappSendCount = 0, whatsappDisabled = false, onSendWhatsApp }: Props) {
   const { t, language } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
-  const selectedBoxes = row.selectedBoxIds || [];
-  const manyBoxes = selectedBoxes.length > 30;
-  const mortalityCount = row.mortality ?? 0;
-  const mortKg = row.mortKg ?? 0;
-  const farmWeight = Number(row.farmWeight || 0);
-  const deliveryWeight = Number(row.weight || 0);
-  const weightLoss =
-    isWeightMode && farmWeight > 0
-      ? Math.max(0, Number((farmWeight - deliveryWeight).toFixed(2)))
-      : 0;
-  const display = (value: string | number | null | undefined) => {
-    if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
-    return localizeTripViewText(String(value), language);
-  };
-  const displayShopName = localizeTripViewText(cleanDeliveryShopName(row.shopName), language, { cleanShopCode: true }) || t("ops.trip.not_entered");
+  const boxes = row.selectedBoxIds ?? [];
+  const weightLoss = isWeightMode ? Math.max(0, Number(row.farmWeight || 0) - Number(row.weight || 0)) : 0;
+  const shopName = localizeTripViewText(cleanDeliveryShopName(row.shopName), language, { cleanShopCode: true }) || "—";
   const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
-
-  return (
-    <div className="relative rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
-      <div className="p-3 flex flex-col gap-2.5 flex-1">
-        {/* Header — mode tile + shop name vertically centred on the logo */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <div
-              className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
-                isWeightMode
-                  ? "bg-purple-50/70 text-purple-500 border-purple-100"
-                  : "bg-blue-50/70 text-blue-500 border-blue-100"
-              }`}
-            >
-              {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
-            </div>
-            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight">
-              {displayShopName}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {communicationEnabled && onSendEmail && (
-              <DeliveryCommunicationButton
-                channel="mail"
-                status={emailStatus}
-                sending={emailSending}
-                sendCount={emailSendCount}
-                disabled={emailDisabled}
-                ariaLabel={t("ops.trip.send_email")}
-                onClick={() => onSendEmail(row)}
-              />
-            )}
-            {communicationEnabled && onSendWhatsApp && (
-              <DeliveryCommunicationButton
-                channel="whatsapp"
-                status={whatsappStatus}
-                sending={whatsappSending}
-                sendCount={whatsappSendCount}
-                disabled={whatsappDisabled}
-                ariaLabel={t("ops.trip.send_whatsapp")}
-                onClick={() => onSendWhatsApp(row)}
-              />
-            )}
-            {!readOnly && (
-              <button
-                type="button"
-                onClick={() => onEdit(row)}
-                className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-                aria-label={t("ops.trip.edit_shop_delivery")}
-              >
-                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={13} className="stroke-[2]" /></span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => onPDF(row)}
-              className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-              aria-label={t("ops.trip.download_pdf")}
-            >
-              <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={13} className="stroke-[2]" /></span>
-            </button>
-          </div>
-        </div>
-
-        {/* KPI trio — weight column is delivery weight in weight mode */}
-        <div className="grid grid-cols-3 gap-1.5 bg-slate-50/70 p-1.5 rounded-lg border border-slate-100">
-          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
-            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
-              <Box size={10} className="text-slate-500 stroke-[2]" /> {t("common.boxes")}
-            </span>
-            <span className="text-[13px] font-bold text-slate-800">{display(selectedBoxes.length || row.boxNo)}</span>
-          </div>
-          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
-            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
-              <Users size={10} className="text-blue-500 stroke-[2]" /> {t("common.birds")}
-            </span>
-            <span className="text-[13px] font-bold text-slate-800">{row.birds ? row.birds : t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="flex flex-col items-center justify-center text-center p-1 bg-white rounded-md border border-slate-200/50">
-            <span className="text-[9px] uppercase font-semibold text-slate-400 flex items-center gap-0.5 mb-0.5">
-              <Scale size={10} className="text-emerald-500 stroke-[2]" />{" "}
-              {isWeightMode ? t("ops.trip.delivered_weight_short") : t("common.weight")}
-            </span>
-            <span className="text-[13px] font-bold text-slate-800">
-              {row.weight ? `${Number(row.weight).toFixed(2)} ${t("common.kg")}` : t("ops.trip.not_entered")}
-            </span>
-          </div>
-        </div>
-
-        {/* Box mode: mortality birds + auto-derived kg (avg farm weight) */}
-        {!isWeightMode && (mortalityCount > 0 || mortKg > 0) && (
-          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
-            <span className="text-rose-400 font-semibold inline-flex items-center gap-1">
-              <Box size={11} className="text-rose-400 stroke-[2]" />
-              {t("ops.trip.mortality")}
-            </span>
-            <span className="text-rose-500 font-bold tabular-nums">
-              {mortalityCount} {t("common.birds")}
-              <span className="text-rose-300 font-medium"> · </span>
-              {mortKg ? Number(mortKg).toFixed(2) : "0.00"} {t("common.kg")}
-            </span>
-          </div>
-        )}
-
-        {/* Weight mode: mortality birds (+ optional entered mort kg when present) */}
-        {isWeightMode && (mortalityCount > 0 || mortKg > 0) && (
-          <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
-            <span className="text-rose-400 font-semibold inline-flex items-center gap-1">
-              <Scale size={11} className="text-rose-400 stroke-[2]" />
-              {t("ops.trip.mortality")}
-            </span>
-            <span className="text-rose-500 font-bold tabular-nums">
-              {mortalityCount} {t("common.birds")}
-              {mortKg > 0 ? (
-                <>
-                  <span className="text-rose-300 font-medium"> · </span>
-                  {Number(mortKg).toFixed(2)} {t("common.kg")}
-                </>
-              ) : null}
-            </span>
-          </div>
-        )}
-
-        {selectedBoxes.length > 0 && (
-          <div
-            className={`flex items-center gap-1.5 px-2 py-1.5 bg-slate-100/70 rounded-md border border-slate-200/40 overflow-x-auto no-scrollbar ${
-              manyBoxes ? "text-[9px]" : "text-[10px]"
-            }`}
-          >
-            <span className="text-slate-400 font-semibold flex items-center gap-1 shrink-0 text-[9px] uppercase">
-              <Package size={11} className="text-slate-500" /> {t("ops.trip.box_nos")}:
-            </span>
-            <div className={`flex items-center flex-wrap ${manyBoxes ? "gap-0.5" : "gap-1"}`}>
-              {selectedBoxes.map((id, idx) => (
-                <span
-                  key={id}
-                  className={`rounded border font-bold shrink-0 ${
-                    manyBoxes ? "px-1 py-px text-[9px]" : "px-1.5 py-0.5 text-[10px]"
-                  } ${BOX_CHIP_PALETTE[idx % BOX_CHIP_PALETTE.length]}`}
-                >
-                  {String(id).padStart(2, "0")}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Weight Loss first, then Remarks (weight mode) */}
-        {(row.remarks || isWeightMode) && (
-          <div
-            className={`flex items-center gap-2 text-[10px] ${
-              isWeightMode ? "justify-between" : ""
-            }`}
-          >
-            {isWeightMode && (
-              <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-50/70 text-amber-600 border border-amber-100 font-bold tabular-nums text-[10px]">
-                {t("ops.trip.kpi_weight_loss")}: {weightLoss.toFixed(2)} {t("common.kg")}
-              </span>
-            )}
-            {row.remarks ? (
-              <p className="text-slate-500 px-0.5 truncate min-w-0 flex-1 text-right sm:text-left">
-                <span className="font-semibold text-slate-400 uppercase text-[9px]">{t("common.remarks")}: </span>
-                {row.remarks}
-              </p>
-            ) : (
-              <span className="flex-1" />
-            )}
-          </div>
-        )}
-
-        {/* Footer — bird type left, captured time right */}
-        <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
-          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
-            {mortalityCount > 0 && (
-              <span
-                className="px-1.5 py-px rounded bg-rose-50/70 text-rose-500 border border-rose-100 shrink-0 flex items-center gap-1 text-[10px] font-bold"
-              >
-                <AlertCircle size={11} className="text-rose-300 stroke-[2.5]" />
-                <span>{mortalityCount}</span>
-              </span>
-            )}
-            {row.birdType ? (
-              <span className="px-1.5 py-px rounded bg-blue-50/70 text-blue-500 font-semibold text-[10px] border border-blue-100 shrink-0">
-                {row.birdType}
-              </span>
-            ) : null}
-          </div>
-          <div className="ml-auto flex shrink-0 items-center justify-end gap-1 text-slate-600">
-            <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
-              <Clock size={11} className="stroke-[2]" />
-            </span>
-            <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
-              {capturedTime}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="grid min-w-[1100px] grid-cols-[3rem_3.5rem_minmax(12rem,1.5fr)_repeat(5,minmax(5.5rem,1fr))_minmax(11rem,1.3fr)_8rem] items-center gap-2 border-b border-slate-100 bg-white px-3 py-2 text-xs last:border-b-0 hover:bg-slate-50/70">
+    <div className="text-center font-bold text-slate-500">{row.serialNo ?? "—"}</div>
+    <div className="flex justify-center"><span title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")} aria-label={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${isWeightMode ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>{isWeightMode ? <Scale size={16} /> : <Package size={16} />}</span></div>
+    <div className="min-w-0"><div className="truncate font-bold text-slate-800">{shopName}</div>{row.subShopName || row.remarks ? <div className="truncate text-[10px] text-slate-500">{[row.subShopName, row.remarks].filter(Boolean).join(", ")}</div> : null}</div>
+    <div className="flex justify-center"><BoxDetailsTooltip boxes={boxes} row={row} emptyLabel={t("ops.trip.not_entered")} /></div>
+    <div className="text-center font-bold text-blue-600">{row.birds || 0}</div><div className="text-center font-bold text-slate-800">{Number(row.weight || 0).toFixed(2)}</div><div className="text-center font-bold text-amber-600">{isWeightMode ? weightLoss.toFixed(2) : "—"}</div>
+    <div className="text-center font-bold text-rose-600">{Number(row.mortality || 0).toLocaleString()}{Number(row.mortKg || 0) > 0 ? <span className="block text-[10px] font-medium text-rose-400">{Number(row.mortKg).toFixed(2)} kg</span> : null}</div>
+    <div className="flex justify-center"><span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-50 px-2 py-1.5 text-[10px] font-semibold text-indigo-700"><Clock3 size={12} />{capturedTime}</span></div>
+    <div className="flex justify-end gap-1">{communicationEnabled && onSendEmail ? <CommunicationButton kind="mail" busy={emailSending || emailStatus === "sending"} count={emailSendCount} disabled={emailDisabled} onClick={() => onSendEmail(row)} label={t("ops.trip.send_email")} /> : null}{communicationEnabled && onSendWhatsApp ? <CommunicationButton kind="whatsapp" busy={whatsappSending || whatsappStatus === "sending"} count={whatsappSendCount} disabled={whatsappDisabled} onClick={() => onSendWhatsApp(row)} label={t("ops.trip.send_whatsapp")} /> : null}{!readOnly ? <button type="button" onClick={() => onEdit(row)} className="rounded-lg border border-slate-200 p-1.5 text-blue-500 hover:bg-blue-50" aria-label={t("ops.trip.edit_shop_delivery")}><Pencil size={13} /></button> : null}<button type="button" onClick={() => onPDF(row)} className="rounded-lg border border-slate-200 p-1.5 text-rose-500 hover:bg-rose-50" aria-label={t("ops.trip.download_pdf")}><FileText size={13} /></button></div>
+  </div>;
 }

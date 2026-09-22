@@ -43,10 +43,10 @@ export default function GeneralExpensesTable({
       e.preventDefault();
     }
   };
-  /** Block mouse-wheel from changing focused number values. */
+  /** Blur on wheel so focused number fields don't nudge values while scrolling.
+   *  Do not call preventDefault — React registers wheel as passive. */
   const blockWheelChange = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
-    e.preventDefault();
   };
 
   /** Shared number-input class: no spinners, no accidental scroll edits. */
@@ -96,7 +96,7 @@ export default function GeneralExpensesTable({
 
   const currentEndMeter = Number(sheetData.endMeter);
   const hasEndMeter = sheetData.endMeter !== undefined && sheetData.endMeter !== null && sheetData.endMeter !== "";
-  // End meter must be ≥ highest of: start / farm dest / any diesel reading.
+  // End meter may equal, but cannot be below, the latest trip reading.
   const isEndMeterInvalid =
     hasEndMeter &&
     requiredMinMeter > 0 &&

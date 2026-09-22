@@ -260,7 +260,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               <Store size={20} />
             </span>
             <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
-            <p className="text-xs font-medium text-slate-500">{t("ops.rate.no_waiting_trips")}</p>
           </div>
         ) : (
           <>

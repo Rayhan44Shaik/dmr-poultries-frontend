@@ -217,8 +217,7 @@ export default function StepPickup({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Which DC-photo slot (0 or 1) the picker was opened for.
   const slotIndexRef = useRef(0);
-  const [savedPhotoKeys, setSavedPhotoKeys] = useState(() => photosFromTrip(trip).map((photo) => photo.key));
-
+  const [, setSavedPhotoKeys] = useState(() => photosFromTrip(trip).map((photo) => photo.key));
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
@@ -240,13 +239,14 @@ export default function StepPickup({
   const pickupDraftFingerprint = useMemo(
     () =>
       JSON.stringify({
+        legIndex: Number(trip.activeLegIndex ?? 1),
         boxes: rows.map((row) =>
           Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid"))
         ),
         removedBoxNos,
         photoKeys: photos.map((p) => p.key),
       }),
-    [rows, removedBoxNos, photos]
+    [trip.activeLegIndex, rows, removedBoxNos, photos]
   );
   const hasUnsavedChanges = pickupDraftFingerprint !== lastSavedFingerprint;
   const pickupLocked = Boolean(trip.pickupStepSubmitted) && !editable && !isLocalEditing;
@@ -262,6 +262,7 @@ export default function StepPickup({
           Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail
       );
       const payload = {
+        activeLegIndex: Number(trip.activeLegIndex ?? 1),
         boxDetails,
         removedBoxNos,
         ...(photos[0]
@@ -280,6 +281,7 @@ export default function StepPickup({
           : {}),
       } as Partial<Trip>;
       const fingerprint = JSON.stringify({
+        legIndex: Number(trip.activeLegIndex ?? 1),
         boxes: boxDetails,
         removedBoxNos,
         photoKeys: photos.map((p) => p.key),
@@ -570,7 +572,7 @@ export default function StepPickup({
         return;
       }
       const next: PickupPhoto = {
-        key: `dc_photo_${trip.id}_${photos.length + 1}_${Date.now()}`,
+        key: `${trip.tripNo || `trip-${trip.id}`}-load-${Number(trip.activeLegIndex ?? 1)}-photo-${photos.length + 1}-${Date.now()}`,
         mime: result.mime,
         data,
       };
@@ -625,13 +627,15 @@ export default function StepPickup({
   const downloadImage = async () => {
     if (!beginAction("image")) return;
     try {
-      if (!photos[0]?.data) return;
-      const link = document.createElement("a");
-      link.href = photos[0].data;
-      link.download = `DC_Photo_${trip.tripNo || "trip"}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      if (!photos.length) return;
+      photos.forEach((photo, index) => {
+        const link = document.createElement("a");
+        link.href = photo.data;
+        link.download = `${trip.tripNo || "trip"}-load-${Number(trip.activeLegIndex ?? 1)}-pickup-${index + 1}.jpg`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
     } catch (error) {
       console.error("Failed to download image:", error);
       setToast({ message: t("ops.trip.failed_download_image"), type: "error" });
@@ -843,14 +847,28 @@ export default function StepPickup({
           />
         </div>
 
-        {/* DC Photo Status Card */}
+        {/* Load-scoped submitted DC photos — visible for inspection, not only PDF. */}
         {photos.length > 0 && (
-          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-[13px] font-medium text-slate-700 flex-wrap">
-            <span className="h-5 w-5 rounded-md bg-emerald-50/80 text-emerald-500 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
-            <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
-            {photos.map((p) => (
-              <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
-            ))}
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-slate-700">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-50/80 text-emerald-500"><Camera size={16} /></span>
+              <span>{t("ops.trip.photos_uploaded", { count: photos.length })} · Load {Number(trip.activeLegIndex ?? 1)}</span>
+            </div>
+            <div className={`grid gap-3 ${photos.length > 1 ? "sm:grid-cols-2" : "grid-cols-1"}`}>
+              {photos.map((photo, index) => (
+                <a
+                  key={photo.key}
+                  href={photo.data}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  aria-label={`View Load ${Number(trip.activeLegIndex ?? 1)} pickup photo ${index + 1}`}
+                >
+                  <img src={photo.data} alt={`Load ${Number(trip.activeLegIndex ?? 1)} pickup ${index + 1}`} className="h-40 w-full object-contain transition-transform duration-200 group-hover:scale-[1.02]" />
+                  <span className="block border-t border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500">Photo {index + 1} · Click to view</span>
+                </a>
+              ))}
+            </div>
           </div>
         )}
 

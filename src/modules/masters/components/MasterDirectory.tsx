@@ -24,7 +24,6 @@ import {
   FileText,
   FileSpreadsheet,
   Pencil,
-  Trash2,
   type LucideIcon,
 } from "lucide-react";
 import { useI18n } from "../../../i18n";
@@ -473,23 +472,10 @@ export function MasterEditButton({
   );
 }
 
-export function MasterDeleteButton({
-  onClick,
-  ariaLabel,
-}: {
+export function MasterDeleteButton(_props: {
   onClick: () => void;
   ariaLabel: string;
 }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-100 bg-red-50/70 text-red-600 transition-all hover:-translate-y-0.5 hover:bg-red-100 hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
-      aria-label={ariaLabel}
-    >
-      <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
-        <Trash2 size={14} />
-      </span>
-    </button>
-  );
+  void _props;
+  return null;
 }

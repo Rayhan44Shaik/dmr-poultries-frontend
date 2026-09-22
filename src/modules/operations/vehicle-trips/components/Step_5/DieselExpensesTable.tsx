@@ -97,6 +97,7 @@ export default function DieselExpensesTable({
   showNotification,
   readOnly = false,
 }: DieselExpensesTableProps) {
+  const gpsRequestRef = useRef<Record<number, number>>({});
   const { t } = useI18n();
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
   const [toastMessage, setToastMessage] = useState<{ message: string; type: "warning" | "error" | "success" } | null>(null);
@@ -149,10 +150,10 @@ export default function DieselExpensesTable({
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
   };
-  /** Block mouse-wheel from changing focused number values. */
+  /** Blur on wheel so focused number fields don't nudge values while scrolling.
+   *  Do not call preventDefault — React registers wheel as passive. */
   const blockWheelChange = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
-    e.preventDefault();
   };
 
   const getFieldValue = (field: string, num: number) => {
@@ -369,6 +370,8 @@ export default function DieselExpensesTable({
 
   const handleClearRow = (num: number) => {
     if (sheetData[`dieselSubmitted${num}`]) return;
+    gpsRequestRef.current[num] = (gpsRequestRef.current[num] ?? 0) + 1;
+    setIsFetchingGPS((prev) => ({ ...prev, [num]: false }));
     applyBatchUpdates({
       [`dieselLtr${num}`]: "",
       [`dieselRate${num}`]: "",
@@ -393,6 +396,8 @@ export default function DieselExpensesTable({
   };
 
   const handleGetLocation = (index: number) => {
+    const requestId = (gpsRequestRef.current[index] ?? 0) + 1;
+    gpsRequestRef.current[index] = requestId;
     setIsFetchingGPS((prev) => ({ ...prev, [index]: true }));
     // Prefer a nearby already-captured diesel/farm point as silent fallback.
     let preferLat: number | null = null;
@@ -406,7 +411,8 @@ export default function DieselExpensesTable({
         break;
       }
     }
-    void captureGpsQuiet({ preferLat, preferLon }).then((gps) => {
+    void captureGpsQuiet({ preferLat, preferLon, timeoutMs: 3000 }).then((gps) => {
+      if (gpsRequestRef.current[index] !== requestId) return;
       applyBatchUpdates({
         [`dieselGpsLat${index}`]: gps.latitude,
         [`dieselGpsLon${index}`]: gps.longitude,
@@ -422,12 +428,12 @@ export default function DieselExpensesTable({
   const absoluteDestMeter = destMeter || 0;
 
   /**
-   * Each diesel meter must be ≥ the previous reading:
-   *   row 1  ≥ farm dest meter
-   *   row N  ≥ previous filled bill meter (by visible order)
+   * Each diesel meter must be greater than the previous reading:
+   *   row 1  > latest destination meter
+   *   row N  > previous filled bill meter (by visible order)
    */
   const getMinAllowedMeter = (num: number, overrideData?: Record<string, unknown>) => {
-    const baseLabel = t("ops.trip.farm_meter_label", { meter: absoluteDestMeter });
+    const baseLabel = t("ops.trip.last_entered_meter_label", { meter: absoluteDestMeter });
     const ordered = [...rowIndices].sort((a, b) => a - b);
     const pos = ordered.indexOf(num);
     const prior = pos > 0 ? ordered.slice(0, pos).reverse() : [];
@@ -493,7 +499,7 @@ export default function DieselExpensesTable({
       return t("ops.trip.meter_chain_banner", {
         sno: issue.sno,
         meter: issue.meter,
-        prevSno: issue.prevSno === "Farm" ? t("ops.trip.dest_farm_meter") : issue.prevSno,
+        prevSno: issue.prevSno === "Farm" ? t("ops.trip.last_entered_meter") : issue.prevSno,
         prevMeter: issue.prevMeter,
       });
     },
@@ -552,6 +558,10 @@ export default function DieselExpensesTable({
     if (value === "" || value == null) return null;
     const n = Number(value);
     if (!Number.isFinite(n)) return null;
+    const endMeter = Number(overrideData?.endMeter ?? draftData.endMeter ?? sheetData.endMeter ?? 0);
+    if (endMeter > 0 && n > endMeter) {
+      return t("ops.trip.meter_exceeds_end", { meter: endMeter });
+    }
     const { minAllowed } = getMinAllowedMeter(num, overrideData);
     if (minAllowed > 0 && isMeterInvalid(n, minAllowed)) {
       // Prefer S.No-style message when the previous bar is another diesel row.
@@ -622,31 +632,48 @@ export default function DieselExpensesTable({
 
   const rowBlockReason = (num: number, useDraft = false): string | null => {
     const data = useDraft && editingRow === num ? draftData : sheetData;
-    if (meterErrors[num]) return meterErrors[num];
-    if (!isPositive(data[`dieselLtr${num}`])) return t("ops.trip.diesel_ltr_required");
-    if (!isPositive(data[`dieselRate${num}`])) return t("ops.trip.rate_required");
+    const reasons: string[] = [];
+    if (meterErrors[num]) reasons.push(meterErrors[num]);
+    if (!isPositive(data[`dieselLtr${num}`])) reasons.push(t("ops.trip.diesel_ltr_required"));
+    if (!isPositive(data[`dieselRate${num}`])) reasons.push(t("ops.trip.rate_required"));
     if (!isPositive(Number(data[`dieselLtr${num}`]) * Number(data[`dieselRate${num}`]))) {
-      return t("ops.trip.amount_greater_zero");
+      reasons.push(t("ops.trip.amount_greater_zero"));
     }
-    if (!isPositive(data[`dieselMeter${num}`])) return t("ops.trip.reading_required");
+    if (!isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
     const meterErr = meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
-    if (meterErr) return meterErr;
+    if (meterErr && !reasons.includes(meterErr)) reasons.push(meterErr);
     const later = laterBillsBlocking(num, useDraft);
     if (later.length > 0) {
       const issue = later[0];
-      return t("ops.trip.meter_later_below", {
+      reasons.push(t("ops.trip.meter_later_below", {
         sno: snoForRow(num),
         meter: Number(data[`dieselMeter${num}`]),
         laterSno: issue.sno,
         laterMeter: issue.meter,
-      });
+      }));
     }
     // GPS is mandatory; bunk city is optional free-text (Kodad / Vijayawada…).
     if (!isValidGps(data[`dieselGpsLat${num}`], data[`dieselGpsLon${num}`])) {
-      return t("ops.trip.gps_must_captured");
+      reasons.push(t("ops.trip.gps_must_captured"));
     }
-    if (!hasRealBill(data[`dieselImage${num}`])) return t("ops.trip.bill_image_required");
-    return null;
+    if (!hasRealBill(data[`dieselImage${num}`])) reasons.push(t("ops.trip.bill_image_required"));
+    const meter = Number(data[`dieselMeter${num}`]);
+    const image = String(data[`dieselImage${num}`] || "");
+    const clientKey = String(data[`dieselClientKey${num}`] || "");
+    for (const other of rowIndices) {
+      if (other === num || !dieselSlotActive(sheetData, other)) continue;
+      if (meter > 0 && Number(sheetData[`dieselMeter${other}`]) === meter) {
+        reasons.push(t("ops.trip.duplicate_diesel_meter", { row: snoForRow(other), meter }));
+      }
+      if (image && image === String(sheetData[`dieselImage${other}`] || "")) {
+        reasons.push(t("ops.trip.duplicate_diesel_bill", { row: snoForRow(other) }));
+      }
+      if (clientKey && clientKey === String(sheetData[`dieselClientKey${other}`] || "")) {
+        reasons.push(t("ops.trip.duplicate_diesel_entry", { row: snoForRow(other) }));
+      }
+    }
+    const unique = Array.from(new Set(reasons));
+    return unique.length ? unique.map((reason) => `• ${reason}`).join("\n") : null;
   };
 
   /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows).
@@ -741,7 +768,7 @@ export default function DieselExpensesTable({
     const liveMeterErr = meterViolation(num, dataForCheck[`dieselMeter${num}`], useDraft ? dataForCheck : undefined);
     if (liveMeterErr) {
       setMeterErrors((prev) => ({ ...prev, [num]: liveMeterErr }));
-      // Top banner beside Destination Farm Meter is the single visible message.
+      // The top banner beside Last Entered Meter is the single visible message.
       return;
     }
 
@@ -911,11 +938,11 @@ export default function DieselExpensesTable({
               >
                 <Gauge size={12} />
                 <span>
-                  {t("ops.trip.dest_farm_meter")} :-{" "}
+                  {t("ops.trip.last_entered_meter")} :-{" "}
                   {absoluteDestMeter > 0 ? `${absoluteDestMeter} KM` : t("ops.trip.dest_meter_missing")}
                 </span>
               </div>
-              {/* Meter chain error — once only, beside Destination Farm Meter */}
+              {/* Meter chain error — once only, beside Last Entered Meter */}
               {chainBannerMessages[0] ? (
                 <div
                   className="inline-flex items-start gap-1.5 max-w-full sm:max-w-xl rounded-md border border-red-100 bg-red-50/70 px-2.5 py-1.5 text-[12px] font-semibold text-red-500 leading-snug shadow-sm"
@@ -1107,7 +1134,7 @@ export default function DieselExpensesTable({
                           const err = meterViolation(num, v, editingRow === num ? draftData : undefined);
                           if (err) {
                             setMeterErrors((prev) => ({ ...prev, [num]: err }));
-                            // Message shows once at top beside Destination Farm Meter — no toast duplicate.
+                            // Message shows once at top beside Last Entered Meter — no toast duplicate.
                           }
                         }}
                         placeholder="0"
@@ -1286,7 +1313,7 @@ export default function DieselExpensesTable({
         const isEditingActionRow = editingRow === actionRow;
         const reason = rowBlockReason(actionRow, isEditingActionRow);
         const canSubmit = rowReady(actionRow, isEditingActionRow);
-        // Meter chain messages already show once at top beside Destination Farm Meter.
+        // Meter chain messages already show once at top beside Last Entered Meter.
         const isMeterReason =
           !!reason &&
           (reason === meterErrors[actionRow] ||

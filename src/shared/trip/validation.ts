@@ -82,10 +82,49 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (required("destMeter") && (!trip.destMeter || trip.destMeter <= 0)) {
     errors.push("Valid Farm Meter reading is required.");
   }
-  const startMeter = trip.openingMeter;
-  if (trip.destMeter != null && startMeter != null && trip.destMeter <= startMeter) {
+  const legIndex = Math.max(1, Number(trip.activeLegIndex ?? 1));
+  let floor = trip.openingMeter != null && trip.openingMeter > 0 ? Number(trip.openingMeter) : 0;
+  let floorLabel = "Step 1 starting meter";
+  if (legIndex > 1) {
+    const prev = trip.legs?.find((l) => l.legIndex === legIndex - 1);
+    const prevDest = prev?.destMeter != null && Number(prev.destMeter) > 0 ? Number(prev.destMeter) : 0;
+    const dieselMax = Math.max(
+      0,
+      ...(trip.dieselEntries ?? [])
+        .map((e) => Number(e.meter ?? 0))
+        .filter((n) => Number.isFinite(n) && n > 0)
+    );
+    floor = Math.max(prevDest, dieselMax);
+    floorLabel =
+      dieselMax >= prevDest && dieselMax > 0
+        ? "last diesel meter on this trip"
+        : `Load ${legIndex - 1} farm meter`;
+  }
+  if (trip.destMeter != null && floor > 0 && trip.destMeter <= floor) {
     errors.push(
-      `Farm meter (${trip.destMeter} KM) must be strictly greater than the Step 1 starting meter (${startMeter} KM).`
+      `Farm meter (${trip.destMeter} KM) must be strictly greater than the ${floorLabel} (${floor} KM).`
+    );
+  }
+  const activeLeg = trip.legs?.find((l) => Number(l.legIndex) === legIndex);
+  const activeSubmittedMs = activeLeg?.farmStepSubmittedAt
+    ? Date.parse(activeLeg.farmStepSubmittedAt)
+    : Number.NaN;
+  const laterReadings = [
+    ...(trip.legs ?? [])
+      .filter((l) => Number(l.legIndex) > legIndex)
+      .map((l) => Number(l.destMeter ?? 0)),
+    ...(trip.dieselEntries ?? [])
+      .filter((entry) => {
+        if (!Number.isFinite(activeSubmittedMs) || !entry.submittedAt) return false;
+        return Date.parse(entry.submittedAt) > activeSubmittedMs;
+      })
+      .map((entry) => Number(entry.meter ?? 0)),
+    Number(trip.closingMeter ?? 0),
+  ].filter((meter) => Number.isFinite(meter) && meter > 0);
+  const nextReading = laterReadings.length ? Math.min(...laterReadings) : 0;
+  if (trip.destMeter != null && nextReading > 0 && trip.destMeter >= nextReading) {
+    errors.push(
+      `Farm meter (${trip.destMeter} KM) must be less than the next entered meter (${nextReading} KM).`
     );
   }
   const tolls = Number(trip.pickupTolls ?? 0);
@@ -260,8 +299,20 @@ export function validateEndStep(trip: Trip): TripValidationResult {
   if (required("closingMeter") && (!trip.closingMeter || trip.closingMeter <= 0)) {
     errors.push("Valid End Meter reading is required.");
   }
-  if (trip.closingMeter <= trip.destMeter && trip.destMeter > 0) {
-    errors.push("Closing Meter cannot be less than the Destination Meter.");
+  const maxDest = Math.max(
+    0,
+    Number(trip.destMeter ?? 0),
+    ...(trip.legs ?? []).map((l) => Number(l.destMeter ?? 0))
+  );
+  const dieselMax = Math.max(
+    0,
+    ...(trip.dieselEntries ?? [])
+      .map((e) => Number(e.meter ?? 0))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  );
+  const floor = Math.max(Number(trip.openingMeter ?? 0), maxDest, dieselMax);
+  if (floor > 0 && trip.closingMeter < floor) {
+    errors.push(`Closing Meter must be greater than or equal to the last entered meter (${floor} KM).`);
   }
   if (required("deliveryTolls")) {
     const tolls = Number(trip.deliveryTolls ?? trip.destinationTolls);

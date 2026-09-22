@@ -188,7 +188,7 @@ function formToTripPatch(form: Step1FormState): Partial<Trip> {
 }
 
 
-// ── Trip date (editable on first create; locked after submit) ────────────────
+// ── Trip date (editable on create and while Step 1 edit mode is open) ────────
 
 const TripDateField = React.memo(function TripDateField({
   tripDate,
@@ -689,14 +689,15 @@ function StepStart({
   useEffect(() => { formRef.current = form; }, [form]);
   const submitLockRef = useRef(false);
 
-  // Preview next TR-YYYYMMDD-NNN for the selected date (create only).
-  // Server remains authoritative on submit; this is operator guidance.
+  // Preview the date sequence for create and date-changing edit.
   useEffect(() => {
-    if (startStepSubmitted || tripId > 0) {
+    const date = form.tripDate?.trim();
+    const originalDate = String(loadSnapshot.tripDate || "").slice(0, 10);
+    const dateChangingEdit = tripId > 0 && date !== originalDate;
+    if ((tripId > 0 && !dateChangingEdit) || (startStepSubmitted && !isLocalEditing && !editable)) {
       setPreviewTripNo("");
       return;
     }
-    const date = form.tripDate?.trim();
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       setPreviewTripNo("");
       return;
@@ -715,7 +716,7 @@ function StepStart({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [form.tripDate, startStepSubmitted, tripId]);
+  }, [editable, form.tripDate, isLocalEditing, loadSnapshot.tripDate, startStepSubmitted, tripId]);
 
   const handleTripDateChange = useCallback(
     (date: string) => {
@@ -1211,8 +1212,8 @@ function StepStart({
               {t("ops.trip.title.start")}
             </h3>
             <TripNoBadge
-              tripNo={tripNo || loadSnapshot.tripNo || previewTripNo}
-              provisional={!tripNo && !loadSnapshot.tripNo && Boolean(previewTripNo)}
+              tripNo={previewTripNo || tripNo || loadSnapshot.tripNo}
+              provisional={Boolean(previewTripNo)}
             />
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1237,8 +1238,8 @@ function StepStart({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
           <TripDateField
             tripDate={form.tripDate || loadSnapshot.tripDate}
-            editable={!startStepSubmitted}
-            disabled={inputsLocked || startStepSubmitted}
+            editable={!startStepSubmitted || isLocalEditing || editable}
+            disabled={inputsLocked}
             language={language}
             onChange={handleTripDateChange}
           />

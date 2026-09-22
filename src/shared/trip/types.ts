@@ -17,6 +17,7 @@ export interface ShopDelivery {
   boxNo: number;
   shopId: number;
   shopName: string;
+  subShopName?: string;
   birdTypeId: number;
   birdType: string;
   birds: number;
@@ -46,6 +47,53 @@ export interface BoxDetail {
   avgWeight?: number | null;
 }
 
+/** One Farm→Pickup→Deliveries cycle on the same Draft trip (max 4). */
+export interface TripLeg {
+  id: number;
+  tripId: number;
+  legIndex: number;
+  sourceFarmId: number | null;
+  sourceFarm: string | null;
+  destMeter: number | null;
+  pickupTolls?: number;
+  farmAddress?: string | null;
+  avgBirdWeight?: number | null;
+  farmRemarks?: string | null;
+  farmBirdTypeId?: number | null;
+  farmBirdType?: string | null;
+  farmBirdCount?: number | null;
+  farmLoadWeight?: number | null;
+  farmGpsLat?: number | null;
+  farmGpsLon?: number | null;
+  farmGpsAccuracy?: number | null;
+  farmGpsTime?: string | null;
+  farmStepSubmitted: boolean;
+  farmStepSubmittedAt?: string | null;
+  reachedTime?: string | null;
+  dcWeight: number;
+  totalBirds: number;
+  boxes: number;
+  avgWeight: number;
+  pickupLoadTime?: string | null;
+  dcPhotoKey?: string | null;
+  pickupStepSubmitted: boolean;
+  pickupStepSubmittedAt?: string | null;
+  deliveryStepSubmitted: boolean;
+  deliveriesStepSubmittedAt?: string | null;
+  boxDetails?: BoxDetail[];
+  deliveries?: ShopDelivery[];
+}
+
+export interface TripLoadSummary {
+  load: number;
+  birds: number;
+  weight: number;
+  mortality: number;
+  mortalityWeight: number;
+  weightLoss: number;
+  shops: number;
+}
+
 export interface PerBoxDelivery {
   boxNo: number;
   birds: number;
@@ -60,6 +108,15 @@ export interface Trip {
   id: number;
   tripNo: string;
   tripDate: string;
+  /** Number of Farm→Pickup→Delivery loads (1–4). */
+  legCount?: number;
+  /** Active load while editing steps 2–4 (1-based). */
+  activeLegIndex?: number;
+  legs?: TripLeg[];
+  /** Count of loads whose Step 2 has been submitted. */
+  submittedLoadCount?: number;
+  /** Recent-table totals for each load whose Step 4 has been submitted. */
+  loadSummaries?: TripLoadSummary[];
 
   startTime: string;
   vehicleId: number;

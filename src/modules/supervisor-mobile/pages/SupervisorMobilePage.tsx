@@ -629,9 +629,6 @@ function SupervisorTripWorkspace({ supervisor }: { supervisor: MobileSupervisorP
           editable={isEditable(farmCompleted)}
           canEdit={false}
           onCancel={closeToDrafts}
-          showNotification={(message, type) =>
-            showNotification(message, type === "warning" ? "info" : type)
-          }
         />
       );
     }

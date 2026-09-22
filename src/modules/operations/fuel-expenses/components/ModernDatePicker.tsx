@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, type MouseEventHandler } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { Calendar } from "lucide-react";
@@ -12,7 +12,15 @@ interface Props {
   id?: string;
 }
 
-const CustomInput = forwardRef<HTMLInputElement, any>(({ value, onClick, placeholder, className, id }, ref) => (
+interface CustomInputProps {
+  value?: string;
+  onClick?: MouseEventHandler<HTMLInputElement>;
+  placeholder?: string;
+  className?: string;
+  id?: string;
+}
+
+const CustomInput = forwardRef<HTMLInputElement, CustomInputProps>(({ value, onClick, placeholder, className, id }, ref) => (
   <div className="relative">
     <input
       ref={ref}
@@ -41,6 +49,7 @@ export function ModernDatePicker({ selected, onChange, placeholder, label, class
         popperClassName="!z-50"
         popperPlacement="bottom-start"
         className="w-full"
+        wrapperClassName="w-full"
         showYearDropdown
         showMonthDropdown
         dropdownMode="select"

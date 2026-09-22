@@ -45,6 +45,7 @@ import StepDeliveries from "./StepDeliveries";
 
 import TripWizardStepper from "./TripWizardStepper.tsx";
 import TripFinalKPI from "./TripFinalKPI";
+import { loadTripById } from "../services/tripHeaderApiService";
 
 interface Props {
   open: boolean;
@@ -240,7 +241,14 @@ function TripViewModal({
   };
   const [viewStepIndex, setViewStepIndex] = useState(() => initialViewStep(trip));
   const [lastTripId, setLastTripId] = useState<number | null>(trip?.id ?? null);
-  const displayTrip = useMemo(() => (trip ? localizeTripForView(trip, language) : null), [trip, language]);
+  const [selectedLoadTrip, setSelectedLoadTrip] = useState<Trip | null>(trip);
+  const [selectedLoadIndex, setSelectedLoadIndex] = useState(() => Number(trip?.activeLegIndex ?? 1));
+  const [loadViewBusy, setLoadViewBusy] = useState(false);
+  const activeViewTrip = selectedLoadTrip?.id === trip?.id ? selectedLoadTrip : trip;
+  const displayTrip = useMemo(
+    () => (activeViewTrip ? localizeTripForView(activeViewTrip, language) : null),
+    [activeViewTrip, language]
+  );
   const displayShops = useMemo(() => localizeShopsForView(shops, language), [shops, language]);
   const displayBirdTypes = useMemo(() => localizeBirdTypesForView(birdTypes, language), [birdTypes, language]);
   const localizedStepLabels = useMemo(
@@ -257,10 +265,12 @@ function TripViewModal({
   if (trip && trip.id !== lastTripId) {
     setLastTripId(trip.id);
     setViewStepIndex(initialViewStep(trip));
+    setSelectedLoadTrip(trip);
+    setSelectedLoadIndex(Number(trip.activeLegIndex ?? 1));
   }
 
-  const emailState = useTripDeliveryEmails(trip, shops, { enabled: showCommunicationStatus });
-  const whatsappState = useTripDeliveryWhatsApps(trip, shops, { enabled: showCommunicationStatus });
+  const emailState = useTripDeliveryEmails(activeViewTrip, shops, { enabled: showCommunicationStatus });
+  const whatsappState = useTripDeliveryWhatsApps(activeViewTrip, shops, { enabled: showCommunicationStatus });
   const [communicationFeedback, setCommunicationFeedback] = useState<CommunicationFeedback | null>(null);
 
   useEffect(() => {
@@ -269,16 +279,41 @@ function TripViewModal({
     return () => window.clearTimeout(timeoutId);
   }, [communicationFeedback]);
 
+  // Recent/Trip List rows are lightweight summaries and intentionally omit
+  // base64 media. Hydrate the initially selected load as soon as View opens so
+  // submitted Step 3 shows its persisted, load-scoped photos (Load 1 included,
+  // without requiring the user to switch to another load and back).
+  useEffect(() => {
+    if (!open || !trip?.id) return;
+    let cancelled = false;
+    const loadIndex = Math.max(1, Number(trip.activeLegIndex ?? 1));
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setLoadViewBusy(true);
+      void loadTripById(trip.id, loadIndex)
+        .then((loaded) => {
+          if (cancelled) return;
+          setSelectedLoadTrip(loaded);
+          setSelectedLoadIndex(loadIndex);
+        })
+        .finally(() => {
+          if (!cancelled) setLoadViewBusy(false);
+        });
+    });
+    return () => { cancelled = true; };
+  }, [open, trip?.id, trip?.activeLegIndex]);
+
   if (!open || !trip) return null;
 
-  const viewTrip = displayTrip ?? trip;
+  const sourceViewTrip = activeViewTrip ?? trip;
+  const viewTrip = displayTrip ?? sourceViewTrip;
   const statusKey = `status.${String(trip.status || "pending").toLowerCase().replace(/\s+/g, "_")}`;
   const translatedStatus = t(statusKey);
   const viewStatus = language === "te" && translatedStatus !== statusKey ? translatedStatus : trip.status;
   const isCompleted = trip.status === "Completed" && isTripWizardComplete(trip);
 
-  const isStartCompleted = Boolean(trip.startStepSubmitted);
-  const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
+  const isStartCompleted = Boolean(sourceViewTrip.startStepSubmitted);
+  const isDeliveryCompleted = Boolean(sourceViewTrip.deliveryStepSubmitted);
   const isEndCompleted = isTripWizardComplete(trip);
   const completedMask = getTripWizardCompletedMask(trip);
   const maxAllowedViewStep = isTripWizardComplete(trip) ? 4 : getNextIncompleteTripStep(trip);
@@ -293,13 +328,13 @@ function TripViewModal({
             sent: emailCounts.sent,
             failed: emailCounts.failed,
             pending: emailCounts.pending,
-            byShop: (trip.deliveries || []).map((delivery) => ({
-              shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName,
+            byShop: (sourceViewTrip.deliveries || []).map((delivery) => ({
+              shopName: [cleanDeliveryShopName(delivery.shopName) || delivery.shopName, delivery.subShopName?.trim()].filter(Boolean).join(", "),
               status: emailState.effectiveStatus(delivery.id),
             })),
           }
         : null;
-    await generateTripReportPDF(trip, emailInfo);
+    await generateTripReportPDF(sourceViewTrip, emailInfo);
   };
 
   const showFeedback = (next: Omit<CommunicationFeedback, "id">) => {
@@ -307,26 +342,26 @@ function TripViewModal({
   };
 
   const handleSendOneEmail = async (delivery: ShopDelivery) => {
-    const sourceDelivery = trip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
+    const sourceDelivery = sourceViewTrip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
     const result = await emailState.sendOne(sourceDelivery);
     const fallbackMessage = result.status === "sending" ? t("ops.trip.sending_email") : t("ops.trip.unable_send_email");
     showFeedback({
       channel: "mail",
       type: result.success ? "success" : "error",
-      shopName: localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }) || t("ops.trip.shops"),
+      shopName: [localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }), sourceDelivery.subShopName?.trim()].filter(Boolean).join(", ") || t("ops.trip.shops"),
       message: result.success ? t("ops.trip.email_sent_toast") : language === "te" ? fallbackMessage : result.message,
       count: result.sendCount,
     });
   };
 
   const handleSendOneWhatsApp = async (delivery: ShopDelivery) => {
-    const sourceDelivery = trip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
+    const sourceDelivery = sourceViewTrip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
     const result = await whatsappState.sendOne(sourceDelivery);
     const fallbackMessage = result.status === "sending" ? t("ops.trip.sending_whatsapp") : t("ops.trip.unable_send_whatsapp");
     showFeedback({
       channel: "whatsapp",
       type: result.success ? "success" : "error",
-      shopName: localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }) || t("ops.trip.shops"),
+      shopName: [localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }), sourceDelivery.subShopName?.trim()].filter(Boolean).join(", ") || t("ops.trip.shops"),
       message: result.success ? t("ops.trip.whatsapp_sent_toast") : language === "te" ? fallbackMessage : result.message,
       count: result.sendCount,
     });
@@ -343,13 +378,13 @@ function TripViewModal({
       case 0:
         return isStartCompleted ? <Step1View trip={viewTrip} onClose={onClose} /> : emptyStep;
       case 1:
-        return trip.farmStepSubmitted ? (
+        return sourceViewTrip.farmStepSubmitted ? (
           <Step2View trip={viewTrip} birdTypes={displayBirdTypes} onClose={onClose} />
         ) : (
           emptyStep
         );
       case 2:
-        return trip.pickupStepSubmitted ? <Step3View trip={viewTrip} onClose={onClose} /> : emptyStep;
+        return sourceViewTrip.pickupStepSubmitted ? <Step3View trip={viewTrip} onClose={onClose} /> : emptyStep;
       case 3:
         return isDeliveryCompleted ? (
           <Step4View
@@ -528,7 +563,54 @@ function TripViewModal({
                 }
               }}
             />
-            <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
+            {safeViewStepIndex >= 1 && safeViewStepIndex <= 3 && (trip.legs?.length ?? 0) > 1 && (
+              <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Trip loads">
+                <div className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm">
+                  {(trip.legs ?? []).map((leg) => {
+                    const idx = Number(leg.legIndex);
+                    const active = selectedLoadIndex === idx;
+                    const available =
+                      safeViewStepIndex === 1
+                        ? Boolean(leg.farmStepSubmitted)
+                        : safeViewStepIndex === 2
+                          ? Boolean(leg.pickupStepSubmitted)
+                          : Boolean(leg.deliveryStepSubmitted);
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        disabled={!available || loadViewBusy}
+                        aria-pressed={active}
+                        onClick={() => {
+                          if (!available || active || loadViewBusy) return;
+                          setLoadViewBusy(true);
+                          void loadTripById(trip.id, idx)
+                            .then((loaded) => {
+                              setSelectedLoadTrip(loaded);
+                              setSelectedLoadIndex(idx);
+                            })
+                            .finally(() => setLoadViewBusy(false));
+                        }}
+                        className={`inline-flex items-center rounded-md px-5 py-1.5 text-xs font-semibold transition-all ${
+                          active
+                            ? "bg-blue-50/80 text-blue-600 shadow-sm"
+                            : available
+                              ? "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
+                              : "cursor-not-allowed text-slate-300"
+                        }`}
+                      >
+                        {loadViewBusy && active ? <Loader2 size={12} className="mr-1 animate-spin" /> : null}
+                        Load {idx}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-xs font-medium text-slate-400">
+                  Viewing Load {selectedLoadIndex}
+                </span>
+              </div>
+            )}
+            <div key={`${trip.id}-load-${selectedLoadIndex}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
               {renderStepContent()}
             </div>
             <TripFinalKPI trip={viewTrip} deliveries={viewTrip.deliveries} />

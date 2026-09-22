@@ -1,12 +1,14 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, X } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
+import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { formatVehicleNumber } from "../../../../utils/format";
 import TripPagination from "./TripPagination";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
@@ -30,6 +32,74 @@ interface Props {
   onDelete?: (trip: Trip, reason: string) => void;
   // ✅ Updated: accept optional approvedBy parameter - now supports all valid status transitions
   onStatusChange?: (trip: Trip, status: TripStatus, approvedBy?: string) => void;
+}
+
+type LoadMetricKey = "birds" | "weight" | "weightLoss" | "mortality";
+
+function ShopsCell({ trip }: { trip: Trip }) {
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const deliveries = (trip.legs?.length ? trip.legs.flatMap((leg) => leg.deliveries ?? []) : trip.deliveries ?? []);
+  const shops = deliveries.map((delivery) => ({
+    id: delivery.id,
+    shop: cleanDeliveryShopName(delivery.shopName) || delivery.shopName || "—",
+    subShop: delivery.subShopName?.trim() || "",
+  }));
+  const openTooltip = (element: HTMLElement) => {
+    if (!shops.length) return;
+    const rect = element.getBoundingClientRect();
+    const estimatedHeight = Math.min(280, 54 + shops.length * 30);
+    const top = rect.bottom + estimatedHeight + 12 <= window.innerHeight ? rect.bottom + 8 : rect.top - estimatedHeight - 8;
+    setPosition({ left: Math.max(12, Math.min(window.innerWidth - 292, rect.left + rect.width / 2 - 140)), top: Math.max(8, top) });
+  };
+  return <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">
+    <span onMouseLeave={() => setPosition(null)}>
+      <button type="button" disabled={!shops.length} onMouseEnter={(event) => openTooltip(event.currentTarget)} onFocus={(event) => openTooltip(event.currentTarget)} onBlur={() => setPosition(null)} className={shops.length ? "rounded border-b border-dotted border-slate-400 px-0.5 font-bold focus:outline-none focus:ring-2 focus:ring-blue-300" : "font-bold"}>{trip.totalShops}</button>
+      {position && createPortal(<span role="tooltip" style={{ left: position.left, top: position.top }} className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
+        <span className="mb-2 block border-b border-slate-100 pb-2 text-[11px] font-bold text-slate-700">Shops / Sub Shops</span>
+        <span className="block max-h-56 space-y-1 overflow-y-auto">{shops.map((item, index) => <span key={`${item.id}-${index}`} className="block rounded-md bg-slate-50 px-2 py-1.5 text-[11px]"><span className="font-semibold text-slate-800">{item.shop}</span>{item.subShop ? <span className="text-blue-600">, {item.subShop}</span> : null}</span>)}</span>
+      </span>, document.body)}
+    </span>
+  </td>;
+}
+
+function LoadMetricCell({
+  trip,
+  metric,
+  value,
+  className,
+}: {
+  trip: Trip;
+  metric: LoadMetricKey;
+  value: string;
+  className: string;
+}) {
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const loads = (trip.loadSummaries ?? []).filter((load) => load.load > 0);
+  const showBreakdown = loads.length > 1;
+  const unit = metric === "birds" || metric === "mortality" ? "" : " kg";
+  const label = metric === "weightLoss" ? "W.L" : metric === "mortality" ? "Mortality" : metric === "weight" ? "Weight" : "Birds";
+  const format = (amount: number) => metric === "birds" || metric === "mortality"
+    ? Math.round(amount).toLocaleString()
+    : Number(amount || 0).toFixed(2);
+  const openTooltip = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const estimatedHeight = 54 + loads.length * 32;
+    const top = rect.bottom + estimatedHeight + 12 <= window.innerHeight ? rect.bottom + 8 : rect.top - estimatedHeight - 8;
+    setTooltipPosition({ left: Math.max(12, Math.min(window.innerWidth - 232, rect.left + rect.width / 2 - 110)), top: Math.max(8, top) });
+  };
+
+  return (
+    <td className={`px-4 py-3 text-center text-xs font-bold ${className}`}>
+      <span className="inline-flex items-center justify-center" onMouseLeave={() => setTooltipPosition(null)}>
+        {showBreakdown ? <button type="button" aria-label={`${label} by load`} onMouseEnter={(event) => openTooltip(event.currentTarget)} onFocus={(event) => openTooltip(event.currentTarget)} onBlur={() => setTooltipPosition(null)} className="rounded border-b border-dotted border-current px-0.5 font-bold focus:outline-none focus:ring-2 focus:ring-blue-300">{value}</button> : <span>{value}</span>}
+        {showBreakdown && tooltipPosition && createPortal(
+          <span role="tooltip" style={{ left: tooltipPosition.left, top: tooltipPosition.top }} className="pointer-events-none fixed z-[9999] w-[220px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl">
+            <span className="mb-2 block border-b border-slate-100 pb-2 font-bold text-slate-700">{label} by load</span>
+            {loads.map((load) => <span key={load.load} className="flex items-center justify-between gap-5 rounded-md px-1.5 py-1.5 odd:bg-slate-50"><span>Load {load.load}</span><span className="font-bold text-slate-900">{format(load[metric])}{unit}</span></span>)}
+          </span>, document.body)}
+      </span>
+    </td>
+  );
 }
 
 function TripRecentTable({
@@ -231,11 +301,14 @@ function TripRecentTable({
   }, [isPending]);
 
   const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-    // Do not hijack arrow/Enter keys from a row's select or View button.
-    if (event.target !== event.currentTarget) return;
+    const targetTag = (event.target as HTMLElement).tagName;
+    const isFormControl = targetTag === "SELECT" || targetTag === "INPUT" || targetTag === "TEXTAREA";
+    // Preserve native keyboard handling for editable/select controls inside a row.
+    if (isFormControl) return;
     const currentTrip = paginatedTrips[rowIndex];
     if (!currentTrip) return;
     if (event.key === "Enter" || event.key === " ") {
+      if (event.target !== event.currentTarget) return;
       event.preventDefault();
       selectRowFromKeyboard(currentTrip);
       return;
@@ -244,18 +317,28 @@ function TripRecentTable({
     event.preventDefault();
     const step = event.key === "ArrowDown" ? 1 : -1;
     let nextIndex = rowIndex + step;
-    while (nextIndex >= 0 && nextIndex < paginatedTrips.length && paginatedTrips[nextIndex]?.deleted) {
+    while (
+      nextIndex >= 0 &&
+      nextIndex < paginatedTrips.length &&
+      (paginatedTrips[nextIndex]?.deleted || isPending(Number(paginatedTrips[nextIndex]?.id)))
+    ) {
       nextIndex += step;
     }
     const nextTrip = paginatedTrips[nextIndex];
     if (!nextTrip) return;
     selectRowFromKeyboard(nextTrip);
-    requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
-  }, [paginatedTrips, selectRowFromKeyboard]);
+    requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus({ preventScroll: true }));
+  }, [isPending, paginatedTrips, selectRowFromKeyboard]);
 
   const handleEditClick = () => {
     if (selectedTrip) onEdit(selectedTrip);
   };
+
+  const handleViewClick = () => {
+    if (selectedTrip && !selectedTrip.deleted) onView(selectedTrip);
+  };
+
+  const canView = Boolean(selectedTrip && !selectedTrip.deleted);
 
   const openDeleteModal = () => {
     if (!selectedTrip) return;
@@ -389,6 +472,16 @@ function TripRecentTable({
               />
             </div>
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleViewClick}
+                disabled={!canView}
+                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canView ? "bg-violet-50/70 hover:bg-violet-50/80 text-violet-600 border border-violet-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`}
+                aria-label={t("ops.trip.view_trip_details")}
+              >
+                <span className={`inline-flex ${canView ? uiActionIconMotionClass.view : ""}`}><Eye size={13} /></span>
+                <span className="hidden md:inline">{t("common.view")}</span>
+              </button>
               <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
                 <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
@@ -416,15 +509,16 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.shops")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.birds")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_loss_short")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.mortality_short")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.status")}</th>
-                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.view")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.load")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={12} className="py-16 text-center text-sm font-medium text-slate-400">
+                  <td colSpan={13} className="py-16 text-center text-sm font-medium text-slate-400">
                     <span className="inline-flex items-center gap-2">
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
                       {t("ops.trip.loading_recent")}
@@ -432,7 +526,7 @@ function TripRecentTable({
                   </td>
                 </tr>
               ) : paginatedTrips.length === 0 ? (
-                <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
+                <tr><td colSpan={13} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
               ) : (
                 paginatedTrips.map((trip, index) => {
                   const isSelected = Number(trip.id) === Number(selectedTripId);
@@ -445,7 +539,10 @@ function TripRecentTable({
                         else rowRefs.current.delete(trip.id);
                       }}
                       tabIndex={isDeleted ? -1 : 0}
-                      onClick={() => handleRowClick(trip)}
+                      onClick={(event) => {
+                        handleRowClick(trip);
+                        if (!isDeleted) event.currentTarget.focus({ preventScroll: true });
+                      }}
                       onKeyDown={(event) => handleRowKeyDown(event, index)}
                       aria-selected={isSelected}
                       className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}
@@ -458,10 +555,11 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.driverName, language)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.supervisorName, language)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600 font-medium">{localizeTripViewText(trip.sourceFarm, language)}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{trip.totalShops}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-500">{trip.totalBirds.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-amber-500">{trip.totalWeight.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-center text-xs font-bold text-rose-500">{trip.totalMortality}</td>
+                      <ShopsCell trip={trip} />
+                      <LoadMetricCell trip={trip} metric="birds" value={trip.totalBirds.toLocaleString()} className="text-blue-500" />
+                      <LoadMetricCell trip={trip} metric="weight" value={Number(trip.totalWeight || 0).toFixed(2)} className="text-amber-500" />
+                      <LoadMetricCell trip={trip} metric="weightLoss" value={Math.max(0, Number(trip.weightLoss || 0)).toFixed(2)} className="text-orange-600" />
+                      <LoadMetricCell trip={trip} metric="mortality" value={trip.totalMortality.toLocaleString()} className="text-rose-500" />
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-red-50 text-red-700 border border-red-200"><AlertCircle size={12} /> {t("status.deleted")}</span>
@@ -521,8 +619,8 @@ function TripRecentTable({
                           })();
                         })()}
                       </td>
-                      <td className="text-center px-4 py-3">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group relative h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" aria-label={t("ops.trip.view_trip_details")}><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span></button>
+                      <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">
+                        {Math.max(1, trip.submittedLoadCount ?? (trip.legs ?? []).filter((leg) => leg.farmStepSubmitted).length)}
                       </td>
                     </tr>
                   );
