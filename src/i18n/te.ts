@@ -16,7 +16,7 @@ export default {
   'nav.vehicles_master': 'వాహనాలు',
   'nav.employees': 'ఉద్యోగులు',
   'nav.banks': 'బ్యాంకులు',
-  'nav.birdTypes': 'పక్షి రకాలు',
+  'nav.birdTypes': 'ఇతరాలు',
   'nav.marketRates': 'మార్కెట్ రేట్లు',
   'nav.routes': 'మార్గాలు',
   'nav.dailyOperationReport': 'ఆపరేషన్ డాష్‌బోర్డ్',

@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { MapPin, AlertTriangle, Plus, Pencil, Trash2, Loader2, Gauge, CheckCircle2, Circle, Upload } from "lucide-react";
+import { AlertTriangle, Plus, Pencil, Trash2, Gauge, CheckCircle2, Circle, Upload, MapPin, Loader2 } from "lucide-react";
 import {
   submitTripDiesel,
   updateTripDiesel,
@@ -18,10 +18,13 @@ import {
 import { GpsAddressText } from "../GpsAddressText";
 import { BillPreviewLink } from "./BillPreviewLink";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
+import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 import { useI18n } from "../../../../../i18n";
 import { compressImageFile } from "../../../../../utils/compressImage";
 import { captureGpsQuiet } from "../../utils/captureGps";
+import { loadBirdTypes } from "../../../../masters/bird-types/services/birdTypeService";
+import type { BirdType } from "../../../../masters/bird-types/types/birdType";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -35,6 +38,8 @@ interface DieselExpensesTableProps {
   readOnly?: boolean;
   onTripSynced?: (trip: Trip) => void;
 }
+
+const OTHER_BUNK_VALUE = "__other__";
 
 function isValidGps(lat: unknown, lon: unknown) {
   const la = Number(lat);
@@ -64,7 +69,7 @@ function collectDieselSlotIndices(data: Record<string, unknown> | null | undefin
   if (!data) return [];
   for (const key of Object.keys(data)) {
     const m = key.match(
-      /^diesel(?:Ltr|Rate|Meter|Bunk|Image|ImageName|Submitted|SubmittedAt|Id|ClientKey|GpsLat|GpsLon|GpsAccuracy|GpsCapturedAt|Amount)(\d+)$/
+      /^diesel(?:Ltr|Rate|Meter|Bunk|BunkSource|FuelBunkId|OtherBunk|Image|ImageName|Submitted|SubmittedAt|Id|ClientKey|GpsLat|GpsLon|GpsAccuracy|GpsCapturedAt|Amount)(\d+)$/
     );
     if (m) {
       const n = Number(m[1]);
@@ -99,8 +104,16 @@ export default function DieselExpensesTable({
 }: DieselExpensesTableProps) {
   const gpsRequestRef = useRef<Record<number, number>>({});
   const { t } = useI18n();
+  const { showNotification: showCornerNotification } = useSafeNotification();
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
-  const [toastMessage, setToastMessage] = useState<{ message: string; type: "warning" | "error" | "success" } | null>(null);
+  const [fuelBunks, setFuelBunks] = useState<BirdType[]>([]);
+  useEffect(() => {
+    let active = true;
+    void loadBirdTypes().then((rows) => {
+      if (active) setFuelBunks(rows.filter((row) => row.category === "Fuel Bunk" && row.status === "Active"));
+    }).catch(() => { if (active) setFuelBunks([]); });
+    return () => { active = false; };
+  }, []);
   const [meterErrors, setMeterErrors] = useState<{ [key: number]: string }>({});
   const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
   const [busyRow, setBusyRow] = useState<number | null>(null);
@@ -135,16 +148,8 @@ export default function DieselExpensesTable({
     });
   }, [sheetData, tripId]);
 
-  useEffect(() => {
-    if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [toastMessage]);
-
   const notifyUser = (msg: string, type: "warning" | "error" | "success" = "warning") => {
-    if (showNotification) showNotification(msg, type);
-    else setToastMessage({ message: msg, type });
+    (showNotification ?? showCornerNotification)(msg, type);
   };
 
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -182,6 +187,9 @@ export default function DieselExpensesTable({
       "dieselRate",
       "dieselMeter",
       "dieselBunk",
+      "dieselBunkSource",
+      "dieselFuelBunkId",
+      "dieselOtherBunk",
       "dieselGpsLat",
       "dieselGpsLon",
       "dieselGpsAccuracy",
@@ -194,11 +202,21 @@ export default function DieselExpensesTable({
     fields.forEach((f) => {
       newDraft[`${f}${num}`] = sheetData[`${f}${num}`] ?? "";
     });
+    const existingBunk = String(sheetData[`dieselBunk${num}`] || "").trim();
+    const existingSource = String(sheetData[`dieselBunkSource${num}`] || "").toUpperCase();
+    if (existingBunk && (existingSource === "OTHER" || (fuelBunks.length > 0 && !fuelBunks.some((bunk) => bunk.birdType === existingBunk)))) {
+      newDraft[`dieselBunk${num}`] = OTHER_BUNK_VALUE;
+      newDraft[`dieselOtherBunk${num}`] = existingBunk;
+    }
     setDraftData(newDraft);
     setEditingRow(num);
   };
 
   const cancelEdit = () => {
+    if (editingRow !== null) {
+      gpsRequestRef.current[editingRow] = (gpsRequestRef.current[editingRow] ?? 0) + 1;
+      setIsFetchingGPS((prev) => ({ ...prev, [editingRow]: false }));
+    }
     setDraftData({});
     setEditingRow(null);
   };
@@ -225,6 +243,9 @@ export default function DieselExpensesTable({
       [`dieselRate${nextId}`]: "",
       [`dieselMeter${nextId}`]: "",
       [`dieselBunk${nextId}`]: "",
+      [`dieselBunkSource${nextId}`]: "",
+      [`dieselFuelBunkId${nextId}`]: "",
+      [`dieselOtherBunk${nextId}`]: "",
       [`dieselGpsLat${nextId}`]: "",
       [`dieselGpsLon${nextId}`]: "",
       [`dieselGpsAccuracy${nextId}`]: "",
@@ -245,6 +266,9 @@ export default function DieselExpensesTable({
       [`dieselRate${nextId}`]: "",
       [`dieselMeter${nextId}`]: "",
       [`dieselBunk${nextId}`]: "",
+      [`dieselBunkSource${nextId}`]: "",
+      [`dieselFuelBunkId${nextId}`]: "",
+      [`dieselOtherBunk${nextId}`]: "",
       [`dieselGpsLat${nextId}`]: "",
       [`dieselGpsLon${nextId}`]: "",
       [`dieselGpsAccuracy${nextId}`]: "",
@@ -318,6 +342,9 @@ export default function DieselExpensesTable({
           "dieselRate",
           "dieselMeter",
           "dieselBunk",
+          "dieselBunkSource",
+          "dieselFuelBunkId",
+          "dieselOtherBunk",
           "dieselGpsLat",
           "dieselGpsLon",
           "dieselGpsAccuracy",
@@ -330,6 +357,12 @@ export default function DieselExpensesTable({
         fields.forEach((f) => {
           newDraft[`${f}${index}`] = sheetData[`${f}${index}`] ?? "";
         });
+        const existingBunk = String(sheetData[`dieselBunk${index}`] || "").trim();
+        const existingSource = String(sheetData[`dieselBunkSource${index}`] || "").toUpperCase();
+        if (existingBunk && (existingSource === "OTHER" || (fuelBunks.length > 0 && !fuelBunks.some((bunk) => bunk.birdType === existingBunk)))) {
+          newDraft[`dieselBunk${index}`] = OTHER_BUNK_VALUE;
+          newDraft[`dieselOtherBunk${index}`] = existingBunk;
+        }
         Object.assign(newDraft, imagePatch);
         setDraftData(newDraft);
         setIsEditingSubmitted(true);
@@ -377,6 +410,9 @@ export default function DieselExpensesTable({
       [`dieselRate${num}`]: "",
       [`dieselMeter${num}`]: "",
       [`dieselBunk${num}`]: "",
+      [`dieselBunkSource${num}`]: "",
+      [`dieselFuelBunkId${num}`]: "",
+      [`dieselOtherBunk${num}`]: "",
       [`dieselGpsLat${num}`]: "",
       [`dieselGpsLon${num}`]: "",
       [`dieselGpsAccuracy${num}`]: "",
@@ -395,32 +431,25 @@ export default function DieselExpensesTable({
     notifyUser(t("ops.trip.row_cancelled", { row: num }), "success");
   };
 
-  const handleGetLocation = (index: number) => {
+  const handleGetOtherLocation = (index: number) => {
     const requestId = (gpsRequestRef.current[index] ?? 0) + 1;
     gpsRequestRef.current[index] = requestId;
+    const captureIntoDraft = editingRow === index;
     setIsFetchingGPS((prev) => ({ ...prev, [index]: true }));
-    // Prefer a nearby already-captured diesel/farm point as silent fallback.
-    let preferLat: number | null = null;
-    let preferLon: number | null = null;
-    for (const row of [...rowIndices].reverse()) {
-      const lat = Number(sheetData[`dieselGpsLat${row}`]);
-      const lon = Number(sheetData[`dieselGpsLon${row}`]);
-      if (Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0)) {
-        preferLat = lat;
-        preferLon = lon;
-        break;
-      }
-    }
-    void captureGpsQuiet({ preferLat, preferLon, timeoutMs: 3000 }).then((gps) => {
+
+    void captureGpsQuiet({ timeoutMs: 8000 }).then((gps) => {
       if (gpsRequestRef.current[index] !== requestId) return;
-      applyBatchUpdates({
+      const gpsPatch = {
         [`dieselGpsLat${index}`]: gps.latitude,
         [`dieselGpsLon${index}`]: gps.longitude,
         [`dieselGpsAccuracy${index}`]: gps.accuracy,
         [`dieselGpsCapturedAt${index}`]: gps.capturedAt,
-      });
-      // Never show "Unable to retrieve…" — always a quiet success.
-      notifyUser(t("ops.trip.gps_captured_row", { row: index }), "success");
+      };
+      if (captureIntoDraft) {
+        setDraftData((prev) => ({ ...prev, ...gpsPatch }));
+      } else {
+        applyBatchUpdates(gpsPatch);
+      }
       setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
     });
   };
@@ -612,6 +641,10 @@ export default function DieselExpensesTable({
     const ltr = data[`dieselLtr${num}`];
     const rate = data[`dieselRate${num}`];
     const reading = data[`dieselMeter${num}`];
+    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
+    const bunkName = selectedBunk === OTHER_BUNK_VALUE
+      ? String(data[`dieselOtherBunk${num}`] || "").trim()
+      : selectedBunk;
     // Bunk city is optional (short city name). GPS + bill are mandatory.
     const image = data[`dieselImage${num}`];
     const lat = data[`dieselGpsLat${num}`];
@@ -623,6 +656,7 @@ export default function DieselExpensesTable({
       isPositive(rate) &&
       isPositive(Number(ltr) * Number(rate)) &&
       isPositive(reading) &&
+      bunkName.length > 0 &&
       hasRealBill(image) &&
       isValidGps(lat, lon) &&
       !meterErr &&
@@ -640,6 +674,11 @@ export default function DieselExpensesTable({
       reasons.push(t("ops.trip.amount_greater_zero"));
     }
     if (!isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
+    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
+    const bunkName = selectedBunk === OTHER_BUNK_VALUE
+      ? String(data[`dieselOtherBunk${num}`] || "").trim()
+      : selectedBunk;
+    if (!bunkName) reasons.push(t("ops.trip.bunk_required"));
     const meterErr = meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
     if (meterErr && !reasons.includes(meterErr)) reasons.push(meterErr);
     const later = laterBillsBlocking(num, useDraft);
@@ -735,6 +774,8 @@ export default function DieselExpensesTable({
       updates[`dieselAmount${n}`] = amount;
       updates[`dieselMeter${n}`] = entry.meter ?? "";
       updates[`dieselBunk${n}`] = entry.bunkName ?? "";
+      updates[`dieselBunkSource${n}`] = entry.bunkSource ?? "OTHER";
+      updates[`dieselFuelBunkId${n}`] = entry.fuelBunkId ?? "";
       updates[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
       updates[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
       updates[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
@@ -814,6 +855,10 @@ export default function DieselExpensesTable({
       return;
     }
     const data = useDraft ? draftData : sheetData;
+    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
+    const resolvedBunkName = selectedBunk === OTHER_BUNK_VALUE
+      ? String(data[`dieselOtherBunk${num}`] || "").trim()
+      : selectedBunk;
     const clientKey = String(data[`dieselClientKey${num}`] || draftClientKey);
     if (!data[`dieselClientKey${num}`]) {
       if (useDraft) {
@@ -827,7 +872,11 @@ export default function DieselExpensesTable({
       litres: Number(data[`dieselLtr${num}`]),
       rate: Number(data[`dieselRate${num}`]),
       meter: Number(data[`dieselMeter${num}`]),
-      bunkName: String(data[`dieselBunk${num}`] || "").trim(),
+      bunkName: resolvedBunkName,
+      bunkSource: selectedBunk === OTHER_BUNK_VALUE ? "OTHER" as const : "MASTER" as const,
+      fuelBunkId: selectedBunk === OTHER_BUNK_VALUE
+        ? null
+        : fuelBunks.find((bunk) => bunk.birdType === selectedBunk)?.id ?? null,
       gpsLat: Number(data[`dieselGpsLat${num}`]),
       gpsLon: Number(data[`dieselGpsLon${num}`]),
       gpsAccuracy: data[`dieselGpsAccuracy${num}`] === "" ? null : Number(data[`dieselGpsAccuracy${num}`]),
@@ -857,6 +906,8 @@ export default function DieselExpensesTable({
         flattened[`dieselAmount${num}`] = Math.round(payload.litres * payload.rate * 100) / 100;
         flattened[`dieselMeter${num}`] = payload.meter;
         flattened[`dieselBunk${num}`] = payload.bunkName;
+        flattened[`dieselBunkSource${num}`] = payload.bunkSource;
+        flattened[`dieselFuelBunkId${num}`] = payload.fuelBunkId ?? "";
         flattened[`dieselGpsLat${num}`] = payload.gpsLat;
         flattened[`dieselGpsLon${num}`] = payload.gpsLon;
         flattened[`dieselGpsAccuracy${num}`] = payload.gpsAccuracy ?? "";
@@ -1009,6 +1060,9 @@ export default function DieselExpensesTable({
               const rateVal = getFieldValue(`dieselRate${num}`, num) ?? "";
               const meterVal = getFieldValue(`dieselMeter${num}`, num) ?? "";
               const bunkVal = getFieldValue(`dieselBunk${num}`, num) ?? "";
+              const otherBunkVal = getFieldValue(`dieselOtherBunk${num}`, num) ?? "";
+              const isOtherBunk = bunkVal === OTHER_BUNK_VALUE;
+              const isFetching = !!isFetchingGPS[num];
               const imageVal = getFieldValue(`dieselImage${num}`, num) ?? "";
               const imageNameVal = getFieldValue(`dieselImageName${num}`, num) || `BILL-${fallbackDateStr}-${String(num).padStart(3, "0")}.png`;
               const ltrNum = Number(ltrVal);
@@ -1024,7 +1078,6 @@ export default function DieselExpensesTable({
                   : amountVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               const isSubmitted = !!sheetData[`dieselSubmitted${num}`];
               const locked = (isSubmitted && !isEditingThisRow) || readOnly;
-              const isFetching = !!isFetchingGPS[num];
               const { minAllowed: rowMinAllowed } = getMinAllowedMeter(
                 num,
                 isEditingThisRow ? draftData : undefined
@@ -1148,23 +1201,55 @@ export default function DieselExpensesTable({
                     </div>
                   </td>
 
-                  {/* Bunk city — optional short city (Kodad, Vijayawada…) */}
+                  {/* Fuel bunk master selection; legacy free-text values remain visible. */}
                   <td className="py-2 px-1.5 align-middle">
-                    <input
-                      type="text"
-                      placeholder={t("ops.trip.bunk_placeholder")}
+                    <div className="space-y-1">
+                    <select
                       disabled={locked || isFetching}
                       value={bunkVal}
-                      maxLength={40}
-                      onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleFieldChange(`dieselBunk${num}`, num, value);
+                        handleFieldChange(`dieselOtherBunk${num}`, num, "");
+                        const bunk = fuelBunks.find((row) => row.birdType === value);
+                        handleFieldChange(
+                          `dieselBunkSource${num}`,
+                          num,
+                          value === OTHER_BUNK_VALUE ? "OTHER" : bunk ? "MASTER" : ""
+                        );
+                        handleFieldChange(`dieselFuelBunkId${num}`, num, bunk?.id ?? "");
+                        const hasBunkGps = bunk?.latitude != null && bunk.longitude != null;
+                        const gpsPatch = {
+                          [`dieselGpsLat${num}`]: hasBunkGps ? bunk.latitude : "",
+                          [`dieselGpsLon${num}`]: hasBunkGps ? bunk.longitude : "",
+                          [`dieselGpsAccuracy${num}`]: hasBunkGps ? 0 : "",
+                          [`dieselGpsCapturedAt${num}`]: hasBunkGps ? new Date().toISOString() : "",
+                        };
+                        if (isEditingThisRow) {
+                          setDraftData((prev) => ({ ...prev, ...gpsPatch }));
+                        } else {
+                          applyBatchUpdates(gpsPatch);
+                        }
+                      }}
                       className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15 disabled:bg-slate-100 disabled:text-slate-600 truncate"
-                    />
+                    ><option value="">Select bunk</option>{bunkVal && bunkVal !== OTHER_BUNK_VALUE && !fuelBunks.some((row) => row.birdType === bunkVal) ? <option value={bunkVal}>{bunkVal}</option> : null}{fuelBunks.map((bunk) => <option key={bunk.id} value={bunk.birdType}>{bunk.birdType}</option>)}<option value={OTHER_BUNK_VALUE}>{t("common.other")}</option></select>
+                    {isOtherBunk && !locked ? (
+                      <input
+                        type="text"
+                        value={otherBunkVal}
+                        maxLength={150}
+                        onChange={(e) => handleFieldChange(`dieselOtherBunk${num}`, num, e.target.value)}
+                        placeholder={t("ops.trip.other_bunk_placeholder")}
+                        className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15"
+                      />
+                    ) : null}
+                    </div>
                   </td>
 
-                  {/* GPS — mandatory; preview + full address in portal tooltip */}
+                  {/* Master bunk GPS is automatic; only Other needs live capture. */}
                   <td className="py-2 px-1.5 align-middle overflow-visible">
-                    <div className="flex items-start gap-1.5 min-w-0 w-full">
-                      <div className="min-w-0 flex-1 overflow-visible">
+                    <div className="flex items-start gap-1.5 min-w-0">
+                      <div className="min-w-0 flex-1">
                         {gpsOk ? (
                           <GpsAddressText
                             lat={gpsLat}
@@ -1176,21 +1261,17 @@ export default function DieselExpensesTable({
                           <span className="text-[12px] text-slate-400 italic">{t("ops.trip.not_captured")}</span>
                         )}
                       </div>
-                      {!locked && (
+                      {isOtherBunk && !locked ? (
                         <button
                           type="button"
-                          onClick={() => handleGetLocation(num)}
+                          onClick={() => handleGetOtherLocation(num)}
                           disabled={isFetching}
-                          className={`shrink-0 px-1.5 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-0.5 border ${
-                            gpsOk
-                              ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                              : "bg-red-50/70 text-red-500 border-red-100 hover:bg-red-50/80"
-                          }`}
+                          className="shrink-0 px-1.5 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-0.5 border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-60"
                         >
-                          {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} className={gpsOk ? "text-emerald-500" : "text-red-500"} />}
+                          {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
                           GPS
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </td>
 
@@ -1311,42 +1392,16 @@ export default function DieselExpensesTable({
         });
         if (!actionRow) return null;
         const isEditingActionRow = editingRow === actionRow;
-        const reason = rowBlockReason(actionRow, isEditingActionRow);
         const canSubmit = rowReady(actionRow, isEditingActionRow);
-        // Meter chain messages already show once at top beside Last Entered Meter.
-        const isMeterReason =
-          !!reason &&
-          (reason === meterErrors[actionRow] ||
-            /meter|S\.No|reading/i.test(reason) ||
-            chainBannerMessages.includes(reason));
-        const showBottomReason = reason && !isMeterReason;
         return (
-          <div className="space-y-2">
-            {toastMessage ? (
-              <div
-                className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[13px] font-semibold leading-snug ${
-                  toastMessage.type === "error"
-                    ? "border-red-100 bg-red-50/70 text-red-500"
-                    : toastMessage.type === "success"
-                      ? "border-emerald-100 bg-emerald-50/70 text-emerald-600"
-                      : "border-amber-100 bg-amber-50/70 text-amber-700"
-                }`}
-                role="status"
-              >
-                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                <span className="min-w-0 break-words">{toastMessage.message}</span>
-              </div>
-            ) : showBottomReason ? (
-              <p className="text-[13px] font-semibold text-red-500 bg-red-50/70 border border-red-100 rounded-lg px-3 py-2">
-                {reason}
-              </p>
-            ) : null}
+          <div>
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => {
+                  const submitted = !!sheetData[`dieselSubmitted${actionRow}`];
                   if (isEditingActionRow) cancelEdit();
-                  else handleClearRow(actionRow);
+                  if (!submitted) handleClearRow(actionRow);
                 }}
                 className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center shrink-0"
               >

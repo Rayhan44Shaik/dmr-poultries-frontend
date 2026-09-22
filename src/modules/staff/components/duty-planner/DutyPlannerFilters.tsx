@@ -83,9 +83,9 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
             <span>{t('dateRange')}</span>
             {periodMeta && <span className="ml-auto flex min-w-0 items-center gap-1 normal-case tracking-normal">{periodMeta}</span>}
           </div>
-          {view === 'custom' ? <div role="group" aria-label={t('customDates')} className="flex min-w-0 items-center gap-1.5">
+          {view === 'custom' ? <div role="group" aria-label={t('customDates')} className="flex min-w-0 flex-col items-stretch gap-1.5 sm:flex-row sm:items-center">
             <div className="min-w-0 flex-1"><label htmlFor="duty-report-from" className="sr-only">{t('fromDate')}</label><DatePicker id="duty-report-from" value={customRange.fromDate} onChange={(fromDate) => onCustomRangeChange({ ...customRange, fromDate })} minDate="1900-01-01" required hideClear language={language} className="w-full" popupClassName="max-w-[calc(100vw_-_4rem)]" /></div>
-            <ArrowRight size={12} aria-hidden="true" className="shrink-0 text-slate-300" />
+            <ArrowRight size={12} aria-hidden="true" className="hidden shrink-0 text-slate-300 sm:block" />
             <div className="min-w-0 flex-1"><label htmlFor="duty-report-to" className="sr-only">{t('toDate')}</label><DatePicker id="duty-report-to" value={customRange.toDate} onChange={(toDate) => onCustomRangeChange({ ...customRange, toDate })} minDate="1900-01-01" required hideClear language={language} className="w-full" popupClassName="!left-auto !right-0 max-w-[calc(100vw_-_4rem)]" /></div>
           </div> : <div role="group" aria-label={t('displayedPeriod')} className="flex h-10 w-full max-w-[260px] items-center gap-0.5 rounded-lg border border-slate-200 px-0.5">
             <button type="button" onClick={onPreviousPeriod} aria-label={t(view === 'week' ? 'previousWeek' : 'previousMonth')} className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"><ChevronLeft size={14} /></button>

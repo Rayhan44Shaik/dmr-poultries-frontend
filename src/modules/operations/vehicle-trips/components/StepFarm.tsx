@@ -149,6 +149,7 @@ export default function StepFarm({
     }));
 
   const birdTypeOptions = birdTypes
+    .filter((bird: any) => !bird.category || bird.category === "Bird")
     .filter((bird: any) => {
       const active = String(bird.status ?? "Active") === "Active";
       return active || bird.id === trip.birdTypeId;
@@ -195,7 +196,7 @@ export default function StepFarm({
 
   const handleBirdChange = (value: string) => {
     const id = Number(value) || 0;
-    const bird = birdTypes.find((b: any) => (b.id ?? b.birdTypeId) === id);
+    const bird = birdTypes.find((b: any) => (!b.category || b.category === "Bird") && (b.id ?? b.birdTypeId) === id);
     setTrip((prev) => ({
       ...prev,
       birdTypeId: id,

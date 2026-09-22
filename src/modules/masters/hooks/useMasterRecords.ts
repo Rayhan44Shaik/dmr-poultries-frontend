@@ -10,6 +10,7 @@ export interface MasterQuery {
   direction?: string;
   department?: string;
   city?: string;
+  category?: string;
 }
 interface PageResult { items: Record<string, unknown>[]; total: number; page: number; facets: Record<string, string[]> }
 interface Config<T> { path: string; load: () => Promise<T[]>; map: (raw: Record<string, unknown>) => T }

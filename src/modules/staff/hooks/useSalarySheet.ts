@@ -1,39 +1,54 @@
 // src/modules/staff/hooks/useSalarySheet.ts
+//
+// Single-employee salary sheet — fully PostgreSQL/API backed. No localStorage.
+// Source: GET /api/staff/salaries/:employeeId?month= for the record and the
+// employee master for identity; writes go through the salary API (the backend
+// recomputes gross / deductions / net and owns the lifecycle).
 
 import { useState, useEffect, useCallback } from 'react';
-import { loadEmployees, loadSalaryRecords, saveSalaryRecords } from '../services/staffService';
+import { apiGet, handleApiError } from '../../../api';
+import { loadEmployees } from '../../masters/employees/services/employeeService';
+import { updateSalary, paySalary, updateSalaryStatus } from '../services/salaryService';
 import type { SalaryRecord } from '../types/staffDashboard';
 
 export function useSalarySheet(employeeId: number | null, month: string) {
   const [employee, setEmployee] = useState<any>(null);
   const [salary, setSalary] = useState<SalaryRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
+    if (!employeeId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setError(null);
     try {
-      const employees = loadEmployees();
-      const emp = employees.find((e) => e.id === employeeId);
-      setEmployee(emp || null);
-
-      const records = loadSalaryRecords();
-      const existing = records.find(
-        (r) => r.employeeId === employeeId && r.month === month
-      );
-      setSalary(existing || null);
-    } catch (error) {
-      console.error('Failed to load salary data:', error);
+      const employees = await loadEmployees().catch(() => []);
+      setEmployee((employees as Array<{ id: number }>).find((e) => e.id === employeeId) ?? null);
+      try {
+        const { data } = await apiGet<SalaryRecord>(`/staff/salaries/${employeeId}`, {
+          params: { month },
+        });
+        setSalary(data);
+      } catch {
+        // No record for this employee/month yet — the sheet starts empty.
+        setSalary(null);
+      }
+    } catch (err) {
+      setError(handleApiError(err));
+      setEmployee(null);
+      setSalary(null);
     } finally {
       setLoading(false);
     }
   }, [employeeId, month]);
 
   useEffect(() => {
-    if (employeeId) {
-      loadData();
-    }
-  }, [loadData, employeeId, month]);
+    void loadData();
+  }, [loadData]);
 
   const calculateNetSalary = useCallback(
     (data: {
@@ -66,55 +81,50 @@ export function useSalarySheet(employeeId: number | null, month: string) {
   );
 
   const saveSalary = useCallback(
-    (data: Omit<SalaryRecord, 'id' | 'createdAt' | 'totalGross' | 'totalDeductions' | 'netSalary'>) => {
+    async (data: Omit<SalaryRecord, 'id' | 'createdAt' | 'totalGross' | 'totalDeductions' | 'netSalary'>) => {
+      // The backend upsert is keyed on (employee_id, month) and recomputes
+      // the totals; the preview totals below are display-only.
       const { gross, deductions, net } = calculateNetSalary(data);
-      const newRecord: SalaryRecord = {
+      const record = await updateSalary({
+        ...(salary ?? {}),
         ...data,
-        id: salary?.id || Date.now().toString(),
+        id: salary?.id ?? '',
         totalGross: gross,
         totalDeductions: deductions,
         netSalary: net,
-        createdAt: salary?.createdAt || new Date().toISOString(),
-      };
-
-      const records = loadSalaryRecords();
-      let updated: SalaryRecord[];
-      if (salary) {
-        updated = records.map((r) => (r.id === salary.id ? newRecord : r));
-      } else {
-        updated = [...records, newRecord];
-      }
-      saveSalaryRecords(updated);
-      setSalary(newRecord);
+        createdAt: salary?.createdAt ?? '',
+      } as SalaryRecord);
+      setSalary(record);
       setIsEditing(false);
-      return newRecord;
+      return record;
     },
     [salary, calculateNetSalary]
   );
 
   const updateStatus = useCallback(
-    (status: 'Pending' | 'Paid', paymentDate?: string) => {
+    async (status: 'Pending' | 'Paid', paymentDate?: string) => {
       if (!salary) return;
-      const records = loadSalaryRecords();
-      const updated = records.map((r) =>
-        r.id === salary.id
-          ? { ...r, status, paymentDate: paymentDate || (status === 'Paid' ? new Date().toISOString().split('T')[0] : undefined) }
-          : r
-      );
-      saveSalaryRecords(updated);
-      setSalary({ ...salary, status, paymentDate });
+      const record =
+        status === 'Paid'
+          ? await paySalary(salary.id, {
+              paymentDate: paymentDate ?? new Date().toISOString().split('T')[0],
+              paymentMode: 'Bank Transfer',
+            })
+          : await updateSalaryStatus(salary.id);
+      setSalary(record);
     },
     [salary]
   );
 
   const refresh = useCallback(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   return {
     employee,
     salary,
     loading,
+    error,
     isEditing,
     setIsEditing,
     calculateNetSalary,

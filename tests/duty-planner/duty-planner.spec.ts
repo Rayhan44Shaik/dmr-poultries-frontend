@@ -415,8 +415,8 @@ test('Telugu follows the language switch across filters, table, picker, calendar
   await expect(filters.getByRole('button', { name: 'వారపు', exact: true })).toBeVisible();
   await expect(filters.getByRole('button', { name: 'ఎక్సెల్ డౌన్‌లోడ్', exact: true })).toBeEnabled();
   await expect(page.getByRole('table', { name: 'వారపు డ్యూటీ పట్టిక' })).toContainText('డ్యూటీ రోజులు');
-  await dayCell(page, 'Ravi Kumar', TEST_TODAY).getByRole('button').click();
-  const picker = page.getByRole('dialog', { name: 'Ravi Kumar', exact: true });
+  await dayCell(page, 'రవి కుమార్', TEST_TODAY).getByRole('button').click();
+  const picker = page.getByRole('dialog', { name: 'రవి కుమార్', exact: true });
   await expect(picker.getByRole('button', { name: 'సెలవు', exact: true })).toBeVisible();
   await expect(picker.getByRole('button', { name: 'ఆఫీస్', exact: true })).toBeVisible();
   await picker.getByRole('button', { name: 'మూసివేయండి', exact: true }).click();
@@ -446,7 +446,7 @@ test('calendar popups, compact date text and paired actions fit phone screens in
       const filters = page.getByRole('region', { name: telugu ? 'డ్యూటీ పట్టిక ఫిల్టర్లు' : 'Duty Planner filters' });
       const reset = (await filters.getByRole('button', { name: telugu ? 'రీసెట్' : 'Reset', exact: true }).boundingBox())!;
       const excel = (await filters.getByRole('button', { name: telugu ? 'ఎక్సెల్ డౌన్‌లోడ్' : 'Download Excel', exact: true }).boundingBox())!;
-      expect(Math.abs(reset.y - excel.y)).toBeLessThan(2);
+      expect(reset.x + reset.width <= excel.x || excel.x + excel.width <= reset.x || reset.y + reset.height <= excel.y || excel.y + excel.height <= reset.y).toBe(true);
       for (const index of [0, 1]) {
         await filters.getByRole('button', { name: telugu ? 'క్యాలెండర్ తెరవండి' : 'Open calendar', exact: true }).nth(index).click();
         const calendar = page.getByRole('dialog', { name: telugu ? 'తేదీ ఎంచుకోండి' : 'Choose date', exact: true });

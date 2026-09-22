@@ -20,6 +20,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { tripExpenseTotals } from "../utils/tripExpenseTotals";
 
 interface Props {
   trip: Trip | null;
@@ -124,25 +125,6 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       : 0;
   })();
 
-  // ─── Synchronized Expenses ──────────────────────────────────────────
-  const totalExpenses = (() => {
-    // 1:1 match with StepEnd.tsx expense calculation logic
-    const computedExpenses =
-      Number(tripRecord.meals || 0) +
-      Number(tripRecord.loading || 0) +
-      Number(tripRecord.mealsTiffin || 0) +
-      Number(tripRecord.vehicleMaintenance || 0) +
-      Number(tripRecord.othersRC || 0) +
-      Number(tripRecord.others1Amt || 0) +
-      Number(tripRecord.others2Amt || 0) +
-      Number(tripRecord.others3Amt || 0) +
-      Number(tripRecord.others4Amt || 0) +
-      Number(tripRecord.others5Amt || 0);
-
-    // Fallback to backend saved totalExpenses if computed is 0
-    return computedExpenses > 0 ? computedExpenses : Number(tripRecord.totalExpenses || 0);
-  })();
-
   const dcWeight = completedLoads.length ? completedLoads.reduce((s, l) => s + l.dcWeight, 0) : pickupSubmitted ? kpiNumber(trip.dcWeight) : null;
   const totalBirds = completedLoads.length ? completedLoads.reduce((s, l) => s + l.pickupBirds, 0) : pickupSubmitted ? kpiNumber(trip.totalBirds) : null;
   const deliveryWeight = completedLoads.length ? completedLoads.reduce((s, l) => s + l.weight, 0) : deliverySubmitted ? kpiNumber(deliveryTotals.totalWeight) : null;
@@ -161,11 +143,8 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       ? null
       : (pickupTollsValue ?? 0) + (deliveryTollsValue ?? 0);
   const mileageValue = expensesSubmitted ? kpiNumber(mileage) : null;
-  const dieselExpense = (trip.dieselEntries ?? []).reduce(
-    (sum, row) => sum + Number(row.amount ?? (Number(row.litres || 0) * Number(row.rate || 0))),
-    0
-  );
-  const expensesValue = expensesSubmitted ? kpiNumber(totalExpenses + dieselExpense) : null;
+  const expenseBreakdown = tripExpenseTotals(trip);
+  const expensesValue = expensesSubmitted ? kpiNumber(expenseBreakdown.total) : null;
 
   const row1Cards = [
     {
@@ -254,7 +233,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     {
       label: translate("ops.trip.kpi_expenses"),
       value: expensesValue == null ? "—" : `₹${expensesValue.toFixed(0)}`,
-      sub: dieselExpense > 0 ? `${translate("ops.trip.total_trip_spends")} · Diesel ₹${dieselExpense.toFixed(0)}` : translate("ops.trip.total_trip_spends"),
+      sub: expensesSubmitted ? `Diesel ₹${expenseBreakdown.diesel.toFixed(2)} · General ₹${expenseBreakdown.general.toFixed(2)}` : translate("ops.trip.total_trip_spends"),
       bg: "bg-orange-50/70",
       icon: <Receipt size={18} className="text-orange-500" />,
     },

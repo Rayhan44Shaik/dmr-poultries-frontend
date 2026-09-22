@@ -168,6 +168,8 @@ export default function StepEnd({
       if (empty(d[`dieselRate${n}`])) d[`dieselRate${n}`] = entry.rate ?? "";
       if (empty(d[`dieselMeter${n}`])) d[`dieselMeter${n}`] = entry.meter ?? "";
       if (empty(d[`dieselBunk${n}`])) d[`dieselBunk${n}`] = entry.bunkName ?? "";
+      if (empty(d[`dieselBunkSource${n}`])) d[`dieselBunkSource${n}`] = entry.bunkSource ?? "OTHER";
+      if (empty(d[`dieselFuelBunkId${n}`])) d[`dieselFuelBunkId${n}`] = entry.fuelBunkId ?? "";
       if (empty(d[`dieselGpsLat${n}`])) d[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
       if (empty(d[`dieselGpsLon${n}`])) d[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
       if (empty(d[`dieselGpsAccuracy${n}`])) d[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
@@ -194,7 +196,7 @@ export default function StepEnd({
   const prevTripId = useRef<number>(trip.id);
   const dieselHydrateKey = Array.isArray(trip.dieselEntries)
     ? trip.dieselEntries
-        .map((e) => `${e?.id ?? ""}:${String(e?.imageData || "").length}:${e?.litres ?? ""}`)
+        .map((e) => `${e?.id ?? ""}:${String(e?.imageData || "").length}:${e?.litres ?? ""}:${e?.bunkSource ?? ""}:${e?.fuelBunkId ?? ""}`)
         .join("|")
     : "";
   useEffect(() => {
@@ -231,6 +233,14 @@ export default function StepEnd({
         }
         if (empty(next[`dieselBunk${n}`]) && entry.bunkName) {
           next[`dieselBunk${n}`] = entry.bunkName as any;
+          changed = true;
+        }
+        if (empty(next[`dieselBunkSource${n}`])) {
+          next[`dieselBunkSource${n}`] = (entry.bunkSource ?? "OTHER") as any;
+          changed = true;
+        }
+        if (empty(next[`dieselFuelBunkId${n}`]) && entry.fuelBunkId != null) {
+          next[`dieselFuelBunkId${n}`] = entry.fuelBunkId as any;
           changed = true;
         }
         if (empty(next[`dieselImage${n}`]) && entry.imageData) {

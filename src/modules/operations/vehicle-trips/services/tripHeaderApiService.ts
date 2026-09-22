@@ -447,6 +447,8 @@ export type DieselSubmitPayload = {
   rate: number;
   meter: number;
   bunkName: string;
+  bunkSource: "MASTER" | "OTHER";
+  fuelBunkId: number | null;
   gpsLat: number;
   gpsLon: number;
   gpsAccuracy: number | null;

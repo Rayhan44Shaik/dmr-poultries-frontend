@@ -36,3 +36,33 @@ test('Supervisor Performance renders backend delivery metrics', async ({ page })
   await expect(page.getByText('Production Supervisor').first()).toBeVisible();
   await expect(page.getByText('900').first()).toBeVisible();
 });
+
+test('Driver search applies to the backend query', async ({ page }) => {
+  await page.goto('/staff?tab=driver-performance');
+  await expect(page.getByText('Production Staff').first()).toBeVisible();
+  const seen: string[] = [];
+  page.on('request', (entry) => {
+    if (entry.url().includes('/api/staff/performance/drivers')) seen.push(entry.url());
+  });
+  await page.getByRole('textbox', { name: 'Search' }).fill('Production');
+  await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+  await expect
+    .poll(() => seen.some((url) => new URL(url).searchParams.get('search') === 'Production'), { timeout: 15000 })
+    .toBe(true);
+  await expect(page.getByText('Production Staff').first()).toBeVisible();
+});
+
+test('Supervisor search applies to the backend query', async ({ page }) => {
+  await page.goto('/staff?tab=supervisor-performance');
+  await expect(page.getByText('Production Supervisor').first()).toBeVisible();
+  const seen: string[] = [];
+  page.on('request', (entry) => {
+    if (entry.url().includes('/api/staff/performance/supervisors')) seen.push(entry.url());
+  });
+  await page.getByRole('textbox', { name: 'Search' }).fill('Supervisor');
+  await page.getByRole('textbox', { name: 'Search' }).press('Enter');
+  await expect
+    .poll(() => seen.some((url) => new URL(url).searchParams.get('search') === 'Supervisor'), { timeout: 15000 })
+    .toBe(true);
+  await expect(page.getByText('Production Supervisor').first()).toBeVisible();
+});

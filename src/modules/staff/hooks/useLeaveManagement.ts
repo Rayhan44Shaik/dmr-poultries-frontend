@@ -327,11 +327,11 @@ export function useLeaveManagement(
   );
 
   const approveLeave = useCallback(
-    async (id: string, approvedBy?: string) => {
+    async (id: string) => {
       if (mutations.current.has(id)) return false;
       mutations.current.add(id);
       try {
-        await updateLeaveStatus(id, 'Approved', approvedBy ? { approvedBy } : {});
+        await updateLeaveStatus(id, 'Approved');
         notify(t('staff.leave.msg_approved'), 'success');
         refresh();
         return true;

@@ -1,8 +1,8 @@
 import MasterStatusBadge from "../../components/MasterStatusBadge";
 import {
+  Hash,
   Bird,
   FileText,
-  Hash,
   Scale,
   Settings2,
   ToggleLeft,
@@ -22,6 +22,7 @@ import {
   MasterDeleteButton,
 } from "../../components/MasterDirectory";
 import {
+  masterThClass,
   masterTdClass,
   masterNameTdClass,
   masterRowClass,
@@ -37,7 +38,9 @@ type BirdTypeTableProps = {
   loading?: boolean;
 };
 
-const COLS = 6;
+const COLS = 7;
+
+
 
 function BirdTypeTable({
   birdTypes,
@@ -58,37 +61,33 @@ function BirdTypeTable({
 
   return (
     <>
-      <MasterTable minWidth="min-w-[46rem]">
+      <MasterTable minWidth="min-w-[66rem]">
         <colgroup>
-          <col className="w-[4rem]" />
-          <col className="w-[12rem]" />
-          <col className="w-[8rem]" />
-          <col className="w-[14rem]" />
+          <col className="w-[3.5rem]" />
+          <col className="w-[13rem]" />
+          <col className="w-[8.5rem]" />
+          <col className="w-[10rem]" />
+          <col className="w-[16rem]" />
           <col className="w-[6.5rem]" />
           <col className="w-[6.5rem]" />
         </colgroup>
         <MasterThead>
-          <MasterTh
-            icon={Hash}
-            iconClass={tint.number}
-            label={t("masters.dir.bird_type_no")}
-            align="center"
-          />
+          <MasterTh icon={Hash} iconClass={tint.number} label={t("masters.dir.s_no")} align="center" />
           <MasterTh
             icon={Bird}
             iconClass={tint.name}
-            label={t("masters.dir.bird_type")}
+            label="Name"
           />
+          <th className={`${masterThClass} text-center`}>Type</th>
           <MasterTh
             icon={Scale}
             iconClass={tint.rate}
-            label={t("masters.dir.avg_weight")}
-            align="right"
+            label="Weight / Contact"
           />
           <MasterTh
             icon={FileText}
             iconClass={tint.tag}
-            label={t("masters.dir.description")}
+            label="Details"
           />
           <MasterTh
             icon={ToggleLeft}
@@ -119,20 +118,22 @@ function BirdTypeTable({
               className={masterRowClass(index, loading)}
               style={masterRowStyle(index)}
             >
-              <td
-                className={`${masterTdClass} text-center tabular-nums text-slate-500`}
-              >
-                {f.birdTypeNo}
-              </td>
+              <td className={`${masterTdClass} text-center tabular-nums text-slate-500`}>{f.birdTypeNo}</td>
               <td className={masterNameTdClass}>
                 <span className="block truncate">{shown(f.birdType)}</span>
               </td>
-              <td className={`${masterTdClass} text-right tabular-nums`}>
-                {f.averageWeight}
-              </td>
+              <td className={`${masterTdClass} text-center`}><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-semibold ${f.category === "Fuel Bunk" ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>{shown(f.category)}</span></td>
+              {f.category === "Fuel Bunk" ? (
+                <td className={`${masterTdClass} text-center`}>
+                  <span className="block font-semibold">{shown(f.ownerName) || "—"}</span>
+                  <span className="block text-xs tabular-nums text-slate-500">{f.mobileNumber || "—"}</span>
+                </td>
+              ) : (
+                <td className={`${masterTdClass} whitespace-nowrap text-center tabular-nums`}>{`${f.averageWeight} kg`}</td>
+              )}
               <td className={masterTdClass}>
                 <span className="block truncate">
-                  {shown(f.description) || "—"}
+                  {f.category === "Fuel Bunk" ? shown(f.address) || "—" : shown(f.description) || "—"}
                 </span>
               </td>
               <td className={`${masterTdClass} text-center`}>

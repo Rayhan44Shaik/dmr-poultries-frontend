@@ -126,15 +126,15 @@ export async function createLeave(input: {
   return mapLeave(data);
 }
 
-/** PATCH /api/staff/leaves/:id/status — approve / reject. */
+/** PATCH /api/staff/leaves/:id/status — approve / reject. Approver identity comes from the session; approvedBy is never sent. */
 export async function updateLeaveStatus(
   id: string,
   status: LeaveRequest["status"],
-  opts: { approvedBy?: string; rejectionReason?: string } = {}
+  opts: { rejectionReason?: string } = {}
 ): Promise<LeaveRequest> {
   const { data } = await apiPatch<Record<string, unknown>>(
     `${LEAVE_PATH}/${id}/status`,
-    { status, ...(opts.approvedBy ? { approvedBy: opts.approvedBy } : {}), ...(opts.rejectionReason ? { rejectionReason: opts.rejectionReason } : {}) }
+    { status, ...(opts.rejectionReason ? { rejectionReason: opts.rejectionReason } : {}) }
   );
   notifyStaffLeavesChanged();
   return mapLeave(data);

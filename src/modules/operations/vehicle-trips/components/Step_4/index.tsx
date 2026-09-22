@@ -253,7 +253,7 @@ export default function UnLoadingTable({
   const { showNotification } = useSafeNotification();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
-  const safeBirdTypes = birdTypes ?? [];
+  const safeBirdTypes = (birdTypes ?? []).filter((bird: any) => !bird.category || bird.category === "Bird");
   const safeTrip = trip ?? null;
 
   // Cache the last known good boxDetails to prevent stale/empty boxDetails from API responses

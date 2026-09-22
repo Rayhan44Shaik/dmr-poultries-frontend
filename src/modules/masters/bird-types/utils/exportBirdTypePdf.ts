@@ -231,7 +231,7 @@ function drawPageHeader(
   setText(doc, COLOR.navy);
 
   doc.text(
-    "Bird Types Master Directory",
+    "Others Master Directory",
     PAGE_MARGIN + 5,
     summaryY + 7,
   );
@@ -402,7 +402,7 @@ export async function exportBirdTypePdf(
 
   doc.setProperties({
     title:
-      "Bird Types Master Directory",
+      "Others Master Directory",
     subject:
       "DMR POULTRIES bird types master directory",
     author: "DMR POULTRIES",

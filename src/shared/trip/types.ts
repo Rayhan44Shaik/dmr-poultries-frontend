@@ -193,6 +193,8 @@ export interface Trip {
     amount?: number | null;
     meter?: number | null;
     bunkName?: string | null;
+    bunkSource?: "MASTER" | "OTHER";
+    fuelBunkId?: number | null;
     gpsLat?: number | null;
     gpsLon?: number | null;
     gpsAccuracy?: number | null;

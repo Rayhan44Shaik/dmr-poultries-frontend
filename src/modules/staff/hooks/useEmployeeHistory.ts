@@ -1,103 +1,120 @@
 // src/modules/staff/hooks/useEmployeeHistory.ts
+//
+// Employee history — fully PostgreSQL/API backed. No localStorage.
+// Source: GET /api/staff/employee/:id/history (duties, leaves, trips,
+// repairs, advances) plus the employee master for identity.
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { loadEmployees, loadTrips, loadLeaveRequests, loadSalaryRecords } from '../services/staffService';
-import type { HistoryEvent } from '../types/staffDashboard';
+import { useState, useEffect, useCallback } from 'react';
+import { apiGet, handleApiError } from '../../../api';
+import { loadEmployees } from '../../masters/employees/services/employeeService';
+import type { HistoryEvent, EmployeeHistoryStats } from '../types/staffDashboard';
+
+interface EmployeeHistoryResponse {
+  employeeId: number;
+  duties: Array<{ date: string; dutyType: string; vehicleNo: string | null; department: string; role: string }>;
+  leaves: Array<{ from: string; to: string; status: string }>;
+  trips: Array<{ tripNo: string; tripDate: string; vehicleNo: string | null; status: string }>;
+  repairs: Array<{ date: string; serviceType: string; vehicleNo: string | null; status: string }>;
+  advances: Array<{ type: string; principal: number; issuedDate: string; status: string }>;
+}
 
 export function useEmployeeHistory(employeeId: number | null) {
   const [employee, setEmployee] = useState<any>(null);
   const [events, setEvents] = useState<HistoryEvent[]>([]);
+  const [stats, setStats] = useState<EmployeeHistoryStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(() => {
+  const loadData = useCallback(async () => {
     if (!employeeId) {
       setLoading(false);
       return;
     }
     setLoading(true);
+    setError(null);
     try {
-      const employees = loadEmployees();
-      const emp = employees.find((e) => e.id === employeeId);
-      setEmployee(emp || null);
-
-      const trips = loadTrips();
-      const leaves = loadLeaveRequests();
-      const salaries = loadSalaryRecords();
+      const [employees, { data }] = await Promise.all([
+        loadEmployees().catch(() => []),
+        apiGet<EmployeeHistoryResponse>(`/staff/employee/${employeeId}/history`),
+      ]);
+      const emp = (employees as Array<{ id: number }>)?.find((e) => e.id === employeeId) ?? null;
+      setEmployee(emp);
 
       const historyEvents: HistoryEvent[] = [];
-
-      // Trip events
-      trips
-        .filter((t) => t.driverName === emp?.employeeName || t.supervisorName === emp?.employeeName)
-        .forEach((t) => {
-          historyEvents.push({
-            id: `trip-${t.id}`,
-            date: t.tripDate,
-            module: 'Trips',
-            event: `Trip ${t.tripNo} Completed`,
-            details: `${t.totalBirds} birds, ${t.totalWeight} KG, ${t.totalShops} shops`,
-            icon: 'truck',
-          });
+      for (const t of data.trips ?? []) {
+        historyEvents.push({
+          id: `trip-${t.tripNo}`,
+          date: t.tripDate,
+          module: 'Trips',
+          event: `Trip ${t.tripNo} ${t.status}`,
+          details: t.vehicleNo ? `Vehicle ${t.vehicleNo}` : '',
+          icon: 'truck',
         });
-
-      // Leave events
-      leaves
-        .filter((l) => l.employeeId === employeeId)
-        .forEach((l) => {
-          historyEvents.push({
-            id: `leave-${l.id}`,
-            date: l.createdAt,
-            module: 'Leave',
-            event: `${l.type} Leave ${l.status}`,
-            details: `${l.fromDate} to ${l.toDate} (${l.days} days)`,
-            icon: 'calendar',
-          });
+      }
+      for (const d of data.duties ?? []) {
+        historyEvents.push({
+          id: `duty-${d.date}`,
+          date: d.date,
+          module: 'Duty',
+          event: `${d.dutyType} duty`,
+          details: d.vehicleNo ? `Vehicle ${d.vehicleNo}` : d.department,
+          icon: 'calendar',
         });
-
-      // Salary events
-      salaries
-        .filter((s) => s.employeeId === employeeId)
-        .forEach((s) => {
-          historyEvents.push({
-            id: `salary-${s.id}`,
-            date: s.createdAt,
-            module: 'Salary',
-            event: `Salary ${s.status}`,
-            details: `₹${s.netSalary.toLocaleString()}`,
-            icon: 'rupee',
-          });
+      }
+      (data.leaves ?? []).forEach((l, index) => {
+        historyEvents.push({
+          id: `leave-${index}-${l.from}`,
+          date: l.from,
+          module: 'Leave',
+          event: `Leave ${l.status}`,
+          details: `${l.from} to ${l.to}`,
+          icon: 'calendar',
         });
-
-      // Sort by date descending
+      });
+      for (const r of data.repairs ?? []) {
+        historyEvents.push({
+          id: `repair-${r.date}-${r.serviceType}`,
+          date: r.date,
+          module: 'Vehicle',
+          event: `${r.serviceType} ${r.status}`,
+          details: r.vehicleNo ? `Vehicle ${r.vehicleNo}` : '',
+          icon: 'truck',
+        });
+      }
+      for (const a of data.advances ?? []) {
+        historyEvents.push({
+          id: `advance-${a.issuedDate}-${a.type}`,
+          date: a.issuedDate,
+          module: 'Advance',
+          event: `${a.type} ${a.status}`,
+          details: `₹${Number(a.principal).toLocaleString()}`,
+          icon: 'rupee',
+        });
+      }
       historyEvents.sort((a, b) => b.date.localeCompare(a.date));
-
       setEvents(historyEvents);
-    } catch (error) {
-      console.error('Failed to load employee history:', error);
+      setStats({
+        totalTrips: (data.trips ?? []).length,
+        totalDistance: 0,
+        totalBirds: 0,
+        totalWeight: 0,
+      });
+    } catch (err) {
+      setError(handleApiError(err));
+      setEmployee(null);
+      setEvents([]);
+      setStats(null);
     } finally {
       setLoading(false);
     }
   }, [employeeId]);
 
   useEffect(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
-  const stats = useMemo(() => {
-    if (!employee) return null;
-    const trips = loadTrips().filter(
-      (t) => t.driverName === employee.employeeName || t.supervisorName === employee.employeeName
-    );
-    return {
-      totalTrips: trips.length,
-      totalDistance: 0, // would come from trip data
-      totalBirds: trips.reduce((sum, t) => sum + t.totalBirds, 0),
-      totalWeight: trips.reduce((sum, t) => sum + t.totalWeight, 0),
-    };
-  }, [employee]);
-
   const refresh = useCallback(() => {
-    loadData();
+    void loadData();
   }, [loadData]);
 
   return {
@@ -105,6 +122,7 @@ export function useEmployeeHistory(employeeId: number | null) {
     events,
     stats,
     loading,
+    error,
     refresh,
   };
 }

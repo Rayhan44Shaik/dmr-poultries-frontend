@@ -14,7 +14,6 @@ export interface PerformanceQueryParams {
   search?: string;
   driverId?: number | null;
   supervisorId?: number | null;
-  vehicleId?: number | null;
 }
 
 const PERFORMANCE_PATH = "/staff/performance";
@@ -27,7 +26,6 @@ function buildQuery(params: PerformanceQueryParams): Record<string, string | num
   if (params.search?.trim()) query.search = params.search.trim();
   if (params.driverId != null) query.driverId = params.driverId;
   if (params.supervisorId != null) query.supervisorId = params.supervisorId;
-  if (params.vehicleId != null) query.vehicleId = params.vehicleId;
   return query;
 }
 

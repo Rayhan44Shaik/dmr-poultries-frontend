@@ -24,8 +24,14 @@ const LEGACY_STORAGE_KEYS = [
 /** Cache filled exclusively by GET /api/masters/bird-types. */
 let birdTypesCache: BirdType[] = [];
 
-export type BirdTypeInput = Omit<BirdType, "id" | "birdTypeNo"> & {
+export type BirdTypeInput = Omit<BirdType, "id" | "birdTypeNo" | "category" | "ownerName" | "mobileNumber" | "address" | "latitude" | "longitude"> & {
   birdTypeNo?: number;
+  category?: BirdType["category"];
+  ownerName?: string;
+  mobileNumber?: string;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 };
 
 function clearLegacyBirdTypeStorage(): void {
@@ -49,6 +55,12 @@ export function mapBirdType(raw: Record<string, unknown>): BirdType {
     birdType: String(raw.birdType ?? raw.bird_type ?? raw.name ?? ""),
     averageWeight: Number(raw.averageWeight ?? raw.average_weight ?? 0),
     description: String(raw.description ?? ""),
+    category: raw.category === "Fuel Bunk" ? "Fuel Bunk" : "Bird",
+    ownerName: String(raw.ownerName ?? raw.owner_name ?? ""),
+    mobileNumber: String(raw.mobileNumber ?? raw.mobile_number ?? ""),
+    address: String(raw.address ?? ""),
+    latitude: raw.latitude == null || raw.latitude === "" ? null : Number(raw.latitude),
+    longitude: raw.longitude == null || raw.longitude === "" ? null : Number(raw.longitude),
     status: normalizeStatus(raw.status),
   };
 }
@@ -59,6 +71,12 @@ function toPayload(input: BirdTypeInput | Partial<BirdType>): Record<string, unk
     birdType: input.birdType?.trim(),
     averageWeight: Number(input.averageWeight ?? 0),
     description: input.description?.trim() ?? "",
+    category: input.category ?? "Bird",
+    ownerName: input.ownerName?.trim() ?? "",
+    mobileNumber: input.mobileNumber?.trim() ?? "",
+    address: input.address?.trim() ?? "",
+    latitude: input.latitude ?? null,
+    longitude: input.longitude ?? null,
     status: input.status ?? "Active",
   };
 }

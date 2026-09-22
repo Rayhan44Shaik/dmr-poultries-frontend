@@ -16,7 +16,7 @@ export default {
   'nav.vehicles_master': 'Vehicles',
   'nav.employees': 'Employees',
   'nav.banks': 'Banks',
-  'nav.birdTypes': 'Bird Types',
+  'nav.birdTypes': 'Others',
   'nav.marketRates': 'Market Rates',
   'nav.routes': 'Routes',
   'nav.dailyOperationReport': 'Operation Dashboard',

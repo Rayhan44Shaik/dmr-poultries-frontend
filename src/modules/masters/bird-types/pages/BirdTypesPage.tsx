@@ -1,14 +1,16 @@
 import "../../styles/masters.css";
-import { Bird } from "lucide-react";
+import MasterDropdown from "../../components/MasterDropdown";
+import { Layers3 } from "lucide-react";
 import { countActiveFilters } from "../../../../ui";
 import {
+  MasterDirectoryField,
   MasterDirectoryFilters,
   MasterDirectoryCard,
 } from "../../components/MasterDirectory";
 import { useI18n } from "../../../../i18n";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\bird-types\pages\BirdTypesPage.tsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
 import PageLayout from "../../../../components/common/PageLayout";
 import BirdTypeTable from "../components/BirdTypeTable";
@@ -20,8 +22,6 @@ import { exportBirdTypesToPDF } from "../utils/exportBirdTypePdf";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/birdTypeService";
 import type { BirdType } from "../types/birdType";
-import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
-import { buildBirdTypeBulkImportConfig } from "../bulkImportConfig";
 
 type BirdTypesPageProps = { embedded?: boolean };
 
@@ -29,11 +29,11 @@ const DEFAULT_PAGE_SIZE = 10;
 
 function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
-  const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingBirdType, setEditingBirdType] = useState<BirdType | null>(null);
   const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -47,11 +47,11 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     error,
     reload,
     addBirdType,
-    addBirdTypesBulk,
     editBirdType,
     removeBirdType,
     total,
     page: serverPage,
+    facets,
     exportRows,
   } = useBirdTypes({
     page: currentPage,
@@ -59,12 +59,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     search,
     status: statusFilter,
     sort: sortOrder,
+    category: typeFilter,
   });
-
-  const birdTypeBulkImportConfig = useMemo(
-    () => buildBirdTypeBulkImportConfig({ addBirdTypesBulk, reload }),
-    [addBirdTypesBulk, reload],
-  );
 
   // Reset to page 1 whenever search keyword changes
   const handleSearchChange = (value: string) => {
@@ -72,6 +68,11 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     setCurrentPage(1);
   };
 
+  const typeOptions = facets.category?.length ? facets.category : ["Bird", "Fuel Bunk"];
+  const handleTypeChange = (value: string) => {
+    setTypeFilter(value);
+    setCurrentPage(1);
+  };
   const safePage = serverPage;
   const paginatedBirdTypes = birdTypes;
 
@@ -111,21 +112,31 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         return;
       }
       const headers = [
-        "Bird Type No",
-        "Bird Type",
+        "Other No",
+        "Category",
+        "Name",
         "Average Weight (kg)",
+        "Owner",
+        "Mobile",
+        "Address",
+        "GPS",
         "Description",
         "Status",
       ];
       const rows = filteredBirdTypes.map((bt) => [
         bt.birdTypeNo.toString(),
+        bt.category,
         bt.birdType,
-        bt.averageWeight.toString(),
+        bt.category === "Bird" ? bt.averageWeight.toString() : "-",
+        bt.ownerName || "-",
+        bt.mobileNumber || "-",
+        bt.address || "-",
+        bt.latitude == null ? "-" : `${bt.latitude}, ${bt.longitude}`,
         bt.description || "-",
         bt.status,
       ]);
-      const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
-      exportToExcel("Bird Types - Master List", headers, rows, filename);
+      const filename = `Others_${new Date().toISOString().split("T")[0]}`;
+      exportToExcel("Others - Master List", headers, rows, filename);
       logAuditEvent("EXPORT_EXCEL", "BirdTypes", undefined, {
         count: filteredBirdTypes.length,
       });
@@ -138,8 +149,8 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const validateBirdType = (birdType: Partial<BirdType>): string | null => {
     const name = birdType.birdType?.trim() ?? "";
     const averageWeight = Number(birdType.averageWeight);
-
-    if (!name || Number.isNaN(averageWeight) || averageWeight <= 0) {
+    const fuel = birdType.category === "Fuel Bunk";
+    if (!name || (!fuel && (Number.isNaN(averageWeight) || averageWeight <= 0))) {
       return "Please fill all required fields with valid values.";
     }
 
@@ -149,7 +160,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         bt.id !== editingBirdType?.id,
     );
     if (duplicate) {
-      return "Bird Type already exists.";
+      return "A record with this name already exists.";
     }
 
     return null;
@@ -168,6 +179,12 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       birdType: birdType.birdType!.trim(),
       averageWeight: Number(birdType.averageWeight),
       description: birdType.description?.trim() ?? "",
+      category: birdType.category ?? "Bird",
+      ownerName: birdType.ownerName?.trim() ?? "",
+      mobileNumber: birdType.mobileNumber?.trim() ?? "",
+      address: birdType.address?.trim() ?? "",
+      latitude: birdType.latitude ?? null,
+      longitude: birdType.longitude ?? null,
       status: birdType.status ?? "Active",
     };
 
@@ -178,12 +195,12 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
           birdTypeNo: editingBirdType.birdTypeNo,
         });
         logAuditEvent("UPDATE_BIRD_TYPE", "BirdTypes", editingBirdType.id);
-        showNotification("Bird Type updated successfully!", "success");
+        showNotification("Record updated successfully!", "success");
       } else {
         const list = await addBirdType(payload);
         const created = list.find((bt) => bt.birdType === payload.birdType);
         logAuditEvent("CREATE_BIRD_TYPE", "BirdTypes", created?.id);
-        showNotification("Bird Type added successfully!", "success");
+        showNotification("Record added successfully!", "success");
       }
 
       setEditingBirdType(null);
@@ -205,7 +222,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     try {
       await removeBirdType(id);
       logAuditEvent("DELETE_BIRD_TYPE", "BirdTypes", id);
-      showNotification("Bird Type deleted successfully!", "success");
+      showNotification("Record deactivated successfully!", "success");
     } catch (err) {
       showNotification(handleApiError(err), "error");
     } finally {
@@ -215,12 +232,14 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
 
   const handleResetFilters = () => {
     setSearch("");
+    setTypeFilter("");
     setStatusFilter("");
     setSortOrder("number");
     setCurrentPage(1);
   };
   const activeFilterCount = countActiveFilters(
     search.trim() !== "",
+    typeFilter !== "",
     statusFilter !== "",
     sortOrder !== "number",
   );
@@ -233,6 +252,21 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         search={search}
         onSearchChange={handleSearchChange}
         searchPlaceholder={t("masters.dir.search_bird_type")}
+        extraActive={typeFilter !== ""}
+        extraFilter={
+          <MasterDirectoryField icon={Layers3} label="Type">
+            <MasterDropdown
+              label="Type"
+              hideLabel
+              value={typeFilter}
+              placeholder="All Types"
+              options={typeOptions}
+              onChange={handleTypeChange}
+              allowClear
+              className="w-full"
+            />
+          </MasterDirectoryField>
+        }
         status={statusFilter}
         onStatusChange={(value) => {
           setStatusFilter(value);
@@ -252,7 +286,6 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
           setEditingBirdType(null);
           setShowDialog(true);
         }}
-        onImport={() => setShowBulkImport(true)}
         onExportPDF={handleExportPDF}
         onExportExcel={handleExportExcel}
         hasRows={paginatedBirdTypes.length > 0}
@@ -261,7 +294,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       />
 
       <MasterDirectoryCard
-        icon={Bird}
+        icon={Layers3}
         title={t("masters.dir.bird_types_title")}
         total={total}
         error={error}
@@ -298,21 +331,6 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
         }}
         onSave={handleSaveBirdType}
         birdType={editingBirdType}
-      />
-      <BulkImportDialog
-        open={showBulkImport}
-        onClose={() => setShowBulkImport(false)}
-        config={birdTypeBulkImportConfig}
-        existing={birdTypes}
-        onImported={(result) => {
-          logAuditEvent("BULK_IMPORT", "BirdTypes", undefined, {
-            count: result.imported,
-          });
-          showNotification(
-            `Imported ${result.imported} of ${result.total} bird types.`,
-            result.failed === 0 ? "success" : "error",
-          );
-        }}
       />
     </div>
   );
