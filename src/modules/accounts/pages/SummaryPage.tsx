@@ -20,6 +20,7 @@ import {
   CalendarRange,
   ChartPie,
   GitCompareArrows,
+  Landmark,
   SlidersHorizontal,
 } from 'lucide-react';
 import { uiFocusRing, uiTransition } from '../../../shared/ui/uiTokens';
@@ -41,6 +42,11 @@ import { useLocation } from 'react-router-dom';
 import { analysisLinkKey, readAnalysisLink } from '../../../shared/kpi/analysisLink';
 import {
   customRange,
+  financialYearLabel,
+  financialYearRangeOf,
+  fiscalQuarterLabel,
+  fiscalQuarterRange,
+  fyStartYearContaining,
   getMonday,
   getSunday,
   isSameMonth,
@@ -313,6 +319,7 @@ const PERIOD_TABS = [
   { id: 'week',    labelKey: 'accounts.summary.period.this_week',   icon: CalendarDays,  dot: 'bg-sky-500',    text: 'text-sky-600 dark:text-sky-400' },
   { id: 'month',   labelKey: 'accounts.summary.period.month',       icon: Calendar,      dot: 'bg-indigo-500', text: 'text-indigo-600 dark:text-indigo-400' },
   { id: 'quarter', labelKey: 'accounts.summary.period.quarter',     icon: ChartPie,      dot: 'bg-violet-500', text: 'text-violet-600 dark:text-violet-400' },
+  { id: 'fy',      labelKey: 'accounts.summary.period.fy',          icon: Landmark,      dot: 'bg-orange-500',   text: 'text-orange-600 dark:text-orange-400' },
   // Custom owns teal, deliberately NOT the amber the comparison control uses.
   { id: 'custom',  labelKey: 'accounts.summary.period.custom_range', icon: CalendarRange, dot: 'bg-teal-500',   text: 'text-teal-600 dark:text-teal-400' },
 ] as const;
@@ -329,6 +336,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() - 1, 1);
   });
+  const [selectedFyStartYear, setSelectedFyStartYear] = useState<number>(() => fyStartYearContaining(new Date()));
   const [customStart, setCustomStart] = useState<string>('');
   const [customEnd, setCustomEnd] = useState<string>('');
   const [refreshKey, setRefreshKey] = useState(0);
@@ -396,6 +404,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       setCustomEnd(landing.customEnd);
       if (landing.weekAnchor) setWeekAnchor(landing.weekAnchor);
       if (landing.monthDate) setSelectedMonthDate(landing.monthDate);
+      if (landing.fyStartYear != null) setSelectedFyStartYear(landing.fyStartYear);
       setPeriod(landing.period);
       setComparePrevious(analysisLink.compare);
     }
@@ -418,6 +427,9 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       return monday;
     });
   const goToThisWeek = () => setWeekAnchor(new Date());
+  const goToPrevFy = () => setSelectedFyStartYear((prev) => prev - 1);
+  const goToNextFy = () => setSelectedFyStartYear((prev) => prev + 1);
+  const goToCurrentFy = () => setSelectedFyStartYear(fyStartYearContaining(new Date()));
 
   const goToPrevMonth = () =>
     setSelectedMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -441,6 +453,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
         return monthRange(selectedMonthDate);
       case 'quarter':
         return quarterRange();
+      case 'fy':
+        return financialYearRangeOf(selectedFyStartYear);
       case 'custom':
         return customRange(customStart, customEnd);
       default: {
@@ -448,7 +462,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
         return { start: now, end: now };
       }
     }
-  }, [period, weekAnchor, selectedMonthDate, customStart, customEnd]);
+  }, [period, weekAnchor, selectedMonthDate, selectedFyStartYear, customStart, customEnd]);
 
   const { start, end } = useMemo(getDateRange, [getDateRange]);
   const previousRange = useMemo(() => getPreviousRange(start, end), [start, end]);
@@ -587,6 +601,21 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   );
 
   const weeklyGroups = useMemo(() => {
+    // FY shows its four fiscal quarters (Q1 Apr–Jun … Q4 Jan–Mar), so the
+    // tables, KPI cards and both exports break the financial year down the
+    // same way the Quarter chip breaks the calendar year down.
+    if (period === 'fy') {
+      const groups = [];
+      for (let q = 1; q <= 4; q++) {
+        const { start: qStart, end: qEnd } = fiscalQuarterRange(selectedFyStartYear, q);
+        const qTrips = trips.filter((trip) => {
+          const d = (parseBusinessDate(trip.tripDate.slice(0, 10)) ?? new Date(NaN));
+          return d >= qStart && d <= qEnd;
+        });
+        groups.push({ label: fiscalQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
+      }
+      return groups;
+    }
     if (period === 'quarter') {
       const year = new Date().getFullYear();
       const groups = [];
@@ -638,10 +667,26 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
         return date && date >= weekStart && date <= weekEnd;
       }),
     }));
-  }, [trips, start, end, period, selectedMonthDate]);
+  }, [trips, start, end, period, selectedMonthDate, selectedFyStartYear]);
 
   // ---- Previous week-by-week groups (for side-by-side comparison beside each Week) ----
   const previousWeeklyGroups = useMemo(() => {
+    // FY compares against the previous financial year's own four fiscal
+    // quarters. previousRange for an FY span is exactly the prior 1 Apr →
+    // 31 Mar, so its start names that FY.
+    if (period === 'fy') {
+      const prevFy = fyStartYearContaining(previousRange.start);
+      const groups = [];
+      for (let q = 1; q <= 4; q++) {
+        const { start: qStart, end: qEnd } = fiscalQuarterRange(prevFy, q);
+        const qTrips = previousTrips.filter((trip) => {
+          const d = (parseBusinessDate(trip.tripDate.slice(0, 10)) ?? new Date(NaN));
+          return d >= qStart && d <= qEnd;
+        });
+        groups.push({ label: fiscalQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
+      }
+      return groups;
+    }
     // Quarter: mirror current year quarters but for previous year (previousRange year)
     if (period === 'quarter') {
       const year = previousRange.start.getFullYear();
@@ -895,6 +940,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       week: t('accounts.summary.report_title.week'),
       month: t('accounts.summary.report_title.month', { month: format(selectedMonthDate, 'MMMM yyyy') }),
       quarter: t('accounts.summary.report_title.quarter'),
+      fy: t('accounts.summary.report_title.fy', { fy: financialYearLabel(selectedFyStartYear) }),
       custom: t('accounts.summary.report_title.custom'),
     };
     return periodLabels[period] || 'Business Summary';
@@ -1130,6 +1176,36 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           )}
 
           {/* ---- Calendar range: always visible and it follows the selection. ---- */}
+          {period === 'fy' && (
+            <div className="relative inline-flex items-center gap-1 rounded-xl border border-orange-200/80 bg-white px-1.5 py-1 dark:border-orange-500/25 dark:bg-slate-800">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-orange-500" />
+              <button
+                type="button"
+                onClick={goToPrevFy}
+                aria-label={t('accounts.summary.prev_fy')}
+                className={`shrink-0 rounded-lg p-1 text-orange-500 outline-none hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/15 dark:hover:text-orange-200 ${uiFocusRing} ${uiTransition}`}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={goToCurrentFy}
+                title={rangeLabel}
+                aria-label={financialYearLabel(selectedFyStartYear)}
+                className={`inline-flex h-6 shrink-0 items-center rounded-md px-2 text-[11px] font-bold text-slate-700 outline-none hover:bg-orange-50 dark:text-slate-100 dark:hover:bg-orange-500/15 ${uiFocusRing} ${uiTransition}`}
+              >
+                {financialYearLabel(selectedFyStartYear)}
+              </button>
+              <button
+                type="button"
+                onClick={goToNextFy}
+                aria-label={t('accounts.summary.next_fy')}
+                className={`shrink-0 rounded-lg p-1 text-orange-500 outline-none hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-500/15 dark:hover:text-orange-200 ${uiFocusRing} ${uiTransition}`}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
           {period === 'custom' ? (
             <button type="button" onClick={() => setCustomEditorOpen(true)} aria-expanded={customEditorOpen} className="inline-flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50/70 px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:border-teal-500/25 dark:bg-teal-500/10 dark:text-slate-200">
               <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-teal-500" />
@@ -1161,7 +1237,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 customStart !== '' || customEnd !== '',
               )}
               onClick={() => {
-                setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false);
+                setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false); setSelectedFyStartYear(fyStartYearContaining(new Date()));
                 setCustomStart(''); setCustomEnd(''); setMonthMenuOpen(false); setExportDropdownOpen(false); setCustomEditorOpen(false);
               }}
             />
@@ -1469,7 +1545,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             <thead className="bg-slate-50 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="w-56 px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">{t('accounts.summary.weekly_table.particulars')}</th>
-                {comparePrevious && period === 'week' ? (
+                {comparePrevious && (period === 'week' || period === 'fy') ? (
                   <>
                     {previousWeeklyGroups.map((pg, idx) => (
                       <th key={`prev-${idx}`} className="w-24 px-3 py-3 text-center font-semibold text-slate-600 bg-amber-50/60 border-l border-amber-200">
@@ -1550,7 +1626,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                   <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
                     <SummaryRowLabel color={SUMMARY_ROW_DOT[item.key]} label={item.label} />
                   </td>
-                  {comparePrevious && period === 'week' ? (
+                  {comparePrevious && (period === 'week' || period === 'fy') ? (
                     <>
                       {previousWeeklyMetrics.map((prevM, idx) => {
                         const prevVal = (prevM?.[item.key as keyof WeeklyMetrics] as number) || 0;
@@ -1847,7 +1923,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             <thead className="bg-slate-50 border-b border-slate-200 dark:border-slate-700">
               <tr>
                 <th className="w-56 px-4 py-3 text-left font-semibold text-slate-600 dark:text-slate-300">{t('accounts.summary.expense_table.expense')}</th>
-                {comparePrevious && period === 'week' ? (
+                {comparePrevious && (period === 'week' || period === 'fy') ? (
                   <>
                     {previousWeeklyGroups.map((pg, idx) => (
                       <th key={`prev-${idx}`} className="w-24 px-3 py-3 text-center font-semibold text-slate-600 bg-amber-50/60 border-l border-amber-200">
@@ -1949,7 +2025,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                     <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
                       <SummaryRowLabel color={EXPENSE_ROW_DOT[item.key]} label={item.label} />
                     </td>
-                    {comparePrevious && period === 'week' ? (
+                    {comparePrevious && (period === 'week' || period === 'fy') ? (
                       <>
                         {previousWeeklyExpenses.map((prevW, idx) => {
                           const prevVal = (prevW?.[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -2068,7 +2144,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                     className="font-bold text-slate-700 dark:text-slate-200"
                   />
                 </td>
-                {comparePrevious && period === 'week' ? (
+                {comparePrevious && (period === 'week' || period === 'fy') ? (
                   <>
                     {previousWeeklyExpenses.map((prevW, idx) => {
                       const prevSum = Object.values(prevW || {}).reduce((a, b) => a + (b as number), 0);
@@ -2192,7 +2268,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                     className="font-bold text-emerald-800 dark:text-emerald-200"
                   />
                 </td>
-                {comparePrevious && period === 'week' ? (
+                {comparePrevious && (period === 'week' || period === 'fy') ? (
                   <>
                     {previousWeeklyNetProfit.map((value, idx) => (
                       <td

@@ -39,7 +39,10 @@ export const exportPDF = async (
   const margin = 12;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const fy = `Financial Year: ${new Date().getFullYear()}-${new Date().getFullYear() + 1}`;
+  // Indian financial year (1 Apr → 31 Mar), not the calendar year: in Jan–Mar
+  // the running FY started last calendar year.
+  const nowFyStart = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  const fy = `Financial Year: ${nowFyStart}-${nowFyStart + 1}`;
 
   // Colors – soft light green theme
   const greenHeaderBg: [number, number, number] = [222, 247, 231]; // emerald-50 light
@@ -368,7 +371,8 @@ export const exportExcel = (
 
   // Header
   wsData.push([title]);
-  wsData.push([`Period: ${dateRange}  |  Financial Year: ${new Date().getFullYear()}-${new Date().getFullYear() + 1}`]);
+  const xlFyStart = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  wsData.push([`Period: ${dateRange}  |  Financial Year: ${xlFyStart}-${xlFyStart + 1}`]);
   wsData.push([]);
 
   // Summary Table

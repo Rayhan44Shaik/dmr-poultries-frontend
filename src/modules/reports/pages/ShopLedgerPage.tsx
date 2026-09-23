@@ -98,11 +98,10 @@ const filterStatementByType = (
 
   const opening = { ...data[0] };
   const transactionType = normalized === "sales" ? "sale" : "collection";
-  let running = opening.balance;
-  const rows = data.slice(1).filter((row) => row.type === transactionType).map((row) => {
-    running = round2(running + row.debit - row.credit);
-    return { ...row, balance: running };
-  });
+  // Type filtering selects rows only. Every kept row retains its authoritative
+  // backend balance — recomputing a progression here would print false
+  // "Balance" figures (and a false closing) on type-filtered statements.
+  const rows = data.slice(1).filter((row) => row.type === transactionType);
   return [opening, ...rows];
 };
 
@@ -2725,7 +2724,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         {formatAmount(summary.totalCredit)}
                       </td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">
-                        {formatAmount(summary.closingBalance)}
+                        {formatAmount(scopeSummary.closingBalance)}
                       </td>
                     </tr>
                   )}

@@ -4,6 +4,12 @@ import assert from 'node:assert/strict';
 import {
   customRange,
   daysInWindow,
+  financialYearLabel,
+  financialYearRange,
+  financialYearRangeOf,
+  fiscalQuarterLabel,
+  fiscalQuarterRange,
+  fyStartYearContaining,
   monthRange,
   periodForWindow,
   quarterRange,
@@ -107,6 +113,43 @@ test('whatever the chip, the window that arrived comes back with it', () => {
     assert.equal(landing.customStart, from);
     assert.equal(landing.customEnd, to);
   }
+});
+
+test('the FY chip is the Indian financial year, 1 Apr → 31 Mar', () => {
+  // September 2026 sits in FY 2026–27.
+  assert.equal(iso(financialYearRange(NOW)), '2026-04-01..2027-03-31');
+  // February 2026 sits in FY 2025–26 — never the Jan–Dec calendar year.
+  assert.equal(iso(financialYearRange(new Date(2026, 1, 10))), '2025-04-01..2026-03-31');
+  // April itself already belongs to the new FY.
+  assert.equal(iso(financialYearRange(new Date(2026, 3, 1))), '2026-04-01..2027-03-31');
+  assert.equal(iso(financialYearRangeOf(2024)), '2024-04-01..2025-03-31');
+  assert.equal(fyStartYearContaining(new Date(2026, 2, 31)), 2025);
+  assert.equal(fyStartYearContaining(new Date(2026, 3, 1)), 2026);
+  assert.equal(financialYearLabel(2025), 'FY 2025–26');
+});
+
+test('fiscal quarters run Apr–Jun … Jan–Mar inside their FY', () => {
+  assert.equal(iso(fiscalQuarterRange(2025, 1)), '2025-04-01..2025-06-30');
+  assert.equal(iso(fiscalQuarterRange(2025, 2)), '2025-07-01..2025-09-30');
+  assert.equal(iso(fiscalQuarterRange(2025, 3)), '2025-10-01..2025-12-31');
+  assert.equal(iso(fiscalQuarterRange(2025, 4)), '2026-01-01..2026-03-31');
+  assert.equal(fiscalQuarterLabel(1), 'Q1 (Apr–Jun)');
+  assert.equal(fiscalQuarterLabel(4), 'Q4 (Jan–Mar)');
+  // The four fiscal quarters tile the FY exactly, with no gaps or overlaps.
+  const tiled = [1, 2, 3, 4].map((q) => iso(fiscalQuarterRange(2025, q))).join('|');
+  assert.equal(tiled, '2025-04-01..2025-06-30|2025-07-01..2025-09-30|2025-10-01..2025-12-31|2026-01-01..2026-03-31');
+});
+
+test('an exact financial-year window lands on the FY chip', () => {
+  const landing = periodForWindow('2025-04-01', '2026-03-31', NOW);
+  assert.equal(landing?.period, 'fy');
+  assert.equal(landing?.fyStartYear, 2025);
+  const current = periodForWindow('2026-04-01', '2027-03-31', NOW);
+  assert.equal(current?.period, 'fy');
+  assert.equal(current?.fyStartYear, 2026);
+  // A 365-day window that is NOT an FY span still cannot use the FY chip.
+  assert.equal(periodForWindow('2026-01-01', '2026-12-31', NOW)?.period, 'quarter');
+  assert.equal(periodForWindow('2025-06-14', '2026-06-13', NOW)?.period, 'custom');
 });
 
 test('a window that is not two well-ordered dates is refused', () => {
