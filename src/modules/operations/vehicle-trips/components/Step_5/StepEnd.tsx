@@ -352,6 +352,9 @@ export default function StepEnd({
 
   // ─── Handle field changes in React state (mirrored to the durable draft) ──
   const handleChange = (field: string, value: any) => {
+    // Locked trips are meter read-only: block closing-meter and diesel-table
+    // sheet edits (per-row diesel API calls are rejected server-side too).
+    if (trip.meterLocked && (field === "endMeter" || field.startsWith("diesel"))) return;
     setErrorMsg("");
     userTouchedRef.current = true;
     setSheetData((prev) => ({ ...prev, [field]: value }));
@@ -883,6 +886,7 @@ export default function StepEnd({
 
           <GeneralExpensesTable
             key={`general-${trip.id}`}
+            readOnly={trip.meterLocked === true}
             sheetData={sheetData}
             handleChange={handleChange}
             pickupTolls={trip.pickupTolls || 0}
@@ -899,6 +903,7 @@ export default function StepEnd({
 
           <DieselExpensesTable
             key={`diesel-${trip.id}`}
+            readOnly={trip.meterLocked === true}
             tripId={trip.id}
             sheetData={sheetData}
             handleChange={handleChange}
@@ -908,6 +913,12 @@ export default function StepEnd({
             destMeter={destMeter}
           />
 
+          {trip.meterLocked ? (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="font-semibold">{t("ops.trip.locked_trip_modify")}</div>
+              <div>{t("ops.trip.meter_locked_trip", { ref: trip.meterLockReason?.ref ?? "—" })}</div>
+            </div>
+          ) : null}
           {errorMsg ? (
             <div className="p-2.5 bg-red-50/70 border border-red-100 text-red-500 text-[13px] font-semibold rounded-lg">
               {errorMsg}

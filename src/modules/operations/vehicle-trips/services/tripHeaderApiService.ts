@@ -11,9 +11,11 @@ import {
   apiPut,
   apiPatch,
   apiDelete,
-  handleApiError,
+  handleApiError as baseHandleApiError,
   toApiError,
 } from "../../../../api";
+import { translate } from "../../../../i18n";
+import { translateTripApiError } from "../utils/translateValidation";
 import {
   createEmptyTrip,
   isTripStatus,
@@ -899,4 +901,11 @@ export async function deleteTripFromApi(id: number, reason?: string): Promise<{ 
   return data;
 }
 
-export { handleApiError };
+/**
+ * Trip-scoped API error messages: backend fuel/meter business codes render in
+ * the active language (English/Telugu); everything else keeps base behavior.
+ * All trip UI error paths import this symbol, so one wrapper covers them.
+ */
+export function handleApiError(error: unknown): string {
+  return translateTripApiError(translate, error) ?? baseHandleApiError(error);
+}

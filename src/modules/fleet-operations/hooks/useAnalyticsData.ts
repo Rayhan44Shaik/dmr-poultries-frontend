@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { endOfWeek, format, startOfWeek } from 'date-fns';
-import { getQuarterSampleRange } from '../../../sample/quarterSample';
 import { useFleetVehicles } from './useFleetVehicles';
 import { handleApiError, isCanceledError } from '../../../api/errors';
 import analyticsApi from '../services/analyticsApi';
@@ -114,23 +113,10 @@ export function useAnalyticsData(active = true) {
   const [fromDate, setFromDateState] = useState(() => dateString(weekStart));
   const [toDate, setToDateState] = useState(() => dateString(weekEnd));
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<number | null>(null);
-  const [sampleRange, setSampleRange] = useState<{ fromDate: string; toDate: string; today: string } | null>(null);
-  const [rangeReady, setRangeReady] = useState(false);
+  // Production Analytics always opens on the current business week. It stays
+  // disconnected from the dev-only quarter-sample server: Gate 0 forbids a
+  // production page depending on sample/demo infrastructure.
   const dateEdited = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getQuarterSampleRange().then((range) => {
-      if (cancelled) return;
-      setSampleRange(range);
-      if (range && !dateEdited.current) {
-        setFromDateState(range.fromDate);
-        setToDateState(range.toDate);
-      }
-      setRangeReady(true);
-    });
-    return () => { cancelled = true; };
-  }, []);
 
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -174,22 +160,22 @@ export function useAnalyticsData(active = true) {
     setSelectedVehicleIdState((current) => (current === value ? current : value));
   }, []);
 
-  /** The range Reset restores — sample quarter when demo data is on, else this week. */
+  /** The range Reset restores — always the current business week. */
   const defaultRange = useMemo(() => {
     const { start, end } = getCurrentWeekRange();
     return {
-      fromDate: sampleRange?.fromDate ?? dateString(start),
-      toDate: sampleRange?.toDate ?? dateString(end),
+      fromDate: dateString(start),
+      toDate: dateString(end),
     };
-  }, [sampleRange]);
+  }, []);
 
   const clearFilters = useCallback(() => {
     const { start, end } = getCurrentWeekRange();
     setSelectedVehicleIdState(null);
     dateEdited.current = true;
-    setFromDateState(sampleRange?.fromDate ?? dateString(start));
-    setToDateState(sampleRange?.toDate ?? dateString(end));
-  }, [sampleRange]);
+    setFromDateState(dateString(start));
+    setToDateState(dateString(end));
+  }, []);
 
   const refresh = useCallback(() => {
     if (inFlight.current) return;
@@ -207,7 +193,7 @@ export function useAnalyticsData(active = true) {
   }, [active, refresh]);
 
   useEffect(() => {
-    if (!rangeReady || !active) return;
+    if (!active) return;
     const key = filterKey(fromDate, toDate, selectedVehicleId);
     const hit = refreshNonce === 0 ? fleetCacheGet<FleetAnalyticsResponse>(key) : undefined;
     if (hit) {
@@ -257,7 +243,7 @@ export function useAnalyticsData(active = true) {
       loadGen.current = gen + 1;
       inFlight.current = false;
     };
-  }, [fromDate, toDate, selectedVehicleId, refreshNonce, rangeReady, active]);
+  }, [fromDate, toDate, selectedVehicleId, refreshNonce, active]);
 
   const kpis = data.kpis;
   const stats = useMemo(
@@ -296,7 +282,6 @@ export function useAnalyticsData(active = true) {
 
   return {
     stats,
-    sampleRange,
     weeklyData: data.weekly,
     expenseBreakdown: data.costCenters,
     topPerformers: data.topPerformers,

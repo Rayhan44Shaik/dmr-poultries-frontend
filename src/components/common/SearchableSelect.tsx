@@ -16,6 +16,7 @@ export interface SearchableSelectOption {
 
 interface SearchableSelectProps {
   label: string;
+  ariaLabel?: string;
   value: string;
   placeholder: string;
   options: Array<string | SearchableSelectOption>;
@@ -32,6 +33,8 @@ interface SearchableSelectProps {
   onToggleValue?: (value: string) => void;
   /** Clear every selection in multi mode. */
   onClearValues?: () => void;
+  /** Colour used for the selected row; blue remains the application default. */
+  selectionTone?: 'blue' | 'green';
 }
 
 /** Five 36px-at-default rows; rem keeps the visible window in scale. */
@@ -39,6 +42,7 @@ const LIST_MAX_HEIGHT = "11.25rem";
 
 const SearchableSelect = ({
   label,
+  ariaLabel,
   value,
   placeholder,
   options,
@@ -51,11 +55,14 @@ const SearchableSelect = ({
   selectedValues = [],
   onToggleValue,
   onClearValues,
+  selectionTone = 'blue',
 }: SearchableSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [activeIndex, setActiveIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const items = useMemo(
     () =>
@@ -86,6 +93,40 @@ const SearchableSelect = ({
   }, [items, query]);
 
   const selectedLabel = items.find((opt) => opt.value === value)?.label;
+
+  const visibleActiveIndex = Math.min(activeIndex, Math.max(0, filtered.length - 1));
+
+  const moveActive = (direction: 1 | -1) => {
+    if (filtered.length === 0) return;
+    setActiveIndex((current) => {
+      const next = (current + direction + filtered.length) % filtered.length;
+      requestAnimationFrame(() => optionRefs.current[next]?.scrollIntoView({ block: 'nearest' }));
+      return next;
+    });
+  };
+
+  const handleMenuKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!open) {
+        setOpen(true);
+        setActiveIndex(0);
+      } else {
+        moveActive(event.key === 'ArrowDown' ? 1 : -1);
+      }
+      return;
+    }
+    if (event.key === 'Enter' && open && filtered[visibleActiveIndex]) {
+      event.preventDefault();
+      pickRow(filtered[visibleActiveIndex].value);
+      return;
+    }
+    if (event.key === 'Escape' && open) {
+      event.preventDefault();
+      setOpen(false);
+      setQuery('');
+    }
+  };
   // Multi trigger: the first pick's label, then a numeric "+N" (digits read
   // the same in Telugu and English).
   const multiCount = selectedValues.length;
@@ -93,6 +134,9 @@ const SearchableSelect = ({
   const display = multi
     ? (multiCount === 0 ? placeholder : multiCount === 1 ? multiFirst ?? placeholder : `${multiFirst ?? ''} +${multiCount - 1}`)
     : selectedLabel || placeholder;
+  const selectedTextClass = selectionTone === 'green' ? 'text-emerald-700' : 'text-blue-600';
+  const selectedBgClass = selectionTone === 'green' ? 'bg-emerald-50' : 'bg-blue-50/70';
+  const selectedCheckClass = selectionTone === 'green' ? 'text-emerald-600' : 'text-blue-600';
 
   const pick = (next: string) => {
     onChange(next);
@@ -114,6 +158,10 @@ const SearchableSelect = ({
       {label ? <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</label> : null}
       <button
         type="button"
+        aria-label={ariaLabel || label || placeholder}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onKeyDown={handleMenuKeyDown}
         onClick={() => {
           if (!open) setQuery('');
           setOpen((o) => !o);
@@ -140,6 +188,7 @@ const SearchableSelect = ({
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={handleMenuKeyDown}
                   placeholder={searchPlaceholder}
                   className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
                 />
@@ -161,33 +210,38 @@ const SearchableSelect = ({
                 pick('');
               }}
               className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-                (multi ? multiCount === 0 : !value) ? 'text-blue-600 bg-blue-50/70' : 'text-slate-600'
+                (multi ? multiCount === 0 : !value) ? `${selectedTextClass} ${selectedBgClass}` : 'text-slate-600'
               }`}
             >
               <span className="w-3.5 shrink-0">
-                {(multi ? multiCount === 0 : !value) && <Check size={13} className="text-blue-600" />}
+                {(multi ? multiCount === 0 : !value) && <Check size={13} className={selectedCheckClass} />}
               </span>
               <span className="truncate">{placeholder}</span>
             </button>
           )}
 
           <ul
+            role="listbox"
             className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
             style={{ maxHeight: LIST_MAX_HEIGHT }}
           >
-            {filtered.map((opt) => {
+            {filtered.map((opt, index) => {
               const isSelected = multi ? selectedValues.includes(opt.value) : value === opt.value;
               return (
                 <li key={opt.value}>
                   <button
+                    ref={(element) => { optionRefs.current[index] = element; }}
                     type="button"
+                    role="option"
+                    aria-selected={isSelected}
                     onClick={() => pickRow(opt.value)}
+                    onMouseEnter={() => setActiveIndex(index)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? 'text-blue-600 bg-blue-50/70' : 'text-slate-700'
+                      isSelected ? `${selectedTextClass} ${selectedBgClass}` : index === visibleActiveIndex ? 'text-slate-800 bg-slate-100' : 'text-slate-700'
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
-                      {isSelected && <Check size={13} className="text-blue-600" />}
+                      {isSelected && <Check size={13} className={selectedCheckClass} />}
                     </span>
                     <span className="truncate">{opt.label}</span>
                   </button>

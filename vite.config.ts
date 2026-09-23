@@ -1,9 +1,72 @@
 import { randomUUID } from 'node:crypto'
+import { EventEmitter } from 'node:events'
+import fs from 'node:fs'
 import { ServerResponse } from 'node:http'
 import { defineConfig } from 'vite'
 import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+// ---------------------------------------------------------------------------
+// Windows watch resilience (must run before the dev server creates watchers).
+//
+// Vite's bundled chokidar attaches no 'error' listener to its root FSWatcher.
+// On Windows, `fs.watch` on a locked path (editor temp file, AV scan, …)
+// throws EBUSY; chokidar re-emits that as an 'error' event, and EventEmitter
+// treats an unhandled 'error' as fatal — the whole `npm run dev` process dies.
+// This config module is evaluated first, so the patches below are active for
+// the entire session. Ignore patterns alone cannot cover every race.
+// ---------------------------------------------------------------------------
+const WATCH_LOCK_CODES = new Set(['EBUSY', 'EPERM', 'EACCES', 'EMFILE', 'ENFILE'])
+
+const originalFsWatch = fs.watch.bind(fs) as (
+  path: fs.PathLike,
+  options?: unknown,
+  listener?: unknown,
+) => fs.FSWatcher
+fs.watch = function patchedFsWatch(
+  path: fs.PathLike,
+  options?: unknown,
+  listener?: unknown,
+): fs.FSWatcher {
+  try {
+    return originalFsWatch(path, options, listener)
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code
+    if (code && WATCH_LOCK_CODES.has(code)) {
+      // Locked path: hand chokidar a no-op watcher instead of crashing.
+      const noop = new EventEmitter() as fs.FSWatcher
+      noop.close = () => {}
+      noop.ref = () => noop
+      noop.unref = () => noop
+      return noop
+    }
+    throw error
+  }
+} as typeof fs.watch
+
+// Async watch errors still surface as 'error' on chokidar's FSWatcher
+// (detectable via its `_handleError` method). Log them; never let them
+// become an uncaught exception.
+const originalEmit = EventEmitter.prototype.emit
+EventEmitter.prototype.emit = function patchedEmit(
+  this: EventEmitter,
+  event: string | symbol,
+  ...args: unknown[]
+): boolean {
+  if (
+    event === 'error' &&
+    typeof (this as { _handleError?: unknown })._handleError === 'function'
+  ) {
+    const error = args[0] as NodeJS.ErrnoException | undefined
+    const code = error?.code
+    if (code && WATCH_LOCK_CODES.has(code)) {
+      console.warn(`[vite] ignored watcher ${code}: ${error?.message ?? ''}`)
+      return false
+    }
+  }
+  return originalEmit.call(this, event, ...args)
+} as typeof EventEmitter.prototype.emit
 
 // Fresh on every dev-server (re)start. Injected into every transformed
 // module (see the `dmr-instance-stamp` plugin below) so a running tab can
@@ -116,7 +179,23 @@ const dmrInstanceStamp = {
       },
     ]
   },
-  configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void) => void } }) {
+  configureServer(server: {
+    middlewares: {
+      use: (
+        path: string,
+        handler: (
+          req: import('node:http').IncomingMessage,
+          res: import('node:http').ServerResponse,
+        ) => void,
+      ) => void
+    },
+    watcher: { on: (event: 'error', handler: (error: Error) => void) => void },
+    config: { logger: { warn: (message: string) => void } },
+  }) {
+    // Belt-and-suspenders: any watcher error after startup is logged, never fatal.
+    server.watcher.on('error', (error) => {
+      server.config.logger.warn(`watcher error: ${error.message}`)
+    })
     server.middlewares.use('/__dmr/ping', (_req, res) => {
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('Cache-Control', 'no-store')
@@ -170,6 +249,14 @@ export default defineConfig({
         '**/playwright/.cache/**',
         '**/.scratch/**',
         '**/.auth-session/**',
+        // Scratch / temp files dropped next to sources (editors, CLIs,
+        // one-off scripts). A locked temp file once crashed the whole dev
+        // process with EBUSY — never watch them.
+        '**/*.fixed',
+        '**/*.bak-tmp',
+        '**/*.tmp',
+        '**/*.bak',
+        '**/*~',
       ],
     },
   },

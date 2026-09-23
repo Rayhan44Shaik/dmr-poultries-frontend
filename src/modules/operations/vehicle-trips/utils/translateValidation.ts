@@ -119,6 +119,46 @@ const PARAMETRIC: Array<{ pattern: RegExp; render: (t: TFunc, m: RegExpMatchArra
   },
 ];
 
+/**
+ * Backend fuel/meter business codes (ApiError.details = response body whose
+ * nested `details.code` is set by the backend) mapped to i18n keys. Dynamic
+ * refs (locking bill/trip) travel as params. Unknown codes fall through.
+ */
+const BACKEND_CODES: Record<string, string> = {
+  TRIP_METER_LOCKED: "ops.trip.meter_locked_trip",
+  MAINTENANCE_NOT_APPROVED: "ops.trip.fuel_maintenance_not_approved",
+  FUEL_NOT_APPROVED: "ops.trip.fuel_bill_not_approved",
+  VEHICLE_INACTIVE: "ops.trip.vehicle_inactive",
+  FUEL_NUMBER_CONFLICT: "ops.trip.fuel_number_conflict",
+  DUPLICATE_FUEL_REQUEST: "ops.trip.duplicate_fuel_request",
+  METER_CONFLICT: "ops.trip.meter_conflict",
+  INVALID_METER_SEQUENCE: "ops.trip.invalid_meter_sequence",
+};
+
+function backendCodeOf(error: unknown): { code: string; ref?: string } | null {
+  const details = (error as { details?: unknown } | null)?.details as
+    | { details?: unknown }
+    | undefined;
+  const inner = (details?.details ?? details) as Record<string, unknown> | undefined;
+  const code = inner?.code;
+  if (typeof code !== "string" || !BACKEND_CODES[code]) return null;
+  const ref = inner?.lockRef ?? inner?.billNo;
+  return { code, ref: ref == null ? undefined : String(ref) };
+}
+
+/**
+ * Translate a backend API error into the active language. Returns null when
+ * the error carries no known fuel/meter business code — the caller falls back
+ * to the default handler (English backend message, unchanged behavior).
+ */
+export function translateTripApiError(t: TFunc, error: unknown): string | null {
+  const found = backendCodeOf(error);
+  if (!found) return null;
+  const params = found.ref ? { ref: found.ref } : undefined;
+  const rendered = t(BACKEND_CODES[found.code], params);
+  return rendered || null;
+}
+
 /** Translate one validator message into the active language (fallback: as-is). */
 export function translateValidationMessage(t: TFunc, message: string): string {
   if (!message) return message;

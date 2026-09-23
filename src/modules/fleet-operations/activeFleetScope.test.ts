@@ -57,8 +57,18 @@ describe('Fleet Operations active scope', () => {
     assert.equal(paths.some((pathValue) => pathValue.includes('tab=dashboard')), false);
     assert.equal(paths.some((pathValue) => pathValue.includes('tab=reports')), false);
     assert.equal(paths.some((pathValue) => pathValue.includes('tab=expenses')), false);
+    // Reachability is sidebar-wide, not vehicles-section-only: Vehicle Analytics
+    // deliberately lives under Reports (nav.vehicleAnalytics →
+    // /fleet?tab=analytics), so the loop below accepts any section. The
+    // deferred-exclusion assertions above stay scoped to Vehicles.
+    const allPaths = NAV_SECTIONS.flatMap((section) =>
+      (section.children ?? []).map((child) => child.path)
+    );
     for (const tab of VISIBLE_FLEET_TABS) {
-      assert.ok(paths.some((pathValue) => pathValue.includes(`tab=${tab}`)));
+      assert.ok(
+        allPaths.some((pathValue) => pathValue.includes(`tab=${tab}`)),
+        tab
+      );
     }
     assert.ok(labels.some((label) => label.includes('fastag')));
   });
@@ -83,10 +93,13 @@ describe('Fleet Operations active scope', () => {
     const source = read('pages/FleetPages.tsx');
     assert.match(source, /lazy\(/);
     assert.match(source, /FleetTabSkeleton/);
-    assert.match(source, /MaintenanceEntryPage/);
-    assert.doesNotMatch(source, /import MaintenanceHistoryPage from/);
-    assert.doesNotMatch(source, /import VehicleAnalyticsPage from/);
-    assert.doesNotMatch(source, /import EmiLoansPage from/);
+    // Tabs resolve through the tab-loader map, never through direct page imports.
+    assert.match(source, /tabLoaders/);
+    const loaders = read('pages/fleetTabs.ts');
+    for (const tab of ACTIVE_FLEET_TABS) {
+      assert.match(loaders, new RegExp(`${tab}: \\(\\) => import\\(`), tab);
+    }
+    assert.match(loaders, /fastag: \(\) => import\(/);
     assert.match(source, /DEFERRED/);
     assert.doesNotMatch(source, /from ["']\.\/FleetDashboardPage["']/);
     assert.doesNotMatch(source, /from ["']\.\/VehicleReportsPage["']/);
@@ -188,8 +201,8 @@ describe('Fleet Operations active scope', () => {
     assert.doesNotMatch(live, /setInterval/);
     assert.doesNotMatch(live, /setTimeout/);
     assert.doesNotMatch(live, /useEffect/);
-    const pages = read('pages/FleetPages.tsx');
-    assert.match(pages, /FastagDashboardPage/);
+    const tabLoadersSource = read('pages/fleetTabs.ts');
+    assert.match(tabLoadersSource, /fastag: \(\) => import\("\.\/FastagDashboardPage"\)/);
     const routesSource = read('routes.tsx');
     assert.match(routesSource, /fleet\/fastag/);
     assert.equal(fs.existsSync(path.join(here, 'hooks/useFastagData.ts')), true);
@@ -243,7 +256,48 @@ describe('Fleet Operations active scope', () => {
       path.join(here, '../../routes/AppRoutes.tsx'),
       'utf8'
     );
-    assert.match(appRoutes, /React\.lazy\(lazyShell\(\(\) => import\("\.\.\/modules\/fleet-operations\/pages\/FleetPages"\)\)\)/);
+    assert.match(appRoutes, /lazyShell\(\(\) => import\("\.\.\/modules\/fleet-operations\/pages\/FleetPages"\)\)/);
     assert.match(appRoutes, /<Suspense fallback=\{<PageLoading \/>\}>/);
+  });
+
+  it('active Fleet data paths never touch sample infrastructure or browser storage', () => {
+    // Gate 0: a production Fleet page must not depend on the dev-only
+    // quarter-sample server and must never read business data from
+    // localStorage/sessionStorage. Preserved deferred/prototype files
+    // (useFastagData, storage.ts, FleetDashboardPage, reports pages) are
+    // intentionally excluded — they are not mounted by any live route.
+    const liveDataFiles = [
+      'hooks/useAnalyticsData.ts',
+      'hooks/useEmiData.ts',
+      'hooks/useMaintenanceData.ts',
+      'hooks/useDocumentsData.ts',
+      'hooks/useFleetVehicles.ts',
+      'services/maintenanceApi.ts',
+      'services/permitApi.ts',
+      'services/emiApi.ts',
+      'services/emiService.ts',
+      'services/analyticsApi.ts',
+      'services/fleetSessionCache.ts',
+      'pages/MaintenanceEntryPage.tsx',
+      'pages/MaintenanceHistoryPage.tsx',
+      'pages/DocumentsExpiryPage.tsx',
+      'pages/EmiLoansPage.tsx',
+      'pages/VehicleAnalyticsPage.tsx',
+      'pages/fleetTabs.ts',
+      'utils/maintenanceHelpers.ts',
+    ];
+    for (const file of liveDataFiles) {
+      const source = read(file);
+      assert.equal(source.includes('quarterSample'), false, file);
+      assert.equal(source.includes('localStorage'), false, file);
+      assert.equal(source.includes('sessionStorage'), false, file);
+    }
+    // The FASTag placeholder keeps its prototype reference only inside the
+    // commented block; the live export below it stays storage-free.
+    const fastag = read('pages/FastagDashboardPage.tsx');
+    const live = fastag.split('export default memo(FastagDashboardPage);')[1] || '';
+    assert.equal(live.includes('quarterSample'), false);
+    assert.equal(live.includes('localStorage'), false);
+    assert.equal(live.includes('sessionStorage'), false);
   });
 });

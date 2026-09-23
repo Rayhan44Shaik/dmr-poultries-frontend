@@ -21,6 +21,7 @@ import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { formatTripViewStamp } from "../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "./TripTimestampDisplay";
 import { withMinSaveDuration } from "../utils/withMinSaveDuration";
+import SearchableSelect from "../../../../components/common/SearchableSelect";
 
 interface Props {
   trip: Trip;
@@ -42,16 +43,17 @@ interface Props {
 
 type Row = BoxDetail & { uid: string };
 type PickupPhoto = { key: string; mime: string; data: string };
-/** Calm alternating tones make each horizontal group of boxes easy to follow
- * without introducing saturated colours or reducing input contrast. */
-const PICKUP_ROW_PALETTE = [
-  "bg-sky-50/55 hover:bg-sky-50/80",
-  "bg-emerald-50/50 hover:bg-emerald-50/75",
-  "bg-amber-50/50 hover:bg-amber-50/75",
-  "bg-violet-50/45 hover:bg-violet-50/70",
-  "bg-rose-50/40 hover:bg-rose-50/65",
+/** One calm tone per BOX (not per table row). Keeping all four values in the
+ * same visual band makes a box easy to track across the dense 3-up table. */
+const PICKUP_BOX_PALETTE = [
+  { cell: "bg-sky-50/75", badge: "border-sky-200 bg-sky-100 text-sky-800", edge: "border-l-sky-300" },
+  { cell: "bg-emerald-50/70", badge: "border-emerald-200 bg-emerald-100 text-emerald-800", edge: "border-l-emerald-300" },
+  { cell: "bg-amber-50/70", badge: "border-amber-200 bg-amber-100 text-amber-800", edge: "border-l-amber-300" },
+  { cell: "bg-violet-50/65", badge: "border-violet-200 bg-violet-100 text-violet-800", edge: "border-l-violet-300" },
+  { cell: "bg-rose-50/60", badge: "border-rose-200 bg-rose-100 text-rose-800", edge: "border-l-rose-300" },
 ] as const;
-const pickupRowTone = (index: number) => PICKUP_ROW_PALETTE[index % PICKUP_ROW_PALETTE.length];
+const pickupBoxTone = (boxNo: number) =>
+  PICKUP_BOX_PALETTE[(Math.max(1, boxNo) - 1) % PICKUP_BOX_PALETTE.length];
 const generateUid = () => Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 const makeRow = (boxNo: number, defaultBirds = 0): Row => ({
   uid: generateUid(),
@@ -118,6 +120,7 @@ export default function StepPickup({
   const pendingWeightFocusUidRef = useRef<string | null>(null);
   const weightInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedBoxNo, setSelectedBoxNo] = useState("");
 
   // Temporary session default for NEW box bird counts only — never persisted,
   // never shown on Trip List / Recent Activity. Changing 18→15 does not rewrite
@@ -127,7 +130,24 @@ export default function StepPickup({
   useEffect(() => {
     setDefaultBoxSizeDraft("");
     setAppliedDefaultBoxSize(0);
+    setSelectedBoxNo("");
   }, [trip.id]);
+
+  const selectBox = (value: string) => {
+    setSelectedBoxNo(value);
+    const boxNo = Number(value);
+    const row = rows.find((item) => item.boxNo === boxNo);
+    if (!row) return;
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-pickup-box-no="${boxNo}"]`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+      const weightInput = weightInputRefs.current.get(row.uid);
+      weightInput?.focus({ preventScroll: true });
+      weightInput?.select();
+    });
+  };
 
   const applyDefaultBoxSize = () => {
     const n = Math.floor(Number(defaultBoxSizeDraft));
@@ -859,23 +879,23 @@ export default function StepPickup({
 
         {/* Load-scoped submitted DC photos — visible for inspection, not only PDF. */}
         {photos.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="mb-3 flex items-center gap-2 text-[13px] font-semibold text-slate-700">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-2">
+            <div className="flex shrink-0 items-center gap-2 text-[12px] font-semibold text-slate-700">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-50/80 text-emerald-500"><Camera size={16} /></span>
               <span>{t("ops.trip.photos_uploaded", { count: photos.length })} · Load {Number(trip.activeLegIndex ?? 1)}</span>
             </div>
-            <div className="flex flex-wrap justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-start gap-2">
               {photos.map((photo, index) => (
                 <a
                   key={photo.key}
                   href={photo.data}
                   target="_blank"
                   rel="noreferrer"
-                  className="group w-48 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="group w-28 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   aria-label={`View Load ${Number(trip.activeLegIndex ?? 1)} pickup photo ${index + 1}`}
                 >
-                  <img src={photo.data} alt={`Load ${Number(trip.activeLegIndex ?? 1)} pickup ${index + 1}`} className="h-32 w-48 object-contain transition-transform duration-200 group-hover:scale-[1.02]" />
-                  <span className="block border-t border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-500">Photo {index + 1} · Click to view</span>
+                  <img src={photo.data} alt={`Load ${Number(trip.activeLegIndex ?? 1)} pickup ${index + 1}`} className="h-16 w-28 object-contain transition-transform duration-200 group-hover:scale-[1.02]" />
+                  <span className="block truncate border-t border-slate-200 bg-white px-1.5 py-1 text-[9px] font-semibold text-slate-500">Photo {index + 1} · View</span>
                 </a>
               ))}
             </div>
@@ -884,7 +904,7 @@ export default function StepPickup({
 
         {/* Box Table */}
         {trip.boxDetails && trip.boxDetails.length > 0 && (
-          <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="max-h-[32rem] overflow-x-auto overflow-y-auto rounded-xl border border-slate-200 bg-white">
             <table className="w-full table-fixed border-collapse text-[13px]">
               <colgroup>
                 {Array.from({ length: 12 }).map((_, i) => (
@@ -905,17 +925,20 @@ export default function StepPickup({
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {grouped.map((group, idx) => (
-                  <tr key={idx} className={`${pickupRowTone(idx)} transition-colors`}>
-                    {group.map((r, colIdx) => (
+                  <tr key={idx} className="bg-white">
+                    {group.map((r, colIdx) => {
+                      const tone = pickupBoxTone(r.boxNo);
+                      return (
                       <React.Fragment key={r.boxNo}>
-                        <td className={`text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200 ${colIdx > 0 ? 'pl-4' : ''}`}>{r.boxNo}</td>
-                        <td className="text-center px-2 py-2 font-bold text-slate-800 border-r border-slate-200">{r.birds || t("ops.trip.not_entered")}</td>
-                        <td className="text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200">{r.weight ? Number(r.weight).toFixed(2) : t("ops.trip.not_entered")}</td>
-                        <td className={`text-center px-2 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
+                        <td className={`border-l-2 ${tone.edge} ${tone.cell} text-center px-2 py-2 font-semibold border-r border-slate-200 ${colIdx > 0 ? 'pl-4' : ''}`}><span className={`inline-flex h-6 min-w-7 items-center justify-center rounded-md border px-1.5 font-bold shadow-sm ${tone.badge}`}>{r.boxNo}</span></td>
+                        <td className={`${tone.cell} text-center px-2 py-2 font-bold text-slate-800 border-r border-slate-200`}>{r.birds || t("ops.trip.not_entered")}</td>
+                        <td className={`${tone.cell} text-center px-2 py-2 font-semibold text-slate-800 border-r border-slate-200`}>{r.weight ? Number(r.weight).toFixed(2) : t("ops.trip.not_entered")}</td>
+                        <td className={`${tone.cell} text-center px-2 py-2 font-semibold text-slate-800 ${colIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
                           {formatAvg(Number(r.birds), Number(r.weight), r.avgWeight)}
                         </td>
                       </React.Fragment>
-                    ))}
+                      );
+                    })}
                     {group.length < 3 &&
                       Array.from({ length: 3 - group.length }).map((_, i) => {
                         const emptyIdx = group.length + i;
@@ -1144,7 +1167,24 @@ export default function StepPickup({
               </span>
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
-            <label className="inline-flex items-center gap-1.5 shrink-0">
+            <div className="inline-flex items-end gap-2 shrink-0">
+            <SearchableSelect
+              label=""
+              ariaLabel={`Loaded boxes, ${rows.length} available`}
+              value={selectedBoxNo}
+              placeholder={`Loaded boxes (${rows.length})`}
+              searchPlaceholder="Search box number..."
+              options={rows.map((row) => ({
+                value: String(row.boxNo),
+                label: `${row.boxNo} · ${row.weight || 0} kg`,
+              }))}
+              onChange={selectBox}
+              searchable
+              allowClear={false}
+              selectionTone="green"
+              widthClass="w-48"
+            />
+            <label className="inline-flex items-center gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
                 {t("ops.trip.default_box_size")}
               </span>
@@ -1181,6 +1221,7 @@ export default function StepPickup({
                 </span>
               )}
             </label>
+            </div>
           </div>
 
           <div
@@ -1207,7 +1248,7 @@ export default function StepPickup({
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {groupedRows.map((group, idx) => (
-                  <tr key={idx} className={`${pickupRowTone(idx)} transition-colors`}>
+                  <tr key={idx} className="bg-white">
                     {group.map((slot, groupIdx) => {
                       if (slot.type === "add") {
                         return (
@@ -1229,10 +1270,12 @@ export default function StepPickup({
                         );
                       }
                       const row = slot.row;
+                      const tone = pickupBoxTone(row.boxNo);
+                      const isSelectedBox = selectedBoxNo === String(row.boxNo);
                       return (
                       <React.Fragment key={row.uid}>
-                        <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-[13px] bg-transparent border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}><span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-white/80 bg-white/75 px-1 shadow-sm">{row.boxNo}</span></td>
-                        <td className="px-1 py-1.5 bg-transparent border-r border-slate-200">
+                        <td data-pickup-box-no={row.boxNo} className={`border-l-2 ${tone.edge} ${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} text-center px-1 py-1.5 font-bold text-[13px] border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}><span className={`inline-flex h-6 min-w-7 items-center justify-center rounded-md border px-1.5 shadow-sm ${isSelectedBox ? 'border-emerald-500 bg-emerald-600 text-white' : tone.badge}`}>{row.boxNo}</span></td>
+                        <td className={`${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} px-1 py-1.5 border-r border-slate-200`}>
                           <input
                             type="number"
                             step="1"
@@ -1247,7 +1290,7 @@ export default function StepPickup({
                             title={t("ops.trip.birds_click_to_edit")}
                           />
                         </td>
-                        <td className="px-1 py-1.5 bg-transparent border-r border-slate-200">
+                        <td className={`${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} px-1 py-1.5 border-r border-slate-200`}>
                           <div className="flex items-center gap-0.5">
                             <input
                               ref={(el) => {
@@ -1275,7 +1318,7 @@ export default function StepPickup({
                             </button>
                           </div>
                         </td>
-                        <td className={`text-center px-1 py-1.5 text-[13px] font-semibold text-slate-700 bg-transparent ${groupIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
+                        <td className={`${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} text-center px-1 py-1.5 text-[13px] font-semibold text-slate-700 ${groupIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
                           {formatAvg(row.birds, row.weight, row.avgWeight)}
                         </td>
                       </React.Fragment>

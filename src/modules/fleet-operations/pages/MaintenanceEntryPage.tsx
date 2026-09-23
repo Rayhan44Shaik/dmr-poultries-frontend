@@ -51,6 +51,8 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
     record: null,
   });
 
+  /** In-flight approve guard: double-clicking Approve must not fire twice. */
+  const [approving, setApproving] = useState(false);
   // --- Deleted records (soft-deleted from backend, exposed by the hook) ---
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
@@ -244,7 +246,8 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
 
   const confirmApprove = async () => {
     const record = approveDialog.record;
-    if (!record || !record.id) return;
+    if (!record || !record.id || approving) return;
+    setApproving(true);
     try {
       await maintenanceApi.approve(record.id, 'system');
       showNotification(t('fleet.maintenance_entry.approved_success'), 'success');
@@ -255,6 +258,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
     } catch (err) {
       showNotification(String(err), 'error');
     } finally {
+      setApproving(false);
       setApproveDialog({ open: false, record: null });
     }
   };
@@ -429,6 +433,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
                 <button
                   onClick={() => setApproveDialog({ open: false, record: null })}
                   className="text-slate-400 hover:text-slate-600"
+                  aria-label={t('common.close')}
                 >
                   <X size={18} />
                 </button>
@@ -444,9 +449,10 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
                   </button>
                   <button
                     onClick={confirmApprove}
+                    disabled={approving}
                     className="px-4 py-2 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition shadow-sm"
                   >
-                    {t('common.approve')}
+                    {approving ? t('common.saving') : t('common.approve')}
                   </button>
                 </div>
               </div>

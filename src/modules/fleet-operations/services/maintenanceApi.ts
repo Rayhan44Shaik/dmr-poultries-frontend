@@ -1,6 +1,6 @@
 // Backend API client for Fleet Maintenance + bill/spare-part documents.
 // The maintenance records and the document binaries live in PostgreSQL — this
-// layer talks to the backend, it never stores binary data in localStorage.
+// layer talks to the backend; binary data is never kept in browser storage.
 import apiClient from '../../../api/client';
 import { saveAs } from 'file-saver';
 import type { MaintenanceDocument, MaintenanceEvent } from '../types';

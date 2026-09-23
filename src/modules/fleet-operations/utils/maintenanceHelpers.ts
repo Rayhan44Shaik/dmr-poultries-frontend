@@ -23,35 +23,10 @@ export const safeDate = (value?: string | number): Date => {
 };
 
 // ============================================================
-// BILL NUMBER GENERATION
+// BILL NUMBERS — SERVER-ALLOCATED ONLY
 // ============================================================
-
-/**
- * Get the next bill number WITHOUT incrementing the counter.
- * Used for display in the form (preview).
- */
-export const getBillNumberPreview = (vehicleId: string, vehicleNumber: string): string => {
-  const lastFour = vehicleNumber.slice(-4);
-  const storageKey = `maintenance_bill_counter_${vehicleId}`;
-  const counter = parseInt(localStorage.getItem(storageKey) || '0', 10);
-  const next = counter + 1;
-  return `Veh-${lastFour}-${next.toString().padStart(4, '0')}`;
-};
-
-/**
- * Increment the counter for a vehicle – called ONLY after successful save.
- */
-export const incrementBillCounter = (vehicleId: string): void => {
-  const storageKey = `maintenance_bill_counter_${vehicleId}`;
-  const counter = parseInt(localStorage.getItem(storageKey) || '0', 10);
-  localStorage.setItem(storageKey, (counter + 1).toString());
-};
-
-/**
- * Generate a new bill number (increments counter) – legacy, kept for compatibility.
- */
-export const generateBillNumber = (vehicleId: string, vehicleNumber: string): string => {
-  const preview = getBillNumberPreview(vehicleId, vehicleNumber);
-  incrementBillCounter(vehicleId);
-  return preview;
-};
+//
+// Bill numbers (MNT-YYYYMMDD-NNNN) are allocated atomically by the backend.
+// A retired per-device counter lived here; it is intentionally removed:
+// device-local counters duplicate across tabs/devices and disagree with the
+// server sequence, so the frontend must never mint bill numbers.

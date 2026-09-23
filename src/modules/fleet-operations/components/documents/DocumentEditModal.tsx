@@ -4,7 +4,7 @@ import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import { makeT, useI18n, type Language } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { formatVehicleNumber } from "../../../../utils/format";
-import { toBusinessDate } from "../../../../utils/businessDate";
+import { isBusinessDate, toBusinessDate } from "../../../../utils/businessDate";
 import type { LucideIcon } from "lucide-react";
 import {
   X,
@@ -131,17 +131,21 @@ const getExpiry = (doc: PermitDocView | undefined): string | undefined => {
 const normalizeDate = (input: string | Date | null | undefined): string => {
   if (!input) return "";
   if (typeof input === "string") {
+    // Date-only strings are already calendar days: validate, never shift zones.
+    if (isBusinessDate(input.trim())) return input.trim();
     const date = new Date(input);
-    if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
+    if (!isNaN(date.getTime())) return toBusinessDate(date);
     const parts = input.split("/");
     if (parts.length === 3) {
-      const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+      // Legacy dd/MM/yyyy entries: strict local parse, reject rollover dates.
+      const day = `${parts[2]}-${String(parts[1]).padStart(2, "0")}-${String(parts[0]).padStart(2, "0")}`;
+      if (isBusinessDate(day)) return day;
+
     }
     return "";
   }
   if (input instanceof Date) {
-    if (!isNaN(input.getTime())) return input.toISOString().split("T")[0];
+    if (!isNaN(input.getTime())) return toBusinessDate(input);
   }
   return "";
 };
@@ -197,6 +201,8 @@ const DocumentEditModal = ({
   >({});
   const [removeFlags, setRemoveFlags] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  /** In-flight save guard: double-clicking Save must not fire twice. */
+  const [saving, setSaving] = useState(false);
 
   const handleDateChange = (type: string, value: string | Date | null) => {
     const normalized = normalizeDate(value);
@@ -235,6 +241,7 @@ const DocumentEditModal = ({
   };
 
   const handleSave = async () => {
+    if (saving) return;
     const newErrors: Record<string, string> = {};
     const todayStr = toBusinessDate(new Date());
 
@@ -320,9 +327,12 @@ const DocumentEditModal = ({
       return;
     }
 
+    setSaving(true);
     try {
       await onSave(vehicle.id, updates, files, removes);
+      setSaving(false);
     } catch {
+      setSaving(false);
       showNotification(t("fleet.documents.update_failed"), "error");
     }
   };

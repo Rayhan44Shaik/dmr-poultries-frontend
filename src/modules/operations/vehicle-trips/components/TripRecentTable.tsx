@@ -270,6 +270,10 @@ function TripRecentTable({
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + pageSize);
 
+  /** Initial load (no cached rows) vs background refresh (rows stay mounted). */
+  const isInitialLoading = isLoading && safeTrips.length === 0;
+  const isRefreshing = isLoading && safeTrips.length > 0;
+
   const selectedTrip = safeTrips.find((t) => Number(t.id) === Number(selectedTripId)) || null;
 
   // Prefer createdAt; fall back to tripDate so a missing stamp never disables actions.
@@ -398,7 +402,7 @@ function TripRecentTable({
 
   return (
     <>
-      <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
+      <div ref={tableRef} aria-busy={isLoading || undefined} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex flex-wrap items-center gap-3">
@@ -411,7 +415,7 @@ function TripRecentTable({
 
             {/* Selected-tab count beside the title (updates when Draft/Pending/Deleted is clicked) */}
             <span
-              className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums"
+              className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums min-w-[2.5rem]"
             >
               {selectedTabCount}
             </span>
@@ -490,13 +494,18 @@ function TripRecentTable({
                 <span className={`inline-flex ${canDelete ? uiActionIconMotionClass.delete : ""}`}><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
-              <BrandRefreshButton onClick={() => onRefresh()} />
+              <BrandRefreshButton loading={isLoading} onClick={() => onRefresh()} />
             </div>
           </div>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto [scrollbar-gutter:stable]">
+          {isRefreshing && (
+            <div aria-hidden="true" className="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-transparent">
+              <div className="h-full w-full animate-pulse bg-emerald-300/80" />
+            </div>
+          )}
           <table className="min-w-full text-sm text-left border-collapse">
             <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
               <tr>
@@ -515,16 +524,18 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.load")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={13} className="py-16 text-center text-sm font-medium text-slate-400">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
-                      {t("ops.trip.loading_recent")}
-                    </span>
-                  </td>
-                </tr>
+            <tbody className={isRefreshing ? "divide-y divide-slate-100 opacity-60 transition-opacity duration-150" : "divide-y divide-slate-100 transition-opacity duration-150"}>
+              {isInitialLoading ? (
+                Array.from({ length: pageSize }).map((_, skeletonRow) => (
+                  <tr key={`recent-skeleton-${skeletonRow}`} className="h-[53px]">
+                    {Array.from({ length: 13 }).map((_, skeletonCell) => (
+                      <td key={skeletonCell} className="px-4 py-3" aria-hidden="true">
+                        <div className="h-3.5 animate-pulse rounded-md bg-slate-100" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+
               ) : paginatedTrips.length === 0 ? (
                 <tr><td colSpan={13} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
               ) : (
@@ -545,7 +556,7 @@ function TripRecentTable({
                       }}
                       onKeyDown={(event) => handleRowKeyDown(event, index)}
                       aria-selected={isSelected}
-                      className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}
+                      className={`cursor-pointer border-l-4 border-l-transparent outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}
                     >
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {localizeTripViewText(trip.tripNo, language)}
@@ -610,7 +621,7 @@ function TripRecentTable({
                                   e.stopPropagation();
                                   if (badge.resume && onResume) onResume(trip);
                                 }}
-                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.resume ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "cursor-default"} transition-all duration-200 ${badge.color}`}
+                                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${badge.resume ? "cursor-pointer hover:shadow-md active:scale-95" : "cursor-default"} transition-colors duration-150 ${badge.color}`}
                               >
                                 {badge.icon}
                                 {badge.label}
@@ -634,6 +645,7 @@ function TripRecentTable({
             10-row threshold. The bar also hosts rows-per-page, which must stay
             reachable on small tabs (Pending/Deleted hold well under 10 rows,
             and shouldShowPagination() was hiding the control there entirely). */}
+        <div className="min-h-[68px]">
         {filteredTrips.length > 0 && (
           <TripPagination
             currentPage={safeCurrentPage}
@@ -647,6 +659,7 @@ function TripRecentTable({
             }}
           />
         )}
+        </div>
       </div>
 
       <PendingDeleteNotification

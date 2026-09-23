@@ -517,6 +517,8 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   invalid,
   error,
   latestMeter,
+  locked,
+  lockRef,
   onChange,
 }: {
   value: string;
@@ -524,6 +526,8 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
   invalid?: boolean;
   error?: string | null;
   latestMeter?: { meter: number; tripNo: string; tripDate: string } | null;
+  locked?: boolean;
+  lockRef?: string | null;
   onChange: (value: string) => void;
 }) {
   const { t } = useI18n();
@@ -564,6 +568,12 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         }`}
         placeholder="0.00"
       />
+      {locked ? (
+        <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="font-semibold">{t("ops.trip.locked_trip_modify")}</div>
+          <div>{t("ops.trip.meter_locked_trip", { ref: lockRef ?? "—" })}</div>
+        </div>
+      ) : null}
       {error ? (
         <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
           <span aria-hidden>⚠</span>
@@ -846,6 +856,10 @@ function StepStart({
   }, [patchForm]);
 
   const handleOpeningMeterChange = useCallback((openingMeterText: string) => {
+    // Locked trips are meter read-only (a later approved same-vehicle fuel /
+    // maintenance / trip transaction exists). The banner explains why; the
+    // backend rejects direct API writes with 409 regardless of this guard.
+    if (loadSnapshot.meterLocked) return;
     patchForm({ openingMeterText });
   }, [patchForm]);
 
@@ -933,6 +947,14 @@ function StepStart({
   }, [onExitEdit, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
+  // Backend-computed meter lock: a later approved same-vehicle fuel /
+  // maintenance / trip transaction exists. The opening meter renders read-only
+  // with the reason; enforcement stays server-side (409 on direct API writes).
+  const meterLocked = Boolean(loadSnapshot.meterLocked);
+  const meterLockRef =
+    typeof loadSnapshot.meterLockReason?.ref === "string"
+      ? loadSnapshot.meterLockReason.ref
+      : null;
   const submitLabel = startStepSubmitted
     ? "ops.trip.update_start_details"
     : "ops.trip.submit_start_details";
@@ -1288,6 +1310,8 @@ function StepStart({
           {/* Opening Meter stays LAST in Step 1 (after Loaders and Advance). */}
           <OpeningMeterField
             value={form.openingMeterText}
+            locked={meterLocked}
+            lockRef={meterLockRef}
             disabled={inputsLocked}
             invalid={fieldInvalid.openingMeter}
             error={openingMeterError}

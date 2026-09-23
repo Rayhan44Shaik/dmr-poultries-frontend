@@ -98,6 +98,9 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
           </div>
 
           <p className="relative mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">FASTAG</p>
+          <h1 className="relative text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+            {t('fleet.fastag.management_title')}
+          </h1>
           <div className="relative mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-700">
             <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
             {t('fleet.fastag.under_construction')}

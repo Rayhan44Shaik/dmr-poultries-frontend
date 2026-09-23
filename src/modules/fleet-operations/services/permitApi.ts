@@ -1,6 +1,6 @@
 // Backend API client for Fleet → Permits (vehicle permit / document expiry).
 // Records and optional scans live in PostgreSQL — this layer talks to the
-// backend; it never stores permit data in localStorage.
+// backend; permit data is never kept in browser storage.
 import apiClient from '../../../api/client';
 import { saveAs } from 'file-saver';
 import type { PermitDocument } from '../types';

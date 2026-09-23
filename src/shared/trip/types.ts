@@ -129,6 +129,10 @@ export interface Trip {
   helpers: string[];
   loaders?: string[];
   openingMeter: number | null;
+  /** Proactive meter-lock state from trip detail reads (backend-computed). */
+  meterLocked?: boolean;
+  /** Lock reason when meterLocked (locking event kind + ref). */
+  meterLockReason?: { kind: "trip" | "maintenance" | "fuel"; ref: string; eventDate: string; approvedAt: string | null } | null;
   startStepSubmitted: boolean;
   /** Official Step 1 submit timestamp (IST, with seconds) — set once at first
    *  submit, never modified by later edits/saves. Display/audit only. */

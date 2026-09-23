@@ -215,6 +215,9 @@ export default function StepFarm({
   );
 
   const handleDestMeterChange = (value: string) => {
+    // Locked trips are meter read-only (later approved same-vehicle fuel /
+    // maintenance / trip transaction). Backend rejects direct API writes too.
+    if (trip.meterLocked) return;
     const num = value === "" ? 0 : Number(value);
     updateTrip({ destMeter: num });
     const invalid = isMeterInvalid(num, previousMeterFloor) && num > 0;
@@ -608,6 +611,12 @@ export default function StepFarm({
               } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="0.00"
             />
+            {trip.meterLocked ? (
+              <div className="mb-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <div className="font-semibold">{t("ops.trip.locked_trip_modify")}</div>
+                <div>{t("ops.trip.meter_locked_trip", { ref: trip.meterLockReason?.ref ?? "—" })}</div>
+              </div>
+            ) : null}
             {destMeterError || fieldErrors.destMeter ? (
               <div className="mt-1 rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-[11px] font-semibold text-red-500">
                 {destMeterError || fieldErrors.destMeter}
