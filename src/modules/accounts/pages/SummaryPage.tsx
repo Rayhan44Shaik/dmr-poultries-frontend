@@ -138,19 +138,6 @@ function splitPeriodLabel(label: string): { name: string; span: string } {
   return { name: label.slice(0, m.index).trim(), span: [m[1], m[2].trim()].filter(Boolean).join(' ') };
 }
 
-const getQuarterLabel = (quarter: number): string => {
-  const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'];
-  return labels[quarter - 1] || `Q${quarter}`;
-};
-
-const getQuarterRange = (year: number, quarter: number): { start: Date; end: Date } => {
-  const startMonth = (quarter - 1) * 3;
-  const start = new Date(year, startMonth, 1);
-  const end = new Date(year, startMonth + 3, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-};
-
 const getPreviousRange = (start: Date, end: Date): { start: Date; end: Date } => {
   const diffMs = end.getTime() - start.getTime();
   const previousEnd = new Date(start);
@@ -452,7 +439,9 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       case 'month':
         return monthRange(selectedMonthDate);
       case 'quarter':
-        return quarterRange();
+        // The Quarter chip shows the selected financial year (1 Apr → 31 Mar)
+        // broken into its four fiscal quarters — never the Jan–Dec year.
+        return quarterRange(selectedFyStartYear);
       case 'fy':
         return financialYearRangeOf(selectedFyStartYear);
       case 'custom':
@@ -603,7 +592,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const weeklyGroups = useMemo(() => {
     // FY shows its four fiscal quarters (Q1 Apr–Jun … Q4 Jan–Mar), so the
     // tables, KPI cards and both exports break the financial year down the
-    // same way the Quarter chip breaks the calendar year down.
+    // same way the Quarter chip breaks the selected financial year down.
     if (period === 'fy') {
       const groups = [];
       for (let q = 1; q <= 4; q++) {
@@ -617,15 +606,16 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       return groups;
     }
     if (period === 'quarter') {
-      const year = new Date().getFullYear();
+      // The Quarter chip breaks the SELECTED financial year into its four
+      // fiscal quarters (Q1 Apr-Jun … Q4 Jan-Mar) — never calendar quarters.
       const groups = [];
       for (let q = 1; q <= 4; q++) {
-        const { start: qStart, end: qEnd } = getQuarterRange(year, q);
+        const { start: qStart, end: qEnd } = fiscalQuarterRange(selectedFyStartYear, q);
         const qTrips = trips.filter((trip) => {
           const d = (parseBusinessDate(trip.tripDate.slice(0, 10)) ?? new Date(NaN));
           return d >= qStart && d <= qEnd;
         });
-        groups.push({ label: getQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
+        groups.push({ label: fiscalQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
       }
       return groups;
     }
@@ -687,17 +677,17 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       }
       return groups;
     }
-    // Quarter: mirror current year quarters but for previous year (previousRange year)
+    // Quarter: mirror the selected FY's fiscal quarters for the previous FY.
     if (period === 'quarter') {
-      const year = previousRange.start.getFullYear();
+      const prevFy = selectedFyStartYear - 1;
       const groups = [];
       for (let q = 1; q <= 4; q++) {
-        const { start: qStart, end: qEnd } = getQuarterRange(year, q);
+        const { start: qStart, end: qEnd } = fiscalQuarterRange(prevFy, q);
         const qTrips = previousTrips.filter((trip) => {
           const d = (parseBusinessDate(trip.tripDate.slice(0, 10)) ?? new Date(NaN));
           return d >= qStart && d <= qEnd;
         });
-        groups.push({ label: getQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
+        groups.push({ label: fiscalQuarterLabel(q), startDate: qStart, endDate: qEnd, trips: qTrips });
       }
       return groups;
     }
@@ -760,7 +750,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
         return date && date >= weekStart && date <= weekEnd;
       }),
     }));
-  }, [period, selectedMonthDate, previousTrips, previousRange, previousTwoWeeksRange, previousTwoWeeksTrips, start]);
+  }, [period, selectedMonthDate, selectedFyStartYear, previousTrips, previousRange, previousTwoWeeksRange, previousTwoWeeksTrips, start]);
 
   const previousWeeklyMetrics: WeeklyMetrics[] = useMemo(() => {
     const sourceCollections = period === 'week' ? previousTwoWeeksCollections : previousCollections;
@@ -797,22 +787,24 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
 
   const quarterComparisonData = useMemo(() => {
     if (period !== 'quarter' || !comparePrevious) return null;
+    // Trailing two fiscal quarters plus the current one, all inside the
+    // Apr-Mar financial year (Q1 Apr-Jun … Q4 Jan-Mar of FY start year + 1).
     const now = new Date();
-    const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
-    const currentYear = now.getFullYear();
+    const m = now.getMonth();
+    const curFy = m >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const curQ = m >= 3 ? Math.floor((m - 3) / 3) + 1 : 4;
     const result: { label: string; start: Date; end: Date; metrics: WeeklyMetrics; expenses: ExpenseBreakdown; distance: number; trips: Trip[] }[] = [];
     for (let offset = 2; offset >= 0; offset--) {
-      let q = currentQuarter - offset;
-      let y = currentYear;
-      while (q <= 0) { q += 4; y -= 1; }
-      while (q > 4) { q -= 4; y += 1; }
-      const { start: s, end: e } = getQuarterRange(y, q);
+      const total = curFy * 4 + (curQ - 1) - offset;
+      const fy = Math.floor(total / 4);
+      const q = (total % 4) + 1;
+      const { start: s, end: e } = fiscalQuarterRange(fy, q);
       const tripsQ = summaryService.getCompletedTripsByDateRange(s, e);
       const collQ = summaryService.getApprovedCollectionsByDateRange(s, e);
       const metricsQ = summaryService.computeMetrics(tripsQ, collQ);
       const expensesQ = computeEffectiveExpenses(tripsQ, s, e);
       const distance = tripsQ.reduce((sum, tr) => sum + getTripDistanceKm(tr), 0);
-      result.push({ label: `${getQuarterLabel(q)} ${y}`, start: s, end: e, metrics: metricsQ, expenses: expensesQ, distance, trips: tripsQ });
+      result.push({ label: `${fiscalQuarterLabel(q)} ${financialYearLabel(fy)}`, start: s, end: e, metrics: metricsQ, expenses: expensesQ, distance, trips: tripsQ });
     }
     return result;
   }, [period, comparePrevious, computeEffectiveExpenses, summaryService]);

@@ -1279,8 +1279,9 @@ export default function UnLoadingTable({
               </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                <div className="grid min-w-[1100px] grid-cols-[3rem_3.5rem_minmax(12rem,1.5fr)_repeat(5,minmax(5.5rem,1fr))_minmax(11rem,1.3fr)_8rem] gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  <span className="text-center">S.No</span><span className="text-center">Mode</span><span>Shop / Sub Shop / Remarks</span><span className="text-center">Boxes</span><span className="text-center">Birds</span><span className="text-center">Weight (kg)</span><span className="text-center">W.L (kg)</span><span className="text-center">Mortality</span><span className="text-center">Time</span><span className="text-right">Actions</span>
+                {/* Time column removed from the UI; former width is shared equally across the data columns. autoCaptureTime stays on each row for PDF/API. */}
+                <div className="grid min-w-[1000px] grid-cols-[3.5rem_4rem_minmax(11rem,1.35fr)_repeat(5,minmax(0,1fr))_8.5rem] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-600">
+                  <span className="text-center">S.No</span><span className="text-center">Mode</span><span>Shop / Sub Shop / Remarks</span><span className="text-center">Boxes</span><span className="text-center">Birds</span><span className="text-center">Weight (kg)</span><span className="text-center">W.L (kg)</span><span className="text-center">Mortality</span><span className="text-right">Actions</span>
                 </div>
                 {currentRows.map((row) => {
                   const emailStatus = emailEffectiveStatus?.(row.id) ?? "pending";

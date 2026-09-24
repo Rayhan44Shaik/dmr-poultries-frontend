@@ -320,6 +320,7 @@ export default function ShopDeliveryForm({
               placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
               searchPlaceholder={t("ops.trip.search_shop_bird")}
               disabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
+              matchMode="prefix"
               onChange={(value) => {
                 if (!value) {
                   handleShopSelect(null);

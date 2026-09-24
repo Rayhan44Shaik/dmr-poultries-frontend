@@ -130,7 +130,7 @@ const DropdownSearchBox = React.memo(function DropdownSearchBox({
 });
 
 /** Shared dropdown panel behaviour: outside-click close + autofocused search. */
-function useDropdownPanel() {
+function useDropdownPanel(matchMode: "includes" | "prefix" = "includes") {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
@@ -154,10 +154,11 @@ function useDropdownPanel() {
       if (!q) return options;
       return options.filter((option) => {
         const haystack = (option.searchText || option.label || "").toLowerCase();
-        return haystack.includes(q);
+        // "prefix": only names that START with the typed letters (shop search).
+        return matchMode === "prefix" ? haystack.startsWith(q) : haystack.includes(q);
       });
     },
-    [query]
+    [query, matchMode]
   );
 
   return { open, setOpen, query, setQuery, ref, searchRef, filtered };
@@ -171,6 +172,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   disabled,
   invalid,
   onChange,
+  matchMode = "includes",
 }: {
   value: string;
   options: DropdownOption[];
@@ -179,8 +181,10 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   disabled: boolean;
   invalid?: boolean;
   onChange: (value: string) => void;
+  /** "prefix" → match only from the first letter (shop name search). */
+  matchMode?: "includes" | "prefix";
 }) {
-  const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
+  const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel(matchMode);
   const { t } = useI18n();
 
   const selected = useMemo(

@@ -26,7 +26,9 @@ const mondayOf = (date?: Date) => (date ? toISODate(date) : undefined);
 
 test('each chip means the dates it has always meant', () => {
   assert.equal(iso(weekRange(NOW)), '2026-09-07..2026-09-13');
-  assert.equal(iso(quarterRange(NOW)), '2026-01-01..2026-12-31');
+  // The Quarter chip shows a financial year, never the Jan-Dec calendar year.
+  assert.equal(iso(quarterRange(2026)), '2026-04-01..2027-03-31');
+  assert.equal(iso(quarterRange(2025)), '2025-04-01..2026-03-31');
   // September 2026 snaps out to whole weeks: Mon 31 Aug → Sun 27 Sep.
   assert.equal(iso(monthRange(new Date(2026, 8, 1))), '2026-08-31..2026-09-27');
   assert.equal(iso(monthRange(new Date(2026, 7, 1))), '2026-07-27..2026-08-30');
@@ -90,16 +92,27 @@ test('a month-ish window lands on the Month chip, on the month it ends in', () =
   assert.equal(periodForWindow('2026-08-31', '2026-09-27', NOW)?.period, 'month');
 });
 
-test('a quarter-ish window lands on the Quarter chip, which is this year', () => {
-  // The dashboard's rolling QTR preset: 14 Jun → 13 Sep.
-  assert.equal(periodForWindow('2026-06-14', '2026-09-13', NOW)?.period, 'quarter');
-  assert.equal(periodForWindow('2026-01-01', '2026-12-31', NOW)?.period, 'quarter');
+test('a longer window inside one FY lands on the Quarter chip, with that FY', () => {
+  // The dashboard's rolling QTR preset: 14 Jun → 13 Sep 2026 sits in FY 2026.
+  const rolling = periodForWindow('2026-06-14', '2026-09-13', NOW);
+  assert.equal(rolling?.period, 'quarter');
+  assert.equal(rolling?.fyStartYear, 2026);
+  // An exact fiscal quarter lands there too.
+  const q2 = periodForWindow('2026-07-01', '2026-09-30', NOW);
+  assert.equal(q2?.period, 'quarter');
+  assert.equal(q2?.fyStartYear, 2026);
+  // The chip's FY stepper reaches other years, so this stays on Quarter.
+  const prev = periodForWindow('2025-06-14', '2025-09-13', NOW);
+  assert.equal(prev?.period, 'quarter');
+  assert.equal(prev?.fyStartYear, 2025);
 });
 
-test('the Quarter chip cannot show another year, so that window stays Custom', () => {
-  const landing = periodForWindow('2025-06-14', '2025-09-13', NOW);
+test('a window spanning two financial years stays Custom', () => {
+  // Jan-Dec 2026 straddles FY 2025 and FY 2026 — no single FY chip shows it.
+  assert.equal(periodForWindow('2026-01-01', '2026-12-31', NOW)?.period, 'custom');
+  const landing = periodForWindow('2025-06-14', '2026-06-13', NOW);
   assert.equal(landing?.period, 'custom');
-  assert.equal(`${landing?.customStart}..${landing?.customEnd}`, '2025-06-14..2025-09-13');
+  assert.equal(`${landing?.customStart}..${landing?.customEnd}`, '2025-06-14..2026-06-13');
 });
 
 test('whatever the chip, the window that arrived comes back with it', () => {
@@ -148,7 +161,8 @@ test('an exact financial-year window lands on the FY chip', () => {
   assert.equal(current?.period, 'fy');
   assert.equal(current?.fyStartYear, 2026);
   // A 365-day window that is NOT an FY span still cannot use the FY chip.
-  assert.equal(periodForWindow('2026-01-01', '2026-12-31', NOW)?.period, 'quarter');
+  // Jan-Dec also spans two FYs, so it cannot use the Quarter chip either.
+  assert.equal(periodForWindow('2026-01-01', '2026-12-31', NOW)?.period, 'custom');
   assert.equal(periodForWindow('2025-06-14', '2026-06-13', NOW)?.period, 'custom');
 });
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { Clock3, FileText, Loader2, Mail, Package, Pencil, Scale } from "lucide-react";
+import { FileText, Loader2, Mail, Package, Pencil, Scale } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
@@ -34,7 +34,7 @@ function BoxDetailsTooltip({ boxes, row, emptyLabel }: { boxes: number[]; row: S
     setPosition({ left: Math.max(12, Math.min(window.innerWidth - 332, rect.left + rect.width / 2 - 160)), top: Math.max(8, top) });
   };
   return <span className="inline-flex items-center" onMouseLeave={() => setPosition(null)}>
-    <button type="button" aria-label="Show box numbers" onMouseEnter={(event) => open(event.currentTarget)} onFocus={(event) => open(event.currentTarget)} onBlur={() => setPosition(null)} className="rounded-md border-b border-dotted border-slate-400 px-1 py-0.5 font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300">{boxes.length || row.boxNo || 0}</button>
+    <button type="button" aria-label="Show box numbers" onMouseEnter={(event) => open(event.currentTarget)} onFocus={(event) => open(event.currentTarget)} onBlur={() => setPosition(null)} className="rounded-md border-b border-dotted border-slate-400 px-1.5 py-0.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-300">{boxes.length || row.boxNo || 0}</button>
     {position && createPortal(
       <div role="tooltip" style={{ left: position.left, top: position.top }} className="pointer-events-none fixed z-[9999] w-[320px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
         <div className="mb-2 flex items-center gap-2 text-xs font-bold text-slate-800"><Package size={14} className="text-blue-500" />Box numbers</div>
@@ -50,14 +50,57 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communi
   const weightLoss = isWeightMode ? Math.max(0, Number(row.farmWeight || 0) - Number(row.weight || 0)) : 0;
   const shopName = localizeTripViewText(cleanDeliveryShopName(row.shopName), language, { cleanShopCode: true }) || "—";
   const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
-  return <div className="grid min-w-[1100px] grid-cols-[3rem_3.5rem_minmax(12rem,1.5fr)_repeat(5,minmax(5.5rem,1fr))_minmax(11rem,1.3fr)_8rem] items-center gap-2 border-b border-slate-100 bg-white px-3 py-2 text-xs last:border-b-0 hover:bg-slate-50/70">
-    <div className="text-center font-bold text-slate-500">{row.serialNo ?? "—"}</div>
-    <div className="flex justify-center"><span title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")} aria-label={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")} className={`inline-flex h-8 w-8 items-center justify-center rounded-lg ${isWeightMode ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}>{isWeightMode ? <Scale size={16} /> : <Package size={16} />}</span></div>
-    <div className="min-w-0"><div className="truncate font-bold text-slate-800">{shopName}</div>{row.subShopName || row.remarks ? <div className="truncate text-[10px] text-slate-500">{[row.subShopName, row.remarks].filter(Boolean).join(", ")}</div> : null}</div>
-    <div className="flex justify-center"><BoxDetailsTooltip boxes={boxes} row={row} emptyLabel={t("ops.trip.not_entered")} /></div>
-    <div className="text-center font-bold text-blue-600">{row.birds || 0}</div><div className="text-center font-bold text-slate-800">{Number(row.weight || 0).toFixed(2)}</div><div className="text-center font-bold text-amber-600">{isWeightMode ? weightLoss.toFixed(2) : "—"}</div>
-    <div className="text-center font-bold text-rose-600">{Number(row.mortality || 0).toLocaleString()}{Number(row.mortKg || 0) > 0 ? <span className="block text-[10px] font-medium text-rose-400">{Number(row.mortKg).toFixed(2)} kg</span> : null}</div>
-    <div className="flex justify-center"><span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-indigo-50 px-2 py-1.5 text-[10px] font-semibold text-indigo-700"><Clock3 size={12} />{capturedTime}</span></div>
-    <div className="flex justify-end gap-1">{communicationEnabled && onSendEmail ? <CommunicationButton kind="mail" busy={emailSending || emailStatus === "sending"} count={emailSendCount} disabled={emailDisabled} onClick={() => onSendEmail(row)} label={t("ops.trip.send_email")} /> : null}{communicationEnabled && onSendWhatsApp ? <CommunicationButton kind="whatsapp" busy={whatsappSending || whatsappStatus === "sending"} count={whatsappSendCount} disabled={whatsappDisabled} onClick={() => onSendWhatsApp(row)} label={t("ops.trip.send_whatsapp")} /> : null}{!readOnly ? <button type="button" onClick={() => onEdit(row)} className="rounded-lg border border-slate-200 p-1.5 text-blue-500 hover:bg-blue-50" aria-label={t("ops.trip.edit_shop_delivery")}><Pencil size={13} /></button> : null}<button type="button" onClick={() => onPDF(row)} className="rounded-lg border border-slate-200 p-1.5 text-rose-500 hover:bg-rose-50" aria-label={t("ops.trip.download_pdf")}><FileText size={13} /></button></div>
-  </div>;
+  return (
+    <div
+      className="grid min-w-[1000px] grid-cols-[3.5rem_4rem_minmax(11rem,1.35fr)_repeat(5,minmax(0,1fr))_8.5rem] items-center gap-3 border-b border-slate-100 bg-white px-4 py-2.5 text-sm last:border-b-0 hover:bg-slate-50/70"
+      data-auto-capture-time={row.autoCaptureTime ?? ""}
+    >
+      <div className="text-center font-bold tabular-nums text-slate-600">{row.serialNo ?? "—"}</div>
+      <div className="flex justify-center">
+        <span
+          title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
+          aria-label={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
+          className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${isWeightMode ? "bg-purple-50 text-purple-600" : "bg-blue-50 text-blue-600"}`}
+        >
+          {isWeightMode ? <Scale size={17} /> : <Package size={17} />}
+        </span>
+      </div>
+      <div className="min-w-0">
+        <div className="truncate font-bold text-slate-900">{shopName}</div>
+        {row.subShopName || row.remarks ? (
+          <div className="truncate text-xs text-slate-500">{[row.subShopName, row.remarks].filter(Boolean).join(", ")}</div>
+        ) : null}
+      </div>
+      <div className="flex justify-center">
+        <BoxDetailsTooltip boxes={boxes} row={row} emptyLabel={t("ops.trip.not_entered")} />
+      </div>
+      <div className="text-center font-bold tabular-nums text-blue-600">{row.birds || 0}</div>
+      <div className="text-center font-bold tabular-nums text-slate-900">{Number(row.weight || 0).toFixed(2)}</div>
+      <div className="text-center font-bold tabular-nums text-amber-600">{isWeightMode ? weightLoss.toFixed(2) : "—"}</div>
+      <div className="text-center font-bold tabular-nums text-rose-600">
+        {Number(row.mortality || 0).toLocaleString()}
+        {Number(row.mortKg || 0) > 0 ? (
+          <span className="block text-xs font-medium text-rose-400">{Number(row.mortKg).toFixed(2)} kg</span>
+        ) : null}
+      </div>
+      {/* Capture time stays on the row (PDF/API/background) but is not shown in the table UI. */}
+      <div className="hidden" data-field="autoCaptureTime">{capturedTime}</div>
+      <div className="flex justify-end gap-1.5">
+        {communicationEnabled && onSendEmail ? (
+          <CommunicationButton kind="mail" busy={emailSending || emailStatus === "sending"} count={emailSendCount} disabled={emailDisabled} onClick={() => onSendEmail(row)} label={t("ops.trip.send_email")} />
+        ) : null}
+        {communicationEnabled && onSendWhatsApp ? (
+          <CommunicationButton kind="whatsapp" busy={whatsappSending || whatsappStatus === "sending"} count={whatsappSendCount} disabled={whatsappDisabled} onClick={() => onSendWhatsApp(row)} label={t("ops.trip.send_whatsapp")} />
+        ) : null}
+        {!readOnly ? (
+          <button type="button" onClick={() => onEdit(row)} className="rounded-lg border border-slate-200 p-1.5 text-blue-500 hover:bg-blue-50" aria-label={t("ops.trip.edit_shop_delivery")}>
+            <Pencil size={14} />
+          </button>
+        ) : null}
+        <button type="button" onClick={() => onPDF(row)} className="rounded-lg border border-slate-200 p-1.5 text-rose-500 hover:bg-rose-50" aria-label={t("ops.trip.download_pdf")}>
+          <FileText size={14} />
+        </button>
+      </div>
+    </div>
+  );
 }

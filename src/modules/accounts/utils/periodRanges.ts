@@ -7,22 +7,23 @@
    31 Aug → 06 Sep) and the page has to decide which chip shows it.
    `periodForWindow` answers with the NEAREST chip — a week or less goes to Week
    (anchored to the week that overlaps the window most), a month-ish window goes
-   to Month, a longer one inside this year goes to Quarter, an exact 1 Apr →
-   31 Mar span goes to FY — and only a window no chip can represent (15 days,
-   say, or one from another year) falls to Custom, which honours arbitrary
-   dates to the day. The window's own dates always come back alongside the
-   choice, so the Custom pickers are seeded with exactly what the tile was
-   showing even when a chip is selected.
+   to Month, a longer one inside a single financial year goes to Quarter, an
+   exact 1 Apr → 31 Mar span goes to FY — and only a window no chip can
+   represent (15 days, say, or one spanning two financial years) falls to
+   Custom, which honours arbitrary dates to the day. The window's own dates
+   always come back alongside the choice, so the Custom pickers are seeded with
+   exactly what the tile was showing even when a chip is selected.
 
    The week/month/quarter/fy bodies below are the ones SummaryPage has always
-   used (fy is the newer Indian-financial-year chip), lifted verbatim so the
-   page and this helper cannot drift apart:
+   used, lifted verbatim so the page and this helper cannot drift apart:
    - week    → the Monday to Sunday around an anchor day (today by default; the
                page can step it, which is what lets it show a week that a
                dashboard KPI arrived with)
    - month   → the selected month, snapped OUT to whole Mon–Sun weeks that still
                end inside the month (so September can read 31 Aug → 27 Sep)
-   - quarter → the whole of the current year, 1 Jan → 31 Dec
+   - quarter → the selected Indian financial year, 1 Apr → 31 Mar, broken into
+               its four fiscal quarters (Q1 Apr–Jun … Q4 Jan–Mar) — never the
+               Jan–Dec calendar year
    - fy      → the whole Indian financial year, 1 Apr → 31 Mar
    - custom  → exactly the two dates given
 */
@@ -85,12 +86,11 @@ export function monthRange(monthDate: Date): PeriodRange {
   return { start, end };
 }
 
-/** "Quarter": the whole of the current year (this is what the chip has always shown). */
-export function quarterRange(now: Date = new Date()): PeriodRange {
-  const year = now.getFullYear();
-  const end = new Date(year, 11, 31);
-  end.setHours(23, 59, 59, 999);
-  return { start: new Date(year, 0, 1), end };
+/** "Quarter": the selected financial year, 1 Apr → 31 Mar.
+ * The chip breaks this span into its four fiscal quarters (see
+ * fiscalQuarterRange) — it is never the Jan–Dec calendar year. */
+export function quarterRange(fyStartYear: number): PeriodRange {
+  return financialYearRangeOf(fyStartYear);
 }
 
 /**
@@ -159,7 +159,7 @@ export interface WindowLanding {
   weekAnchor?: Date;
   /** Present when `period` is 'month' — the month to display. */
   monthDate?: Date;
-  /** Present when `period` is 'fy' — the FY start year to display. */
+  /** Present when `period` is 'fy' or 'quarter' — the FY start year to display. */
   fyStartYear?: number;
   /** The window itself, which is what the Custom chip shows. */
   customStart: string;
@@ -251,9 +251,14 @@ export function periodForWindow(
   if (days <= 27) return { ...landing, period: 'custom' };
   if (days <= 45) return { ...landing, period: 'month', monthDate: firstOfMonth(to) };
 
-  const year = quarterRange(now);
-  const insideThisYear = from >= toISODate(year.start) && to <= toISODate(year.end);
-  if (insideThisYear) return { ...landing, period: 'quarter' };
+  // A longer window inside ONE financial year belongs to the Quarter chip,
+  // which breaks that FY into its four fiscal quarters. The chip's FY stepper
+  // can show any FY, so unlike the old calendar-year chip this is not limited
+  // to the current year. A window spanning two FYs stays Custom.
+  void now;
+  const fromFy = fyStartYearContaining(new Date(`${from}T00:00:00`));
+  const toFy = fyStartYearContaining(new Date(`${to}T00:00:00`));
+  if (fromFy === toFy) return { ...landing, period: 'quarter', fyStartYear: fromFy };
 
   return { ...landing, period: 'custom' };
 }
