@@ -2,6 +2,8 @@ import { apiGet, apiPost } from "../../../../api";
 import { generateShopPDFBlob } from "../utils/generateShopPDF";
 import type { ShopDelivery, Trip } from "../types/trip";
 
+const EMAIL_BACKEND_ENABLED = import.meta.env.VITE_EMAIL_BACKEND_ENABLED === "true";
+
 export type DeliveryEmailStatusValue = "pending" | "sending" | "sent" | "failed";
 
 export type DeliveryEmailRow = {
@@ -45,6 +47,9 @@ export function sanitizeShopNameForFile(shopName: string): string {
 }
 
 export async function fetchDeliveryEmailStatuses(tripId: number): Promise<DeliveryEmailRow[]> {
+  if (!EMAIL_BACKEND_ENABLED) {
+    return [];
+  }
   const { data } = await apiGet<DeliveryEmailRow[]>(`/trips/${tripId}/delivery-emails`);
   return Array.isArray(data) ? data : [];
 }
@@ -54,6 +59,13 @@ export async function sendDeliveryEmail(input: {
   delivery: ShopDelivery;
   shopEmail?: string | null;
 }): Promise<{ success: boolean; status: DeliveryEmailStatusValue; message?: string; sendCount?: number; attemptCount?: number }> {
+  if (!EMAIL_BACKEND_ENABLED) {
+    return {
+      success: false,
+      status: "failed",
+      message: "Email integration is not configured yet.",
+    };
+  }
   const blob = await generateShopPDFBlob(
     {
       ...input.delivery,
@@ -70,7 +82,12 @@ export async function sendDeliveryEmail(input: {
     undefined,
     undefined,
     input.delivery.autoCaptureTime,
-    input.trip.driverName
+    input.trip.driverName,
+    undefined,
+    {
+      supervisorId: input.trip.supervisorId,
+      driverId: input.trip.driverId,
+    }
   );
   const pdfBase64 = await blobToBase64(blob);
   const fileName = `Delivery-${input.trip.tripNo}-${sanitizeShopNameForFile(input.delivery.shopName)}.pdf`;

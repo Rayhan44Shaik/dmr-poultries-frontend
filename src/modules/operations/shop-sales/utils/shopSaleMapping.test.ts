@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mapApiSaleToShopSale, type ApiShopSale } from "./shopSaleMapping";
+import { displayStep4Remark, mapApiSaleToShopSale, type ApiShopSale } from "./shopSaleMapping";
 
 function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
   return {
@@ -10,6 +10,7 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     deliveryTime: "2026-08-20T09:15:00",
     shopId: 7,
     shopName: "Maahirah",
+    subShopName: "Counter 2",
     birdTypeId: 3,
     birdType: "Broiler",
     tripId: 9,
@@ -69,6 +70,15 @@ describe("mapApiSaleToShopSale", () => {
     assert.equal(mapped.tripPickupBirds, 600);
     assert.equal(mapped.maxEditableBirds, 84);
     assert.equal(mapped.remark, "Urgent delivery");
+    assert.equal(mapped.subShopName, "Counter 2");
+  });
+
+  it("shows the Step 4 note without the internal order tracking marker", () => {
+    const mapped = mapApiSaleToShopSale(
+      row({ remarks: "[ORDER] O:ORD-2026-001 | Call before delivery" })
+    );
+    assert.equal(mapped.remark, "Call before delivery");
+    assert.equal(displayStep4Remark("[ORDER] O:ORD-2026-001"), "");
   });
 
   it("carries the numeric ids additively", () => {

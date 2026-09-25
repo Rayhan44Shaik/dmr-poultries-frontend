@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import { IndianRupee, LoaderCircle, Store } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
@@ -7,10 +7,7 @@ import EnterRateModal from "../components/EnterRateModal";
 import { Pagination } from "../../../../ui/Pagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { useI18n } from "../../../../i18n";
-import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
-import { formatVehicleNumber } from "../../../../utils/format";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 
 type EnterRateModalProps = ComponentProps<typeof EnterRateModal>;
@@ -42,23 +39,10 @@ type Props = {
 
 export default function RatesEntryPage({ embedded = false }: Props) {
   void embedded;
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
-  const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-
-  // A selection belongs only to this table. Clicking elsewhere clears its
-  // highlight, matching Recent Trip Activity and Trip List.
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!tableContainerRef.current?.contains(event.target as Node)) {
-        setSelectedRowId(null);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const {
     filteredTrips,
@@ -127,82 +111,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     });
   };
 
-  const handleExportPDF = () => {
-    if (exportBusyRef.current) return;
-    exportBusyRef.current = "pdf";
-    try {
-      if (filteredTrips.length === 0) {
-        showNotification(t("ops.rate.no_data_export"), "error");
-        return;
-      }
-      const headers = [
-        t("operations.trip_no"),
-        t("ops.rate.col.day"),
-        t("common.vehicle"),
-        t("common.supervisor"),
-        t("ops.trip.source_farm"),
-        t("ops.trip.shops"),
-        t("common.birds"),
-        t("ops.trip.weight_kg"),
-      ];
-      const rows = filteredTrips.map((trip) => [
-        trip.tripNo,
-        formatRateEntryDay(trip.tripDate, language),
-        formatVehicleNumber(trip.vehicleNo),
-        displayRateEntryName(trip.supervisorName, language),
-        displayRateEntryName(trip.sourceFarm, language),
-        trip.totalShops.toString(),
-        trip.totalBirds.toString(),
-        trip.totalWeight.toFixed(2),
-      ]);
-      const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-      exportToPDF(t("ops.rate.report_title"), headers, rows, filename);
-      showNotification(t("ops.rate.pdf_success"), "success");
-    } catch {
-      showNotification(t("ops.rate.pdf_error"), "error");
-    } finally {
-      exportBusyRef.current = null;
-    }
-  };
-
-  const handleExportExcel = () => {
-    if (exportBusyRef.current) return;
-    exportBusyRef.current = "excel";
-    try {
-      if (filteredTrips.length === 0) {
-        showNotification(t("ops.rate.no_data_export"), "error");
-        return;
-      }
-      const headers = [
-        t("operations.trip_no"),
-        t("ops.rate.col.day"),
-        t("common.vehicle"),
-        t("common.supervisor"),
-        t("ops.trip.source_farm"),
-        t("ops.trip.shops"),
-        t("common.birds"),
-        t("ops.trip.weight_kg"),
-      ];
-      const rows = filteredTrips.map((trip) => [
-        trip.tripNo,
-        formatRateEntryDay(trip.tripDate, language),
-        formatVehicleNumber(trip.vehicleNo),
-        displayRateEntryName(trip.supervisorName, language),
-        displayRateEntryName(trip.sourceFarm, language),
-        trip.totalShops,
-        trip.totalBirds,
-        trip.totalWeight,
-      ]);
-      const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-      exportToExcel(t("ops.rate.report_title"), headers, rows, filename);
-      showNotification(t("ops.rate.excel_success"), "success");
-    } catch {
-      showNotification(t("ops.rate.excel_error"), "error");
-    } finally {
-      exportBusyRef.current = null;
-    }
-  };
-
   return (
     <div className={`w-full space-y-5 ${embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"}`}>
       {/* Filter — separate card like trip list */}
@@ -226,8 +134,11 @@ export default function RatesEntryPage({ embedded = false }: Props) {
           refreshing={isLoading}
           pendingTrips={filteredTrips.length}
           hasFilters={hasFilters}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
+          onRateEntry={() => {
+            const trip = filteredTrips.find((row) => row.id === selectedRowId);
+            if (trip) openRateEntry(trip);
+          }}
+          rateEntryEnabled={selectedRowId !== null}
         />
       </div>
 

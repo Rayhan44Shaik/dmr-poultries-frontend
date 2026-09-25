@@ -24,6 +24,8 @@ export interface ShopSale {
 
   shopName: string;
 
+  subShopName?: string;
+
   birdType: string;
 
   totalBirds: number;

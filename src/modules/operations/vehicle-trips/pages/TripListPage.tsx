@@ -301,6 +301,19 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     totalCompletedMortality: completedTrips.reduce((sum, trip) => sum + trip.totalMortality, 0),
   }), [completedTrips]);
 
+  // Load mix for the Total Trips KPI: how many filtered trips ran with one
+  // load, two loads, or more — same load rule as the Trip List table.
+  const loadBreakdown = useMemo(() => {
+    const mix = { one: 0, two: 0, more: 0 };
+    for (const trip of completedTrips) {
+      const loads = Math.max(1, trip.submittedLoadCount ?? trip.loadSummaries?.length ?? 1);
+      if (loads <= 1) mix.one += 1;
+      else if (loads === 2) mix.two += 1;
+      else mix.more += 1;
+    }
+    return mix;
+  }, [completedTrips]);
+
   const {
     totalCompletedTrips,
     totalCompletedShops,
@@ -533,6 +546,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       {hasFilters && filterResultsReady && !isLoading && (
         <TripKPICards
           totalTrips={totalCompletedTrips}
+          loadBreakdown={vehicle !== ALL_VEHICLES || supervisor !== ALL_SUPERVISORS ? loadBreakdown : undefined}
           totalBirds={totalCompletedBirds}
           totalWeight={totalCompletedWeight}
           totalMortality={totalCompletedMortality}

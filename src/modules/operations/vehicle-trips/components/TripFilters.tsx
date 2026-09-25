@@ -234,7 +234,7 @@ function TripFilters({
           />
         </div>
 
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("common.search")}</span>
@@ -250,17 +250,17 @@ function TripFilters({
           </div>
         </div>
 
-        <div className="lg:col-span-4 flex items-center gap-2 justify-end flex-wrap">
-          {showViewButton && onViewSelected && (
+        <div className="lg:col-span-6 flex items-center gap-2 justify-end flex-wrap lg:flex-nowrap">
+          {onViewSelected && (
             <button
               ref={viewButtonRef}
               type="button"
-              onClick={onViewSelected}
+              onClick={onViewSelected} disabled={!showViewButton}
               className={`group relative ${opsViewButtonClass}`}
-              aria-label={t("ops.trip.view_selected")}
+              aria-label={t("common.view")}
             >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={15} /></span>
-              {t("ops.trip.view_selected")}
+              <span className={`inline-flex ${showViewButton ? "motion-safe:group-hover:animate-[var(--animate-action-view)]" : ""}`}><Eye size={15} /></span>
+              {t("common.view")}
             </button>
           )}
           <FilterResetButton

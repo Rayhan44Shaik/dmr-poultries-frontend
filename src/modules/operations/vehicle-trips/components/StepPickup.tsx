@@ -38,13 +38,14 @@ interface Props {
   onExitEdit?: () => void;
   clearForm?: () => void;
   /** Hide locked-view Close X (Recent / Trip List read-only view). */
-  hideWizardClose?: boolean;
+  hideWizardClose?: boolean; hideLockedChip?: boolean;
 }
 
 type Row = BoxDetail & { uid: string };
 type PickupPhoto = { key: string; mime: string; data: string };
-/** One calm tone per BOX (not per table row). Keeping all four values in the
- * same visual band makes a box easy to track across the dense 3-up table. */
+/** One calm tone per ROW (not per box). All three boxes in a row share the
+ * same light band, and the next row takes the next tone, so rows stay
+ * visually distinct across the dense 3-up table. */
 const PICKUP_BOX_PALETTE = [
   { cell: "bg-sky-50/75", badge: "border-sky-200 bg-sky-100 text-sky-800", edge: "border-l-sky-300" },
   { cell: "bg-emerald-50/70", badge: "border-emerald-200 bg-emerald-100 text-emerald-800", edge: "border-l-emerald-300" },
@@ -52,8 +53,8 @@ const PICKUP_BOX_PALETTE = [
   { cell: "bg-violet-50/65", badge: "border-violet-200 bg-violet-100 text-violet-800", edge: "border-l-violet-300" },
   { cell: "bg-rose-50/60", badge: "border-rose-200 bg-rose-100 text-rose-800", edge: "border-l-rose-300" },
 ] as const;
-const pickupBoxTone = (boxNo: number) =>
-  PICKUP_BOX_PALETTE[(Math.max(1, boxNo) - 1) % PICKUP_BOX_PALETTE.length];
+const pickupRowTone = (rowIdx: number) =>
+  PICKUP_BOX_PALETTE[((Math.max(0, rowIdx) % PICKUP_BOX_PALETTE.length) + PICKUP_BOX_PALETTE.length) % PICKUP_BOX_PALETTE.length];
 const generateUid = () => Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 const makeRow = (boxNo: number, defaultBirds = 0): Row => ({
   uid: generateUid(),
@@ -99,7 +100,7 @@ export default function StepPickup({
   onCancel,
   onExitEdit,
   clearForm,
-  hideWizardClose = false,
+  hideWizardClose = false, hideLockedChip = false,
 }: Props) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
@@ -835,7 +836,7 @@ export default function StepPickup({
                 <Pencil size={14} className={uiActionIconMotionClass.edit} />
               </button>
             )}
-            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">
+            <span className={`bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap ${hideLockedChip ? "hidden" : ""}`}>
               {t("ops.trip.submitted_locked")}
             </span>
           </div>
@@ -927,7 +928,7 @@ export default function StepPickup({
                 {grouped.map((group, idx) => (
                   <tr key={idx} className="bg-white">
                     {group.map((r, colIdx) => {
-                      const tone = pickupBoxTone(r.boxNo);
+                      const tone = pickupRowTone(idx);
                       return (
                       <React.Fragment key={r.boxNo}>
                         <td className={`border-l-2 ${tone.edge} ${tone.cell} text-center px-2 py-2 font-semibold border-r border-slate-200 ${colIdx > 0 ? 'pl-4' : ''}`}><span className={`inline-flex h-6 min-w-7 items-center justify-center rounded-md border px-1.5 font-bold shadow-sm ${tone.badge}`}>{r.boxNo}</span></td>
@@ -1270,7 +1271,7 @@ export default function StepPickup({
                         );
                       }
                       const row = slot.row;
-                      const tone = pickupBoxTone(row.boxNo);
+                      const tone = pickupRowTone(idx);
                       const isSelectedBox = selectedBoxNo === String(row.boxNo);
                       return (
                       <React.Fragment key={row.uid}>

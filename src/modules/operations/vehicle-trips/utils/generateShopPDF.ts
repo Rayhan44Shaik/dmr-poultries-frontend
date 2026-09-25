@@ -7,6 +7,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { BoxDetail } from "../types/trip";
+import { resolveShopPdfHeader, type ShopPdfEmployeeRef } from "./shopPdfHeader";
 import type { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
 
 import henImage from "../../../../assets/dmr-hen.jpg";
@@ -71,6 +72,7 @@ function drawField(
   doc.line(valueX, y + 1.5, valueX + lineWidth, y + 1.5);
 }
 
+
 export async function generateShopPDFBlob(
   row: ShopDeliveryWithExtra,
   safeBoxDetails: BoxDetail[] = [],
@@ -82,7 +84,9 @@ export async function generateShopPDFBlob(
   _logoLeftUrl?: string,
   _henIconUrl?: string,
   deliveryTime?: string,
-  driverName?: string
+  driverName?: string,
+  driverMobile?: string,
+  employeeRef?: ShopPdfEmployeeRef
 ): Promise<Blob> {
   try {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -101,44 +105,22 @@ export async function generateShopPDFBlob(
 
     const isBoxMode = row.deliveryMode === "box";
 
-    const resolvedSupervisorName =
-      supervisorName ||
-      (row as any).supervisorName ||
-      (row as any).supervisor ||
-      "";
+    // Header identity resolves through the shared model: Trip/Delivery
+    // Supervisor → Employee Master → mobile (same record for the driver).
+    // Missing values stay blank; subShopRemark stays "" when absent.
+    const headerSeed = resolveShopPdfHeader(row, {
+      vehicleNo,
+      supervisorName,
+      supervisorPhone,
+      driverName,
+      driverMobile,
+      employeeRef,
+    });
 
-    const resolvedDriverName =
-      driverName ||
-      (row as any).driverName ||
-      (row as any).driver ||
-      "";
-
-    let resolvedSupervisorPhone =
-      supervisorPhone ||
-      (row as any).supervisorPhone ||
-      (row as any).supervisorMobile ||
-      (row as any).supervisorPhoneNo ||
-      (row as any).phone ||
-      (row as any).employee?.phoneNumber ||
-      "";
-
-    if (!resolvedSupervisorPhone && resolvedSupervisorName) {
-      try {
-        const empStorage = localStorage.getItem("dmr-employees");
-        if (empStorage) {
-          const employees = JSON.parse(empStorage);
-          const matchedEmp = employees.find(
-            (emp: any) =>
-              emp.employeeName?.trim().toLowerCase() === resolvedSupervisorName.trim().toLowerCase()
-          );
-          if (matchedEmp && matchedEmp.phoneNumber) {
-            resolvedSupervisorPhone = matchedEmp.phoneNumber;
-          }
-        }
-      } catch (err) {
-        console.error("Error looking up supervisor phone from employee master:", err);
-      }
-    }
+    const resolvedSupervisorName = headerSeed.supervisorName;
+    const resolvedDriverName = headerSeed.driverName;
+    const resolvedSupervisorPhone = headerSeed.supervisorMobile;
+    const resolvedDriverMobile = headerSeed.driverMobile;
 
     const storedDeliveryTime =
       (row as any).autoCaptureTime ||
@@ -197,27 +179,41 @@ export async function generateShopPDFBlob(
     const c2 = margin + 98;
     const shopEmail =
       String((row as { shopEmail?: string; email?: string }).shopEmail || (row as { email?: string }).email || "").trim();
-    const cardH = shopEmail ? 52 : 44;
+    // Reading order: Shop Name → Sub Shop/Remark (only when present) →
+    // Delivery Type → Date/Time. The cursor steps only over rendered rows so
+    // an absent Sub Shop/Remark leaves no gap.
+    const cardTop = currentY;
+    let cardH = 53;
+    if (headerSeed.subShopRemark) cardH += 7;
+    if (shopEmail) cardH += 8;
 
     setFill(doc, COLOR.cardBg);
     setDraw(doc, COLOR.borderLight);
     doc.setLineWidth(0.3);
-    doc.roundedRect(margin, currentY, contentWidth, cardH, 2, 2, "FD");
+    doc.roundedRect(margin, cardTop, contentWidth, cardH, 2, 2, "FD");
 
-    drawField(doc, "Supervisor Name", resolvedSupervisorName, c1, currentY + 9, 34, 48);
-    drawField(doc, "Vehicle No", vehicleNo || "", c2, currentY + 9, 30, 48);
-    drawField(doc, "Supervisor Mobile No", resolvedSupervisorPhone, c1, currentY + 18, 40, 42);
-    drawField(doc, "Driver Name", resolvedDriverName, c2, currentY + 18, 30, 48);
+    drawField(doc, "Supervisor Name", resolvedSupervisorName, c1, cardTop + 9, 34, 48);
+    drawField(doc, "Vehicle No", headerSeed.vehicleNo, c2, cardTop + 9, 30, 48);
+    drawField(doc, "Supervisor Mobile No", resolvedSupervisorPhone, c1, cardTop + 18, 40, 42);
+    drawField(doc, "Driver Name", resolvedDriverName, c2, cardTop + 18, 30, 48);
+    drawField(doc, "Driver Mobile No", resolvedDriverMobile, c1, cardTop + 27, 40, 42);
 
     setDraw(doc, COLOR.borderLight);
-    doc.line(margin + 2, currentY + 23, pageWidth - margin - 2, currentY + 23);
+    doc.line(margin + 2, cardTop + 32, pageWidth - margin - 2, cardTop + 32);
 
-    drawField(doc, "Shop Name", row.shopName || "", c1, currentY + 31, 34, 48);
-    drawField(doc, "Date", dateValue, c2, currentY + 31, 30, 48);
-    const typeY = shopEmail ? currentY + 45 : currentY + 38;
-    if (shopEmail) {
-      drawField(doc, "Shop Email", shopEmail, c1, currentY + 38, 34, 48);
+    let rowY = cardTop + 40;
+    drawField(doc, "Shop Name", headerSeed.shopName, c1, rowY, 34, 48);
+    drawField(doc, "Date", dateValue, c2, rowY, 30, 48);
+    rowY += 7;
+    if (headerSeed.subShopRemark) {
+      drawField(doc, "Sub Shop / Remark", headerSeed.subShopRemark, c1, rowY, 40, 42);
+      rowY += 7;
     }
+    if (shopEmail) {
+      drawField(doc, "Shop Email", shopEmail, c1, rowY, 34, 48);
+      rowY += 7;
+    }
+    const typeY = rowY;
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
@@ -533,7 +529,9 @@ export async function generateShopPDF(
   _logoLeftUrl?: string,
   _henIconUrl?: string,
   deliveryTime?: string,
-  driverName?: string
+  driverName?: string,
+  driverMobile?: string,
+  employeeRef?: ShopPdfEmployeeRef
 ): Promise<void> {
   const pdfBlob = await generateShopPDFBlob(
     row,
@@ -546,7 +544,9 @@ export async function generateShopPDF(
     _logoLeftUrl,
     _henIconUrl,
     deliveryTime,
-    driverName
+    driverName,
+    driverMobile,
+    employeeRef
   );
   const isBoxMode = row.deliveryMode === "box";
   const suffix = isBoxMode ? "Box" : "Weight";

@@ -1,11 +1,12 @@
-import React, { useCallback, useRef } from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown } from "lucide-react";
+import React, { useCallback, useRef, useState } from "react";
+import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown, Layers3 } from "lucide-react";
 import type { Trip } from "../types/trip";
 import type { TripListSortKey } from "../utils/filterTripList";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
+import { createPortal } from "react-dom";
 
 export type TripSortKey = TripListSortKey;
 
@@ -32,6 +33,63 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
       <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
       <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
     </span>
+  );
+}
+
+type TripListLoadMetricKey = "birds" | "weight" | "weightLoss" | "mortality" | "shops";
+
+/** Loads backing the per-load breakdown, mirroring Recent Trip Activity. */
+function tripListLoads(trip: Trip) {
+  return (trip.loadSummaries ?? []).filter((load) => load.load > 0);
+}
+
+function openBreakdownTooltip(element: HTMLElement, rows: number, width: number, setPosition: (position: { left: number; top: number } | null) => void) {
+  const rect = element.getBoundingClientRect();
+  const estimatedHeight = 54 + rows * 32;
+  const top = rect.bottom + estimatedHeight + 12 <= window.innerHeight ? rect.bottom + 8 : rect.top - estimatedHeight - 8;
+  setPosition({ left: Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2)), top: Math.max(8, top) });
+}
+
+/**
+ * Metric cell (Birds / Weight / W.L. / Mortality / Shops) with the same
+ * modern per-load breakdown tooltip as Recent Trip Activity: plain value for
+ * a single load, dotted-underline button + floating card once loads > 1.
+ */
+function TripListMetricCell({
+  trip,
+  metric,
+  value,
+  className,
+}: {
+  trip: Trip;
+  metric: TripListLoadMetricKey;
+  value: string;
+  className: string;
+}) {
+  const [tooltipPosition, setTooltipPosition] = useState<{ left: number; top: number } | null>(null);
+  const loads = tripListLoads(trip);
+  const showBreakdown = loads.length > 1;
+  const unit = metric === "weight" || metric === "weightLoss" ? " kg" : metric === "shops" ? " shops" : "";
+  const label =
+    metric === "weightLoss" ? "W.L" : metric === "mortality" ? "Mortality" : metric === "weight" ? "Weight" : metric === "shops" ? "Shops" : "Birds";
+  const format = (amount: number) =>
+    metric === "birds" || metric === "mortality" || metric === "shops"
+      ? Math.round(amount).toLocaleString()
+      : Number(amount || 0).toFixed(2);
+  const loadValue = (load: { birds: number; weight: number; mortality: number; weightLoss: number; shops: number }) =>
+    metric === "birds" ? load.birds : metric === "weight" ? load.weight : metric === "mortality" ? load.mortality : metric === "weightLoss" ? Math.max(0, load.weightLoss) : load.shops;
+
+  return (
+    <td className={`px-4 py-5 text-center text-[13px] font-bold whitespace-nowrap ${className}`}>
+      <span className="inline-flex items-center justify-center" onMouseLeave={() => setTooltipPosition(null)}>
+        {showBreakdown ? <button type="button" aria-label={`${label} by load`} onMouseEnter={(event) => openBreakdownTooltip(event.currentTarget, loads.length, 220, setTooltipPosition)} onFocus={(event) => openBreakdownTooltip(event.currentTarget, loads.length, 220, setTooltipPosition)} onBlur={() => setTooltipPosition(null)} className="rounded border-b border-dotted border-current px-0.5 font-bold focus:outline-none focus:ring-2 focus:ring-blue-300">{value}</button> : <span>{value}</span>}
+        {showBreakdown && tooltipPosition && createPortal(
+          <span role="tooltip" style={{ left: tooltipPosition.left, top: tooltipPosition.top }} className="pointer-events-none fixed z-[9999] w-[220px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl">
+            <span className="mb-2 block border-b border-slate-100 pb-2 font-bold text-slate-700">{label} by load</span>
+            {loads.map((load) => <span key={load.load} className="flex items-center justify-between gap-5 rounded-md px-1.5 py-1.5 odd:bg-slate-50"><span>Load {load.load}</span><span className="font-bold text-slate-900">{format(loadValue(load))}{unit}</span></span>)}
+          </span>, document.body)}
+      </span>
+    </td>
   );
 }
 
@@ -153,17 +211,23 @@ function TripMasterTable({
                 </div>, true)}
               </th>
               <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+                <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="text-orange-500" /><span>W.L</span></div>
+              </th>
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 {sortable("totalMortality", <div className="flex items-center justify-center gap-1.5">
                   <HeartPulse size={14} className="text-rose-500 flex-shrink-0" />
                   <span>{t("operations.mortality_count")}</span>
                 </div>, true)}
+              </th>
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+                <div className="flex items-center justify-center gap-1.5"><Layers3 size={14} className="text-indigo-500" /><span>Load</span></div>
               </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={11} className="py-16 text-center text-sm font-medium text-slate-400">
+                <td colSpan={13} className="py-16 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
                     {t("ops.trip.loading_trip_list")}
@@ -172,7 +236,7 @@ function TripMasterTable({
               </tr>
             ) : trips.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-slate-400 text-[13px] font-medium">
+                <td colSpan={13} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                   {t("ops.trip.no_completed_trips")}
                 </td>
               </tr>
@@ -180,6 +244,9 @@ function TripMasterTable({
               trips.map((trip, index) => {
                 const isSelected = trip.id === selectedRowId;
                 const serialNo = startIndex + index + 1;
+                // Per-load breakdown tooltips are only meaningful when the
+                // trip actually has more than one load.
+                const loadCount = Math.max(1, trip.submittedLoadCount ?? trip.loadSummaries?.length ?? 1);
                 return (
                   <tr
                     key={trip.id}
@@ -207,10 +274,12 @@ function TripMasterTable({
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.driverName, language) || "-"}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.supervisorName, language)}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">{localizeTripViewText(trip.sourceFarm, language)}</td>
-                    <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
-                    <td className="px-4 py-5 text-center text-[13px] font-bold text-blue-600 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
-                    <td className="px-4 py-5 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                    <td className="px-4 py-5 text-center text-[13px] font-bold text-rose-600 whitespace-nowrap">{trip.totalMortality}</td>
+                    <TripListMetricCell trip={trip} metric="shops" value={String(trip.totalShops)} className="text-slate-700" />
+                    <TripListMetricCell trip={trip} metric="birds" value={trip.totalBirds.toLocaleString()} className="text-blue-600" />
+                    <TripListMetricCell trip={trip} metric="weight" value={trip.totalWeight.toFixed(2)} className="text-amber-600" />
+                    <TripListMetricCell trip={trip} metric="weightLoss" value={Math.max(0, Number(trip.weightLoss || 0)).toFixed(2)} className="text-orange-600" />
+                    <TripListMetricCell trip={trip} metric="mortality" value={String(trip.totalMortality)} className="text-rose-600" />
+                    <td className="px-4 py-5 text-center text-[13px] font-bold text-indigo-600 whitespace-nowrap">{loadCount}</td>
                   </tr>
                 );
               })

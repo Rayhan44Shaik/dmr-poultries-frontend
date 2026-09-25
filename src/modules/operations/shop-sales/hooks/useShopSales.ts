@@ -100,6 +100,7 @@ function useShopSales() {
       const patch: ShopSalePatch = {};
       if (updatedSale.totalBirds !== original.totalBirds) patch.birds = updatedSale.totalBirds;
       if (updatedSale.totalWeight !== original.totalWeight) patch.weight = updatedSale.totalWeight;
+      if (updatedSale.rate !== original.rate && updatedSale.rate != null) patch.rate = updatedSale.rate;
       if (updatedSale.remark !== original.remark) patch.remarks = updatedSale.remark;
       if (Object.keys(patch).length === 0) {
         return updatedSale;

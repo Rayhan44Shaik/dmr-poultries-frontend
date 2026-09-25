@@ -3,9 +3,9 @@ import { toBusinessDate } from '../../../utils/businessDate';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';
-import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
+import { listTrips, loadTripById } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
-import { loadTripFarmPayments, saveTripFarmPayments } from '../services/farmPaymentApiService';
+import { loadTripFarmPayments, saveTripFarmPayments } from '../services/farmPaymentApiService'; import { farmPaymentRowDetails, isFarmPaymentTrip, mergeFarmPaymentRows, useQuietRefreshSignal } from '../utils/farmPaymentSync';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
 import { Save, RotateCcw, HandCoins } from 'lucide-react';
@@ -34,8 +34,8 @@ function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayme
   }
   return {
     tripId,
-    totalBirds: trip.totalBirds || apiRow.totalBirds || 0,
-    dcWeight: trip.dcWeight || apiRow.dcWeight || 0,
+    ...farmPaymentRowDetails(trip, apiRow),
+
     ratePerKg: apiRow.rate,
     totalAmount: apiRow.amount,
     amountPaid: apiRow.paidAmount,
@@ -56,18 +56,18 @@ function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayme
 type FarmerPaymentPageProps = { embedded?: boolean };
 
 /**
- * Default window: last 14 days through today so newly completed trips that
- * already appear on Trip List also land here without clearing filters.
- * (Previously opened on the last *complete* Mon–Sun week, which hid same-week
- * completions such as TR-20260918-001.)
+ * No default date window — every completed trip shows on open, like Trip List.
+ * Picking From/To narrows the list date-wise; the totals bar appears only then.
+
+
  */
-function recentTripsRange(): { from: string; to: string } {
-  const iso = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const today = new Date();
-  const from = new Date(today);
-  from.setDate(today.getDate() - 13);
-  return { from: iso(from), to: iso(today) };
+function emptyRange(): { from: string; to: string } {
+  // No default window: every completed trip shows on open, like Trip List.
+
+
+
+
+  return { from: '', to: '' };
 }
 
 /** One figure in the totals bar under the table — a compact caption/value pair
@@ -90,12 +90,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [allTrips, setAllTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0); useQuietRefreshSignal(setRefreshKey);
 
   // Timestamp of the last initiated refresh: a double-click on Refresh is one
   // user intent, so a second click within 500ms is ignored instead of firing
   // a duplicate fetch (fast responses already reset `loading` between clicks).
-  const lastRefreshAtRef = useRef(0);
+  const lastRefreshAtRef = useRef(0); const dirtyTripIdsRef = useRef<Set<string>>(new Set());
   // True while a user-initiated refresh is in flight — the finished load
   // confirms with the shared "Data refreshed" toast (the Trip List contract).
   const refreshToastPendingRef = useRef(false);
@@ -113,7 +113,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
   // Filter states
   // Opens on the last 14 days (through today); see recentTripsRange().
-  const [defaultRange] = useState(recentTripsRange);
+  const [defaultRange] = useState(emptyRange);
   const [dateFrom, setDateFrom] = useState(defaultRange.from);
   const [dateTo, setDateTo] = useState(defaultRange.to);
   const [selectedFarm, setSelectedFarm] = useState('All');
@@ -124,7 +124,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [pageSize, setPageSize] = useState(10);
 
   // Trip opened in the read-only trip view modal (per-row eye button).
-  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null);
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null); const viewRequestSeqRef = useRef(0); const handleViewTrip = (trip: Trip) => { const seq = viewRequestSeqRef.current + 1; viewRequestSeqRef.current = seq; setViewingTrip(trip); void loadTripById(trip.id).then((loaded) => { if (viewRequestSeqRef.current === seq) setViewingTrip(loaded); }).catch(() => { if (viewRequestSeqRef.current === seq) showNotification(t('ops.trip.refresh_failed_using_cached'), 'info'); }); };
 
   // Trip IDs whose payment the user edited since the last load/save. Only
   // these rows are saved by "Save Payments" — rows restored from a previous
@@ -134,11 +134,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const markDirty = (tripId: string) =>
     setDirtyTripIds((prev) => {
       if (prev.has(tripId)) return prev;
-      const next = new Set(prev);
+      const next = new Set(prev); dirtyTripIdsRef.current.add(tripId);
       next.add(tripId);
       return next;
     });
-  const clearDirty = () => setDirtyTripIds(new Set());
+  const clearDirty = () => { dirtyTripIdsRef.current = new Set(); setDirtyTripIds(new Set()); };
 
   // ----- load data -----
   // Completed trips are backend-authoritative (GET /api/trips — the same
@@ -178,10 +178,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
         const completed = all
           .filter((t) => {
-            const isCompleted = t.status === 'Completed';
-            const notDeleted = !t.deleted;
-            const pickupSubmitted = t.pickupStepSubmitted === true;
-            return isCompleted && notDeleted && pickupSubmitted;
+
+
+
+            return isFarmPaymentTrip(t);
           })
           .sort(
             // Deterministic order: newest date first, then highest trip id,
@@ -191,9 +191,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           );
 
         setAllTrips(completed);
-        syncPaymentData(completed);
-        // paymentData now mirrors persisted storage — nothing is unsaved.
-        clearDirty();
+        setPaymentData((prev) => mergeFarmPaymentRows(prev, completed, apiFarmByTripRef.current, dirtyTripIdsRef.current, formFromApiRow));
+        // Dirty rows are preserved by the merge above — flags stay until save/reset.
+
       })
       .then(() => {
         // The Trip List's refresh contract: a user-initiated refresh confirms
@@ -386,7 +386,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleClearFilters = () => {
-    // Clear means "back to the default week", not "every trip ever".
+    // Clear means "every trip ever" — no dates, no farm, no search.
     setDateFrom(defaultRange.from);
     setDateTo(defaultRange.to);
     setSelectedFarm('All');
@@ -405,8 +405,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     }).length;
   }, [paymentData, dirtyTripIds]);
 
-  // The page always opens on a real week, so "filtered" means: something the
-  // user changed. Only then does the totals bar appear under the table.
+  // The page opens unfiltered, so "filtered" means: a date, farm, or search
+  // the user picked. Only then does the totals bar appear under the table.
   const isFilterActive = Boolean(
     (dateFrom && dateFrom !== defaultRange.from) ||
       (dateTo && dateTo !== defaultRange.to) ||
@@ -520,7 +520,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               paymentData={paymentData}
               onPaymentUpdate={handlePaymentUpdate}
               loading={loading && allTrips.length === 0}
-              onViewTrip={setViewingTrip}
+              onViewTrip={handleViewTrip}
               startIndex={(currentPage - 1) * pageSize}
               emptyMessage={
                 isFilterActive
@@ -529,8 +529,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               }
             />
 
-            {/* Totals bar — the last strip of the table, only once the view is
-                narrowed away from the default week. */}
+            {/* Totals bar — the last strip of the table, only once a date range
+                or filter narrows the list. */}
             {isFilterActive && filteredTrips.length > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-slate-200/70 bg-slate-50/80 px-4 py-2">
                 <p className="text-[11px] font-semibold text-slate-500">
@@ -575,7 +575,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       <FarmPaymentTripViewModal
         open={Boolean(viewingTrip)}
         trip={viewingTrip}
-        onClose={() => setViewingTrip(null)}
+        onClose={() => { viewRequestSeqRef.current += 1; setViewingTrip(null); }}
       />
     </div>
   );

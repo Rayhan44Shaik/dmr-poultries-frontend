@@ -1032,7 +1032,15 @@ export default function UnLoadingTable({
         supervisorName,
         supervisorPhone,
         tripDate,
-        undefined
+        undefined,
+        undefined,
+        undefined,
+        safeTrip?.driverName || undefined,
+        undefined,
+        {
+          supervisorId: safeTrip?.supervisorId,
+          driverId: safeTrip?.driverId,
+        }
       );
     } catch (error: any) {
       console.error("PDF download failed:", error);

@@ -27,6 +27,8 @@ export interface RateEntryDeliveryDto {
   boxNo: number | null;
   shopId: number | null;
   shopName: string;
+  subShopName: string;
+  load: number;
   birdTypeId: number | null;
   birdType: string;
   birds: number;
@@ -140,6 +142,8 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
           boxNo: d.boxNo ?? 0,
           shopId: d.shopId ?? 0,
           shopName: d.shopName,
+          subShopName: d.subShopName,
+          legIndex: d.load,
           birdTypeId: d.birdTypeId ?? 0,
           birdType: d.birdType,
           birds: num(d.birds),

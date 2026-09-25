@@ -78,8 +78,7 @@ export interface ShopSalePatch {
   remarks?: string;
   birdTypeId?: number | null;
   birdType?: string;
-  // Rate, amount, shop and trip identity are intentionally not patchable
-  // client-side after Rate Entry locks the sale.
+  rate?: number;
 }
 
 /** PUT /operations/shop-sales/:id */

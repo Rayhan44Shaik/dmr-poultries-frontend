@@ -1,8 +1,5 @@
 import React, { useCallback, useRef, type ReactNode } from "react";
 import {
-  IndianRupee,
-  Pencil,
-  Lock,
   ArrowUp,
   ArrowDown,
   Check,
@@ -18,16 +15,8 @@ import {
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
-import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import type { RateEntrySortKey } from "../hooks/useCompletedTrips";
 import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
-
-const isWithin10Days = (createdAt: string) => {
-  const created = new Date(createdAt);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-  return diffDays <= 10;
-};
 
 interface Props {
   trips: Trip[];
@@ -58,8 +47,6 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
 
 function CompletedTripsTable({
   trips,
-  onEnterRate,
-  onModifyRate,
   children,
   selectedRowId = null,
   onRowClick,
@@ -146,23 +133,17 @@ function CompletedTripsTable({
             <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
               {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="text-orange-500 flex-shrink-0" /><span>{t("ops.trip.weight_kg")}</span></div>, true)}
             </th>
-            <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
-              <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="text-emerald-500 flex-shrink-0" /><span>{t("ops.rate.col.action")}</span></div>
-            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {trips.length === 0 ? (
             <tr>
-              <td colSpan={10} className="py-12 text-center text-slate-400 text-[13px] font-medium">
+              <td colSpan={9} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                 {t("ops.rate.no_waiting_trips")}
               </td>
             </tr>
           ) : (
             trips.map((trip, index) => {
-              const isLocked = trip.rateCompleted === true;
-              const canModify = isLocked && isWithin10Days(trip.createdAt || "");
-              const isReadOnly = isLocked && !canModify;
               const serialNo = startIndex + index + 1;
               const isSelected = trip.id === selectedRowId;
               const totalShops = trip.totalShops ?? 0;
@@ -180,12 +161,12 @@ function CompletedTripsTable({
                   aria-selected={isSelected}
                   className={`${onRowClick || onRowSelect ? "cursor-pointer" : ""} outline-none border-t transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isSelected
-                      ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
+                      ? "bg-emerald-50/60 border-l-4 border-l-emerald-300 ring-1 ring-inset ring-emerald-200"
                       : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
                   }`}
                 >
                   <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-10">
-                    {isSelected ? <Check size={16} className="inline text-blue-500" /> : serialNo}
+                    {isSelected ? <Check size={16} className="inline text-emerald-600" /> : serialNo}
                   </td>
                   {/* Keep 2d logo in header but working start from name S */}
                   <td className="px-4 py-4 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
@@ -206,44 +187,6 @@ function CompletedTripsTable({
                     {trip.totalBirds.toLocaleString()}
                   </td>
                   <td className="px-4 py-4 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                  <td className="px-4 py-4 text-center whitespace-nowrap">
-                    {!isLocked ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEnterRate(trip);
-                        }}
-                        className="group relative inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:text-emerald-800 px-3.5 py-2 text-[13px] font-bold shadow-sm transition-all active:scale-95"
-                        aria-label={`${t("ops.rate.enter_tooltip")} ${trip.tripNo}`}
-                      >
-                        <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
-                          <IndianRupee size={15} />
-                        </span>
-                        {t("ops.rate.enter_rates")}
-                      </button>
-                    ) : canModify ? (
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onModifyRate(trip);
-                        }}
-                        className="group relative inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 px-3.5 py-2 text-[13px] font-bold shadow-sm transition-all active:scale-95"
-                        aria-label={`${t("ops.rate.modify_tooltip")} ${trip.tripNo}`}
-                      >
-                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-orange-600 ring-1 ring-orange-200 group-hover:bg-orange-200 ${uiActionIconMotionClass.edit}`}>
-                          <Pencil size={13} />
-                        </span>
-                        {t("ops.rate.modify_rates")}
-                      </button>
-                    ) : isReadOnly ? (
-                      <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-2 text-[13px] font-semibold cursor-not-allowed">
-                        <Lock size={15} />
-                        {t("ops.rate.locked")}
-                      </span>
-                    ) : null}
-                  </td>
                 </tr>
               );
             })

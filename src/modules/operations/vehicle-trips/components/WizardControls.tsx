@@ -106,11 +106,13 @@ const DropdownSearchBox = React.memo(function DropdownSearchBox({
   query,
   setQuery,
   searchPlaceholder,
+  onKeyDown,
 }: {
   searchRef: React.RefObject<HTMLInputElement | null>;
   query: string;
   setQuery: (q: string) => void;
   searchPlaceholder: string;
+  onKeyDown?: React.KeyboardEventHandler<HTMLInputElement>;
 }) {
   return (
     <div className="p-1.5 border-b border-slate-100 bg-slate-50/60">
@@ -121,6 +123,7 @@ const DropdownSearchBox = React.memo(function DropdownSearchBox({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={onKeyDown}
           placeholder={searchPlaceholder}
           className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
         />
@@ -286,6 +289,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   chipSummary,
   renderOptionLabel,
   selectAllLabel,
+  numericRangeSelection = false,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -303,6 +307,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   renderOptionLabel?: (option: DropdownOption) => React.ReactNode;
   /** When provided, a pinned "select all" row appears above the options. */
   selectAllLabel?: string;
+  /** Enter accepts `68 to 70`, `68-70`, or a single numeric option. */
+  numericRangeSelection?: boolean;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
   const { t } = useI18n();
@@ -390,6 +396,25 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             query={query}
             setQuery={setQuery}
             searchPlaceholder={searchPlaceholder}
+            onKeyDown={(event) => {
+              if (!numericRangeSelection || event.key !== "Enter") return;
+              const match = query.trim().match(/^(\d+)\s*(?:to|-)\s*(\d+)$/i);
+              const single = query.trim().match(/^\d+$/);
+              if (!match && !single) return;
+              event.preventDefault();
+              const start = Number(match?.[1] ?? single?.[0]);
+              const end = Number(match?.[2] ?? single?.[0]);
+              const low = Math.min(start, end);
+              const high = Math.max(start, end);
+              const available = new Set(options.filter((option) => !option.disabled).map((option) => option.value));
+              const additions: string[] = [];
+              for (let value = low; value <= high; value += 1) {
+                const key = String(value);
+                if (available.has(key)) additions.push(key);
+              }
+              if (additions.length) onChange(Array.from(new Set([...selectedValues, ...additions])));
+              setQuery("");
+            }}
           />
 
           {/* Pinned "select all" row */}

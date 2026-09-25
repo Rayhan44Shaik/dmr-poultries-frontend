@@ -12,6 +12,8 @@ import {
 import { userFacingDeliveryEmailError } from "../services/deliveryEmailErrors";
 import { translate } from "../../../../i18n";
 
+const EMAIL_BACKEND_ENABLED = import.meta.env.VITE_EMAIL_BACKEND_ENABLED === "true";
+
 export type EmailCounts = {
   sent: number;
   pending: number;
@@ -44,6 +46,7 @@ type Options = {
 export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], options: Options = {}) {
   const { enabled = true } = options;
   const completed = Boolean(trip && trip.status === "Completed" && enabled);
+  const emailEnabled = completed && EMAIL_BACKEND_ENABLED;
 
   const [rows, setRows] = useState<DeliveryEmailRow[]>([]);
   const [localStatus, setLocalStatus] = useState<Record<number, DeliveryEmailStatusValue>>({});
@@ -93,17 +96,17 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
   useEffect(() => () => clearAllFailureResets(), [clearAllFailureResets]);
 
   const refresh = useCallback(async () => {
-    if (!completed || !tripId) return;
+    if (!emailEnabled || !tripId) return;
     try {
       const next = await fetchDeliveryEmailStatuses(tripId);
       setRows(next);
     } catch {
       /* keep last known rows */
     }
-  }, [completed, tripId]);
+  }, [emailEnabled, tripId]);
 
   useEffect(() => {
-    if (!completed) {
+    if (!emailEnabled) {
       clearAllFailureResets();
       setRows([]);
       setLocalStatus({});
@@ -120,7 +123,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     return () => {
       cancelled = true;
     };
-  }, [completed, refresh, clearAllFailureResets]);
+  }, [emailEnabled, refresh, clearAllFailureResets]);
 
   const effectiveStatus = useCallback(
     (deliveryId: number): DeliveryEmailStatusValue => {

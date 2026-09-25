@@ -38,7 +38,7 @@ interface Props {
   /** Close the whole Trip Entry editor (no data change). */
   clearForm?: () => void;
   /** Hide locked-view Close X (Recent / Trip List read-only view). */
-  hideWizardClose?: boolean;
+  hideWizardClose?: boolean; hideLockedChip?: boolean;
 }
 
 function farmMasterAddress(farm: any): string {
@@ -59,7 +59,7 @@ export default function StepFarm({
   onCancel,
   onExitEdit,
   clearForm: _clearForm,
-  hideWizardClose = false,
+  hideWizardClose = false, hideLockedChip = false,
 }: Props) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
@@ -348,7 +348,7 @@ export default function StepFarm({
                 <Pencil size={14} className={uiActionIconMotionClass.edit} />
               </button>
             )}
-            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+            <span className={`bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap ${hideLockedChip ? "hidden" : ""}`}>
               {t("ops.trip.submitted_locked")}
             </span>
           </div>

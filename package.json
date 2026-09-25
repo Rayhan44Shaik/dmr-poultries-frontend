@@ -44,7 +44,7 @@
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:sample-quarter": "tsx --test src/sample/quarterSample.test.ts",
     "test:collection-balances": "node --test scripts/verify-collection-balances.mjs",
-    "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts src/modules/accounts/utils/paymentRegister.test.ts src/modules/accounts/utils/tripNavigation.test.ts src/modules/accounts/utils/analysisWeeks.test.ts src/modules/accounts/utils/approvedExpenses.test.ts src/modules/accounts/services/farmPaymentApiService.test.ts src/modules/accounts/services/analysisService.test.ts src/modules/dashboard/services/paymentRegisterSummary.test.ts",
+    "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts src/modules/accounts/utils/paymentRegister.test.ts src/modules/accounts/utils/tripNavigation.test.ts src/modules/accounts/utils/analysisWeeks.test.ts src/modules/accounts/utils/approvedExpenses.test.ts src/modules/accounts/services/farmPaymentApiService.test.ts src/modules/accounts/services/analysisService.test.ts src/modules/accounts/utils/farmPaymentSync.test.ts src/modules/dashboard/services/paymentRegisterSummary.test.ts",
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
     "verify:quarter-data": "node scripts/verify-quarter-sample-data.mjs",

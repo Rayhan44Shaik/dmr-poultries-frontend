@@ -56,7 +56,7 @@ function FarmStepLockedView({ trip }: { trip: Trip }) {
       trip={viewTrip}
       setTrip={noop as React.Dispatch<React.SetStateAction<Trip>>}
       updateTrip={noop}
-      submitFarmStep={noopFalse}
+      submitFarmStep={noopFalse} hideWizardClose hideLockedChip
       farms={[]}
       birdTypes={[]}
       editable={false}
@@ -76,7 +76,7 @@ function PickupStepLockedView({ trip }: { trip: Trip }) {
       setTrip={noop as React.Dispatch<React.SetStateAction<Trip>>}
       updateTrip={noop}
       updateBoxDetails={noop}
-      submitPickupStep={noopFalse}
+      submitPickupStep={noopFalse} hideWizardClose hideLockedChip
       editable={false}
       canEdit={false}
       clearForm={noop}

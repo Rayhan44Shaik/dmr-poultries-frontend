@@ -82,7 +82,12 @@ export async function sendDeliveryWhatsApp(input: {
     undefined,
     undefined,
     input.delivery.autoCaptureTime,
-    input.trip.driverName
+    input.trip.driverName,
+    undefined,
+    {
+      supervisorId: input.trip.supervisorId,
+      driverId: input.trip.driverId,
+    }
   );
   const pdfBase64 = await blobToBase64(blob);
   const fileName = `Delivery-${input.trip.tripNo}-${sanitizeShopNameForFile(input.delivery.shopName)}.pdf`;

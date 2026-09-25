@@ -16,6 +16,7 @@ export interface ApiShopSale {
   deliveryTime?: string | null;
   shopId: number | null;
   shopName: string;
+  subShopName?: string;
   birdTypeId: number | null;
   birdType: string;
   tripId: number | null;
@@ -63,6 +64,16 @@ function num(value: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+/** Hide Step 4's internal order-tracking token and keep the operator's note. */
+export function displayStep4Remark(value: unknown): string {
+  return String(value ?? "")
+    .replace(/\[ORDER\]\s*O:[^\s|]+/gi, "")
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" | ");
+}
+
 /** Maps one backend ShopSale row onto the existing frontend ShopSale shape —
  * every field the components read (totalBirds, totalWeight, remark, etc.)
  * keeps its exact name and type; the real numeric ids, the Shop Sales
@@ -78,12 +89,13 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     shopId: row.shopId == null ? "" : String(row.shopId),
     shopNo: row.shopNo ?? "",
     shopName: row.shopName,
+    subShopName: row.subShopName?.trim() || undefined,
     birdType: row.birdType,
     totalBirds: num(row.birds),
     totalWeight: num(row.weight),
     rate: row.rate,
     amount: num(row.amount),
-    remark: row.remarks,
+    remark: displayStep4Remark(row.remarks),
     status: row.status === "Approved" ? "Completed" : "Pending",
     numericId: row.id,
     numericTripId: row.tripId,

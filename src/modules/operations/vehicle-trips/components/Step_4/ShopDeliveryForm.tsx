@@ -346,6 +346,7 @@ export default function ShopDeliveryForm({
                 chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
                 renderOptionLabel={renderBoxOptionLabel}
                 selectAllLabel={t("ops.trip.select_all_boxes")}
+                numericRangeSelection
                 onChange={(values) => handleBoxSelection(values.map(Number))}
               />
             ) : (

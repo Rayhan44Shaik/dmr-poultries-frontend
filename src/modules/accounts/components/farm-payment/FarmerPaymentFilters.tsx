@@ -1,8 +1,8 @@
 // src/modules/accounts/components/farm-payment/FarmerPaymentFilters.tsx
 //
 // The Farm Payment filter card — the SAME card the Trip List uses
-// (opsFilterCardClass): one labelled grid of icon + name fields, then the
-// search row with every register action beside it. Glyph motions come from
+// (opsFilterCardClass): From/To, farm, search, and actions in a single row
+// on desktop (stacked below). Glyph motions come from
 // the global tokens: search sways, reset spins, refresh is the brand hen.
 
 import React from 'react';
@@ -90,9 +90,9 @@ export function FarmerPaymentFilters({
   );
 
   return (
-    <div className={opsFilterCardClass} role="search" aria-label={t('accounts.farmpay.filters_aria')}>
-      {/* Row 1 — labelled fields, each icon + name like the Trip List. */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+    <div className={`${opsFilterCardClass} lg:grid lg:grid-cols-12 lg:gap-3.5 lg:items-end [&>div:first-child>div]:lg:col-span-2`} role="search" aria-label={t('accounts.farmpay.filters_aria')}>
+      {/* Single row on desktop — dates, farm, search, and actions side by side. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:contents gap-3.5">
         <div>
           <label htmlFor={fromId} className={opsFilterLabelClass}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
@@ -143,10 +143,10 @@ export function FarmerPaymentFilters({
         </div>
       </div>
 
-      {/* Row 2 — the search field with its icon label, then Reset and the
-          brand hen Refresh, right-aligned exactly like the Trip List. */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-7">
+
+
+      <div className="grid grid-cols-1 lg:contents gap-3.5 items-end pt-1">
+        <div className="lg:col-span-4">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t('common.search')}</span>
@@ -163,7 +163,7 @@ export function FarmerPaymentFilters({
           </div>
         </div>
 
-        <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+        <div className="lg:col-span-2 flex items-center gap-2 justify-end flex-nowrap">
           <button
             type="button"
             onClick={handleClear}

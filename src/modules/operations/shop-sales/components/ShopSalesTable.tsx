@@ -84,7 +84,10 @@ function ShopSalesTable({
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
   const selectedBirdLimit = Number(selectedSale?.maxEditableBirds);
-  const hasSelectedBirdLimit = Number.isSafeInteger(selectedBirdLimit) && selectedBirdLimit >= 0;
+  const hasSelectedBirdLimit =
+    selectedSale?.maxEditableBirds != null &&
+    Number.isSafeInteger(selectedBirdLimit) &&
+    selectedBirdLimit >= 0;
 
   const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
     const values = SORT_VALUES[column];
@@ -117,6 +120,7 @@ function ShopSalesTable({
     setEditData({
       totalBirds: selectedSale.totalBirds,
       totalWeight: selectedSale.totalWeight,
+      rate: selectedSale.rate,
     });
   }, [selectedSale, saving]);
 
@@ -136,16 +140,27 @@ function ShopSalesTable({
 
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
-    if (!Number.isInteger(newBirds) || newBirds < 0) {
+    const newRate = editData.rate ?? originalSale.rate ?? 0;
+    const birdsChanged = newBirds !== originalSale.totalBirds;
+    const weightChanged = newWeight !== originalSale.totalWeight;
+
+    // Validate only the quantity the operator actually changed. A rate-only
+    // correction must not be blocked by legacy/multi-load capacity metadata
+    // (for example maxEditableBirds = 0 on an already-delivered row).
+    if (birdsChanged && (!Number.isInteger(newBirds) || newBirds < 0)) {
       globalNotify.error(t("ops.shop_sales.birds_integer"));
       return;
     }
-    if (newWeight < 0) {
+    if (weightChanged && (!Number.isFinite(newWeight) || newWeight < 0)) {
       globalNotify.error(t("ops.shop_sales.invalid_weight"));
       return;
     }
+    if (!Number.isFinite(newRate) || newRate < 50 || newRate > 300) {
+      globalNotify.error("Rate must be between ₹50 and ₹300");
+      return;
+    }
     const maximumBirds = Number(originalSale.maxEditableBirds);
-    if (Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
+    if (birdsChanged && Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
       globalNotify.error(t("ops.shop_sales.max_birds_error", { maximum: maximumBirds }));
       return;
     }
@@ -156,6 +171,7 @@ function ShopSalesTable({
         ...originalSale,
         totalBirds: newBirds,
         totalWeight: newWeight,
+        rate: newRate,
       });
       setEditingId(null);
       setEditData({});
@@ -248,6 +264,17 @@ function ShopSalesTable({
                   onChange={(event) => handleInputChange("totalWeight", parseFloat(event.target.value) || 0)}
                   className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-orange-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min={0}
+                  step={0.01}
+                />
+                <IndianRupee size={13} className="text-violet-600" />
+                <input
+                  type="number"
+                  aria-label={t("ops.shop_sales.rate")}
+                  value={editData.rate ?? 0}
+                  onChange={(event) => handleInputChange("rate", Number(event.target.value))}
+                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-violet-600 shadow-2xs outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                  min={50}
+                  max={300}
                   step={0.01}
                 />
               </div>
@@ -343,12 +370,15 @@ function ShopSalesTable({
                     <div>{sale.saleNo || sale.tripNo || "—"}</div>
                   </td>
                   <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
-                  <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
+                  <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">
+                    <div>{cleanDeliveryShopName(sale.shopName) || "—"}</div>
+                    {sale.subShopName?.trim() ? <div className="mt-0.5 text-[11px] font-semibold text-indigo-600">{sale.subShopName.trim()}</div> : null}
+                  </td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
-                  <td className="whitespace-nowrap px-4 py-5 text-[13px] text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
+                  <td className="max-w-[260px] px-4 py-5 text-[13px] text-slate-600"><span className="block whitespace-normal break-words font-medium leading-5 text-slate-700" title={sale.remark || undefined}>{formatSaleRemark(sale.remark)}</span></td>
                 </tr>
               );
             })}

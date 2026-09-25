@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog } from "lucide-react";
+import { Search, IndianRupee, Calendar, Truck, UserCog } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import {
@@ -7,8 +7,6 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsPrimaryButtonClass,
-  opsPdfButtonClass,
-  opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
@@ -34,8 +32,8 @@ interface Props {
   refreshing?: boolean;
   pendingTrips?: number;
   hasFilters?: boolean;
-  onExportPDF?: () => void;
-  onExportExcel?: () => void;
+  onRateEntry?: () => void;
+  rateEntryEnabled?: boolean;
 }
 
 function withoutSentinel(
@@ -64,12 +62,11 @@ function CompletedTripsFilters({
   refreshing = false,
   pendingTrips = 0,
   hasFilters = false,
-  onExportPDF,
-  onExportExcel,
+  onRateEntry,
+  rateEntryEnabled = false,
 }: Props) {
   const { t, language } = useI18n();
   // Exports should be available whenever there is data, not only when filtered
-  const enableExports = pendingTrips > 0;
   void hasFilters;
   const localizeOptions = (options: readonly (string | MasterDropdownOption)[]) => options.map((option) => {
     const raw = typeof option === "string" ? option : option.label;
@@ -194,16 +191,10 @@ function CompletedTripsFilters({
               {t("common.refresh")}
             </BrandRefreshButton>
           )}
-          {onExportPDF && (
-            <button type="button" onClick={onExportPDF} disabled={!enableExports} className={`group relative ${opsPdfButtonClass}`} aria-label={t("ops.rate.export_pdf")}>
-              <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.pdf : ""}`}><FileText size={15} /></span>
-              PDF
-            </button>
-          )}
-          {onExportExcel && (
-            <button type="button" onClick={onExportExcel} disabled={!enableExports} className={`group relative ${opsExcelButtonClass}`} aria-label={t("ops.rate.export_excel")}>
-              <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.excel : ""}`}><FileSpreadsheet size={15} /></span>
-              Excel
+          {onRateEntry && (
+            <button type="button" onClick={onRateEntry} disabled={!rateEntryEnabled} className={`group relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg font-semibold h-9 px-3.5 text-[13px] border border-emerald-200 bg-emerald-50 text-emerald-800 shadow-xs transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out hover:bg-emerald-100 active:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none whitespace-nowrap select-none ${rateEntryEnabled ? "shadow-emerald-200/70 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-95" : ""}`}>
+              <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg border transition-all ${rateEntryEnabled ? `border-emerald-200 bg-white/80 text-emerald-700 ${uiActionIconMotionClass.edit}` : "border-slate-200 bg-slate-50 text-slate-400"}`}><IndianRupee size={14} /></span>
+              Rate Entry
             </button>
           )}
         </div>

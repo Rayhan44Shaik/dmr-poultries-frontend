@@ -18,6 +18,8 @@ export interface ShopDelivery {
   shopId: number;
   shopName: string;
   subShopName?: string;
+  /** Authoritative trip-leg/load number for multi-load displays. */
+  legIndex?: number;
   birdTypeId: number;
   birdType: string;
   birds: number;

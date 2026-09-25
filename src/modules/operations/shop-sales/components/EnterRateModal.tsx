@@ -10,7 +10,7 @@ import {
   Lock,
   Save,
   RotateCcw,
-  PackageCheck,
+  PackageCheck, Package, Scale,
   Calculator,
   ChevronLeft,
   ChevronRight,
@@ -92,7 +92,6 @@ export default function EnterRateModal({
   isSaving = false,
   loadError,
   shops = [],
-  shopsLoading: _shopsLoading = false,
 }: Props) {
   const { t, language } = useI18n();
   const [deliveries, setDeliveries] = useState<Trip["deliveries"]>([]);
@@ -106,6 +105,7 @@ export default function EnterRateModal({
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
   const [shopSearch, setShopSearch] = useState("");
   const [localLanguage, setLocalLanguage] = useState(language);
+  const [showMarketReference, setShowMarketReference] = useState(false);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -120,6 +120,7 @@ export default function EnterRateModal({
     setShopSortKey("time");
     setShopSortDir("asc");
     setShopSearch("");
+    setShowMarketReference(false);
     setLocalLanguage(language);
     setDeliveries(trip.deliveries.map((d) => ({ ...d, rate: normalizeRate(d.rate) })));
   }, [trip, language]);
@@ -222,6 +223,18 @@ export default function EnterRateModal({
     return { ratedCount, totalWeight, totalAmount, totalBirds, progressPct };
   }, [deliveries]);
 
+  const loadTotals = useMemo(() => {
+    const byLoad = new Map<number, { birds: number; weight: number }>();
+    for (const delivery of deliveries) {
+      const load = Math.max(1, Number(delivery.legIndex || 1));
+      const current = byLoad.get(load) ?? { birds: 0, weight: 0 };
+      current.birds += Number(delivery.birds || 0);
+      current.weight += Number(delivery.weight || 0);
+      byLoad.set(load, current);
+    }
+    return [...byLoad.entries()].sort(([a], [b]) => a - b);
+  }, [deliveries]);
+
   const filteredSortedDeliveries = useMemo(() => {
     let list = deliveries.map((row, idx) => ({ row, originalIndex: idx }));
     if (shopSearch.trim()) {
@@ -232,6 +245,10 @@ export default function EnterRateModal({
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
       const rb = b.row;
+      // Loads are always contiguous. User sorting applies within each load so
+      // the single Load 2 divider remains meaningful and deterministic.
+      const loadDiff = Math.max(1, Number(ra.legIndex || 1)) - Math.max(1, Number(rb.legIndex || 1));
+      if (loadDiff !== 0) return loadDiff;
       const masterA = resolveShopMaster(ra, shopMasterLookup);
       const masterB = resolveShopMaster(rb, shopMasterLookup);
       switch (shopSortKey) {
@@ -380,8 +397,8 @@ export default function EnterRateModal({
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
         /* perf scroll - fix freezing */
         @keyframes lock-pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.45)}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}
-                .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
-        .no-drag-table{overflow:hidden;transform:translateZ(0)}
+                .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+        .no-drag-table{overflow:hidden;contain:layout paint}
         .no-drag-table table{width:100%;table-layout:fixed}
         @media (min-width:1280px){.modal-responsive{max-width:1250px}} @media (min-width:1536px){.modal-responsive{max-width:1350px}} @media (min-width:1920px){.modal-responsive{max-width:1480px}} @media (min-width:2560px){.modal-responsive{max-width:1650px}} .modal-responsive{height:88vh; max-height:88vh} .no-drag-table{max-height:100%}
       `}</style>
@@ -418,7 +435,7 @@ export default function EnterRateModal({
       )}
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto">
-        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto animate-fade-in-up">
+        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto">
           {/* Header - logo with hen dance + search beside title + local Telugu toggle */}
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl gap-3">
             <div className="flex items-center gap-3 group flex-1 min-w-0">
@@ -473,17 +490,25 @@ export default function EnterRateModal({
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm btn-anim">
               <div className="h-9 w-9 rounded-lg bg-white border border-violet-200 flex items-center justify-center text-violet-700 shadow-sm"><CalendarDays size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">{t("ops.rate.modal.trip_date")}</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">Day</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[10px] font-semibold text-amber-700">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg</p>)}</div>
             </div>
           </div>
 
-          {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts - with gap */}
           {marketThreeDays.length > 0 && (
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[18vh] overflow-auto scroll-perf scroll-smooth">
+            <div className="flex items-center justify-end border-b border-slate-100 bg-white px-5 py-1.5">
+              <button type="button" onClick={() => setShowMarketReference((visible) => !visible)} className="btn-anim inline-flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-1.5 text-[11px] font-semibold text-sky-700 hover:bg-sky-100" aria-expanded={showMarketReference}>
+                {showMarketReference ? "Hide market reference" : "Show market reference"}
+              </button>
+            </div>
+          )}
+
+          {/* Kept out of the initial render so rate inputs stay responsive. */}
+          {showMarketReference && marketThreeDays.length > 0 && (
+            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[18vh] overflow-auto scroll-perf">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {/* Company & Association Rates - Telugu supported via language */}
                 <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
@@ -612,7 +637,7 @@ export default function EnterRateModal({
           {/* Shop table - increased size by way, bigger table, perfect middle with gaps */}
           <div className="px-5 py-3 flex-[1.6] min-h-[380px] flex flex-col overflow-hidden bg-white">
             <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
-              <div className="flex-1 min-h-0 overflow-auto scroll-perf scroll-smooth">
+              <div className="flex-1 min-h-0 overflow-auto scroll-perf">
                 <table className="w-full table-fixed text-[13.5px]">
                   <thead className="bg-slate-50 sticky top-0 z-[1]">
                     <tr className="border-b border-slate-200">
@@ -647,13 +672,18 @@ export default function EnterRateModal({
                       const belowMin = rate != null && rate < 50;
                       const aboveMax = rate != null && rate > 300;
                       const missingForLock = lockAttempted && !isValid;
+                      const load = Math.max(1, Number(delivery.legIndex || 1));
+                      const previousLoad = idx > 0 ? Math.max(1, Number(pagedDeliveries[idx - 1]?.row.legIndex || 1)) : load;
+                      const startsLoad = idx === 0 || load !== previousLoad;
 
                       return (
-                        <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
+                        <tr key={delivery.id} className={`${startsLoad && load > 1 ? "border-t-4 border-t-indigo-300" : ""} border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-700 tabular-nums bg-slate-50/50 border-r border-slate-100">{serialNo}</td>
                           <td className="px-3 py-3.5">
-                            <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
-                            {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{displayRateEntryName(masterShop.city, language)}</div>}
+                            <div className="flex items-center gap-1.5"><span className="min-w-0 text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</span>{delivery.deliveryMode === "weight" ? (<span title={t("ops.trip.weight_mode")} aria-label={t("ops.trip.weight_mode")} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-50 text-purple-600"><Scale size={15} /></span>) : (<span title={t("ops.trip.box_mode")} aria-label={t("ops.trip.box_mode")} className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600"><Package size={15} /></span>)}</div>
+                            {masterShop?.city?.trim() ? <div className="text-[11px] font-normal text-slate-500 truncate">{displayRateEntryName(masterShop.city, language)}</div> : null}
+                            {delivery.subShopName?.trim() ? <div className="text-[11px] font-semibold text-indigo-600 truncate">{delivery.subShopName.trim()}</div> : null}
+                            {delivery.remarks?.trim() ? <div className="mt-0.5 text-[10px] font-medium italic text-slate-500 line-clamp-2" title={delivery.remarks.trim()}>{delivery.remarks.trim()}</div> : null}
                           </td>
                           <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>

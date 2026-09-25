@@ -40,6 +40,15 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
+// Number fields retain keyboard entry but never mutate while the page is
+// being scrolled. Capture handles every current and future numeric input.
+document.addEventListener("wheel", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.type === "number" && document.activeElement === target) {
+    event.preventDefault();
+  }
+}, { capture: true, passive: false });
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
