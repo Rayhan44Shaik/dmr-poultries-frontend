@@ -26,7 +26,7 @@ import {
   cleanRateEntryShopName,
   displayRateEntryName,
   displayRateEntryShopName,
-  formatRateEntryTripDate,
+  formatRateEntryTripDate, formatRateEntryWeekday,
 } from "../utils/rateEntryDisplay";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import { addCalendarDays, sizeCategoryHeaders } from "../utils/rateEntryMarketMaster";
@@ -478,23 +478,23 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Trip info - TRIP NO light green, Vehicle light blue, Date light violet, Total light amber - perfect colour neat */}
+          {/* Trip info - TRIP NO light green, Date light violet, Vehicle light blue, Total light amber - perfect colour neat */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0 bg-slate-50/70 border-b border-slate-100">
             <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 shadow-sm"><PackageCheck size={16} /></span>
               <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-700/70 font-semibold">{t("ops.rate.modal.trip_number")}</p><p className="text-[13px] font-bold text-emerald-900 truncate">{displayRateEntryName(trip.tripNo, language)}</p></div>
             </div>
+            <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm btn-anim">
+              <div className="h-9 w-9 rounded-lg bg-white border border-violet-200 flex items-center justify-center text-violet-700 shadow-sm"><CalendarDays size={16} /></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">Day</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)} ({formatRateEntryWeekday(trip.tripDate, language)})</p></div>
+            </div>
             <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm btn-anim">
               <div className="h-9 w-9 rounded-lg bg-white border border-sky-200 flex items-center justify-center text-sky-700 shadow-sm"><Truck size={16} /></div>
               <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-sky-700/70 font-semibold">{t("ops.rate.modal.vehicle_no")}</p><p className="text-[13px] font-bold text-sky-900 truncate">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm btn-anim">
-              <div className="h-9 w-9 rounded-lg bg-white border border-violet-200 flex items-center justify-center text-violet-700 shadow-sm"><CalendarDays size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">Day</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
-            </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[10px] font-semibold text-amber-700">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg</p>)}</div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[12px] font-bold text-amber-700">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg</p>)}</div>
             </div>
           </div>
 

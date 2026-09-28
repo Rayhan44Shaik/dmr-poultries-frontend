@@ -91,7 +91,7 @@ import {
   collectionRowWeightKg,
   weightForBirds,
 } from "../utils/ordersUtils";
-import { ordersErrorMessage } from "../utils/ordersErrorMessage";
+import { ordersErrorMessage } from "../utils/ordersErrorMessage"; import { collectionDeliveryMode } from "../utils/collectionDeliveryMode";
 import {
   finishCollection,
   saveCollection,
@@ -312,7 +312,7 @@ function toOrderShopRows(
         rate: null,
         amount: 0,
         remarks: ORDER_REMARKS,
-        deliveryMode: "box" as const,
+        deliveryMode: collectionDeliveryMode(r.boxes), // Boxed rows are box sales; a weight-only capture (boxes 0) is a weight sale.
         selectedBoxIds: [],
         village: r.village,
       }))

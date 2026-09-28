@@ -30,7 +30,6 @@ import {
   ChevronDown,
   Layers,
   ArrowUpRight,
-  RefreshCw,
   SlidersHorizontal,
 } from "lucide-react";
 import { DatePicker } from "../../../components/common/DatePicker";
@@ -39,6 +38,7 @@ import { weekRange } from "../../../utils/businessDate";
 import { FIXED_DASHBOARD_GREETING } from "../../settings/services";
 import { kickApprovalSnapshot } from "../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { BrandRefreshButton } from "../../../ui";
 import {
   loadPaymentRegisterSummary,
   type PaymentRegisterSummary,
@@ -939,16 +939,13 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
 
   const headerActions = (
     <>
-      <button
-        type="button"
+      <BrandRefreshButton
         onClick={handleRefreshAll}
-        disabled={refreshing}
+        loading={refreshing}
+        compact
+        ariaLabel={t("ops.dashboard.refresh_all")}
         title={t("ops.dashboard.refresh_all")}
-        aria-label={t("ops.dashboard.refresh_all")}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-emerald-500/50 hover:bg-slate-100/80 hover:text-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 active:scale-[0.96] disabled:opacity-60"
-      >
-        <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
-      </button>
+      />
       {rangePicker}
     </>
   );

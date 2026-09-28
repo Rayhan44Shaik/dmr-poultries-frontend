@@ -11,6 +11,7 @@ import { useEffect, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
+  ArrowUpRight,
   Banknote,
   CalendarDays,
   CheckCircle2,
@@ -228,57 +229,50 @@ export default function PendingApprovalsPanel({
           })
       : t(stat.tipKey);
 
-  const pendingTotal = stats.reduce((sum, s) => sum + s.count, 0);
-
   return (
     <section
       aria-label={t("ops.dashboard.approvals.title")}
-      className="relative z-30 rounded-2xl border border-amber-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+      className="relative z-30 overflow-visible rounded-[1.5rem] border border-amber-200/70 bg-white shadow-[0_18px_55px_-34px_rgba(120,53,15,0.45)] motion-safe:animate-[var(--animate-fade-in-up)]"
     >
-      {/* ── Header: logo + title left, the calendar / refresh actions right ── */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200/70">
-            <ClipboardCheck size={18} strokeWidth={2.2} />
+      {/* Simple title row; calendar and hen refresh stay together on the right. */}
+      <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200/70">
+            <ClipboardCheck size={17} strokeWidth={2.3} />
           </span>
           <div className="min-w-0">
-            <h3 className="truncate text-sm font-black text-slate-800">
+            <h2 className="truncate text-sm font-black tracking-tight text-slate-900">
               {t("ops.dashboard.approvals.title")}
-            </h3>
-            <span
-              aria-hidden="true"
-              className="mt-1 block h-0.5 w-10 rounded-full bg-amber-400"
-            />
-            <p className="mt-1 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
-              {loading
-                ? t("ops.dashboard.syncing")
-                : t("ops.dashboard.approvals.subtitle", {
-                    count: pendingTotal,
-                  })}
-            </p>
+            </h2>
           </div>
         </div>
         {actions && (
-          <div className="ml-auto flex items-center gap-2 pl-2">{actions}</div>
+          <div className="ml-auto flex items-center gap-2">
+            {actions}
+          </div>
         )}
       </div>
 
-      {/* ── One map-style tile per queue, same links / tooltips as before ── */}
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+      {/* One card per queue; active work is vivid while zero queues stay quiet. */}
+      <div className="relative grid grid-cols-2 gap-2.5 p-4 sm:grid-cols-4 sm:gap-3 sm:p-5 xl:grid-cols-7">
         {loading ? (
           [0, 1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="h-28 animate-pulse rounded-xl border border-slate-200/60 bg-slate-100/70"
+              className="h-[7.25rem] animate-pulse rounded-2xl border border-slate-200/60 bg-slate-100/70"
             />
           ))
         ) : allClear ? (
-          <p className="col-span-full flex items-center gap-1.5 rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-4 py-3 text-[12px] font-semibold text-emerald-600">
-            <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
-            {t("ops.dashboard.approvals.all_clear")}
-          </p>
+          <div className="col-span-full flex min-h-24 items-center justify-center rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 to-teal-50/70 px-5 py-4 text-center shadow-inner shadow-emerald-100/50">
+            <p className="flex items-center gap-2 text-[12px] font-bold text-emerald-700">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-emerald-600 shadow-sm ring-1 ring-emerald-200 motion-safe:animate-[var(--animate-pop-in)]">
+                <CheckCircle2 size={18} strokeWidth={2.5} />
+              </span>
+              {t("ops.dashboard.approvals.all_clear")}
+            </p>
+          </div>
         ) : (
-          stats.map((stat) => {
+          stats.map((stat, index) => {
             const Icon = stat.icon;
             const empty = stat.count === 0;
             return (
@@ -292,24 +286,27 @@ export default function PendingApprovalsPanel({
                   count: stat.count,
                   label: t(stat.labelKey),
                 })}
-                className={`group/tile relative flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-slate-50/40 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
-                  empty ? "opacity-40 hover:bg-slate-50/40" : ""
+                style={{ animationDelay: `${Math.min(index * 55, 330)}ms`, animationFillMode: "both" }}
+                className={`group/tile relative flex min-h-[7.25rem] flex-col justify-between overflow-hidden rounded-2xl border p-3.5 outline-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 active:scale-[0.98] motion-safe:animate-[var(--animate-fade-in-up)] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                  empty
+                    ? "border-slate-200/80 bg-slate-50/60 opacity-55 hover:bg-white"
+                    : `border-slate-200/90 bg-white ${stat.hover}`
                 }`}
               >
-                <span
-                  className={`flex h-8 w-8 shrink-0 origin-center items-center justify-center rounded-lg shadow-sm ring-1 ring-inset ring-slate-200/70 transition-transform duration-200 ease-out group-hover/tile:scale-110 group-active/tile:scale-75 group-active/tile:-rotate-12 motion-reduce:transform-none motion-reduce:transition-none ${stat.chip}`}
-                >
-                  <Icon size={15} strokeWidth={2.2} />
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-slate-400 transition-colors duration-150 group-hover/tile:text-amber-700">
+                {!empty && <span className={`absolute inset-x-3 top-0 h-0.5 rounded-full ${stat.dot}`} />}
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`flex h-9 w-9 shrink-0 origin-center items-center justify-center rounded-xl shadow-sm ring-1 ring-inset ring-white/70 transition-transform duration-200 ease-out group-hover/tile:scale-110 group-hover/tile:-rotate-3 motion-reduce:transform-none ${stat.chip}`}>
+                    <Icon size={16} strokeWidth={2.25} />
+                  </span>
+                  <ArrowUpRight size={14} className="text-slate-300 transition-all group-hover/tile:-translate-y-0.5 group-hover/tile:translate-x-0.5 group-hover/tile:text-slate-600" />
+                </div>
+                <span className="mt-2 min-w-0">
+                  <span className="block truncate text-[10px] font-extrabold uppercase tracking-[0.075em] text-slate-500 transition-colors duration-150 group-hover/tile:text-slate-700">
                     {t(stat.labelKey)}
                   </span>
-                  <span className="mt-0.5 block text-lg font-black leading-tight tabular-nums text-slate-800">
-                    {stat.count}
-                  </span>
-                  <span className="block truncate text-[10px] font-semibold text-slate-400">
-                    {t("ops.dashboard.approvals.pending_unit")}
+                  <span className="mt-0.5 flex items-baseline gap-1.5">
+                    <span className={`text-2xl font-black leading-none tabular-nums ${empty ? "text-slate-400" : "text-slate-900"}`}>{stat.count}</span>
+                    <span className="truncate text-[9.5px] font-bold text-slate-400">{t("ops.dashboard.approvals.pending_unit")}</span>
                   </span>
                 </span>
 

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
+import henImage from "../../../assets/dmr-hen-cut-256.png";
 
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
@@ -82,36 +83,48 @@ const formatWeightNumber = (
 const cardConfig = {
   "Total Trips": {
     bg: "bg-blue-500",
+    chip: "bg-blue-100 text-blue-600",
+    hover: "hover:bg-blue-50/60",
     text: "text-blue-600",
     icon: Truck,
     upIsGood: true,
   },
   "Total Birds": {
     bg: "bg-amber-500",
+    chip: "bg-amber-100 text-amber-600",
+    hover: "hover:bg-amber-50/60",
     text: "text-amber-600",
     icon: Bird,
     upIsGood: true,
   },
   "Total Weight (KG)": {
     bg: "bg-green-500",
+    chip: "bg-emerald-100 text-emerald-600",
+    hover: "hover:bg-emerald-50/60",
     text: "text-green-600",
     icon: ShoppingBag,
     upIsGood: true,
   },
   "Total Sales Amount": {
     bg: "bg-violet-500",
+    chip: "bg-violet-100 text-violet-600",
+    hover: "hover:bg-violet-50/60",
     text: "text-violet-600",
     icon: IndianRupee,
     upIsGood: true,
   },
   "Total Collections": {
     bg: "bg-orange-500",
+    chip: "bg-orange-100 text-orange-600",
+    hover: "hover:bg-orange-50/60",
     text: "text-orange-600",
     icon: Wallet,
     upIsGood: true,
   },
   "Pending Collections": {
     bg: "bg-cyan-500",
+    chip: "bg-cyan-100 text-cyan-700",
+    hover: "hover:bg-cyan-50/60",
     text: "text-cyan-600",
     icon: Hourglass,
     // Outstanding dues going UP is not a win.
@@ -119,6 +132,8 @@ const cardConfig = {
   },
   "Total Expenses": {
     bg: "bg-pink-500",
+    chip: "bg-pink-100 text-pink-600",
+    hover: "hover:bg-pink-50/60",
     text: "text-pink-600",
     icon: ReceiptIndianRupee,
     // Nor is spending more.
@@ -254,7 +269,7 @@ const KPICard = memo(function KPICard({
      measured on the card itself) and keeps `max-w-full` + `shrink-0`, so the
      change and its period are never clipped and never push anything out. */
   let trendChipClasses =
-    "inline-flex w-full max-w-full items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-center text-[8px] font-black tracking-[0.02em] ring-1 ring-inset shadow-sm @min-[96px]:text-[8.5px] @min-[120px]:text-[9px] ";
+    "inline-flex max-w-full items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-center text-[8px] font-black tracking-[0.02em] ring-1 ring-inset shadow-sm @min-[96px]:text-[8.5px] @min-[120px]:text-[9px] ";
   const trendIconClass =
     "h-2.5 w-2.5 shrink-0 @min-[96px]:h-3 @min-[96px]:w-3 @min-[120px]:h-3.5 @min-[120px]:w-3.5";
   let trendIcon: React.ReactNode = null;
@@ -350,17 +365,27 @@ const KPICard = memo(function KPICard({
      full figure plus the full comparison always sit in the tooltips. */
   const cardContent = (
     <div
-      className={`@container group relative flex h-full min-h-[7.35rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+      className={`@container group relative flex h-full min-h-[7.25rem] min-w-0 flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-sm outline-none transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${config.hover} ${
         /* No navigation from the KPI row on purpose — only Expenses keeps the
            "hover me for the breakdown" cue. */
         showBreakdown ? "cursor-help" : ""
       }`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
-      <div
-        className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`}
-      />
-      <div className="absolute top-2 right-3 z-20 flex w-[4.1rem] items-center justify-center text-center @min-[96px]:right-3.5 @min-[96px]:w-[4.45rem] @min-[120px]:right-4 @min-[120px]:w-[4.8rem]">
+      <span className={`absolute inset-x-3 top-0 h-0.5 rounded-full ${config.bg}`} />
+      <div className="relative z-20 flex items-start justify-between gap-1.5">
+        <div className={`${config.chip} flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-inset ring-white/70 transition-transform duration-200 ease-out group-hover:scale-110 group-hover:-rotate-3 motion-reduce:transform-none`}>
+          {label === "Total Birds" ? (
+            <img
+              src={henImage}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="h-8 w-8 select-none object-contain drop-shadow-sm"
+            />
+          ) : (
+            <Icon className="h-4 w-4" size={16} strokeWidth={2.25} />
+          )}
+        </div>
         <span
           className={trendChipClasses}
           title={`${badgeTitle} · ${rangeLabel}`}
@@ -370,32 +395,20 @@ const KPICard = memo(function KPICard({
           <span className="font-medium opacity-70">{periodLabel}</span>
         </span>
       </div>
-      <div className="absolute right-1.5 top-1/2 z-10 flex h-8 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-9 @min-[96px]:w-[3.25rem] @min-[120px]:h-10 @min-[120px]:w-14">
-        <div
-          className={`${config.bg} mx-auto flex h-8 w-8 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-9 @min-[96px]:w-9 @min-[120px]:h-10 @min-[120px]:w-10`}
-        >
-          <Icon
-            className="h-[18px] w-[18px] text-white @min-[96px]:h-5 @min-[96px]:w-5 @min-[120px]:h-[22px] @min-[120px]:w-[22px]"
-            size={18}
-          />
-        </div>
-      </div>
 
-      <div className="relative flex h-full min-w-0 flex-col gap-1.5 pr-12 @min-[96px]:pr-14 @min-[120px]:pr-16">
-        {/* line 1 — KPI name; the logo/period stack is centred on the right edge */}
-        <div className="min-w-0 pr-1">
+      <div className="relative mt-2 flex min-w-0 flex-col gap-1">
+        <div className="min-w-0">
           <span
-            className="block min-w-0 text-[8.5px] leading-snug font-semibold break-words text-slate-500 @min-[96px]:text-[10px] @min-[120px]:text-[11px]"
+            className="block min-w-0 truncate text-[8.5px] font-extrabold uppercase leading-snug tracking-[0.075em] text-slate-500 @min-[96px]:text-[10px]"
             title={t(kpiCardLabel(label))}
           >
             {t(kpiCardShortLabel(label))}
           </span>
         </div>
 
-        {/* line 2 — the main figure, enlarged and centred in the remaining space */}
-        <div className="my-auto min-w-0">
+        <div className="min-w-0">
           <div
-            className={`min-w-0 truncate font-bold leading-none tracking-tight ${valueSizeClass} ${config.text}`}
+            className={`min-w-0 truncate font-black leading-none tracking-tight ${valueSizeClass} ${config.text}`}
             title={valueTooltip}
           >
             {displayMain}
@@ -411,7 +424,7 @@ const KPICard = memo(function KPICard({
 
         {baseline ? (
           <span
-            className={`block min-w-0 max-w-full truncate text-[10px] font-bold leading-none @min-[96px]:text-[10.5px] @min-[120px]:text-[11px] ${wasValueClass}`}
+            className={`block min-w-0 max-w-full truncate text-[8px] font-bold leading-none @min-[96px]:text-[9px] @min-[120px]:text-[10px] ${wasValueClass}`}
             title={badgeTitle}
           >
             {t("ops.dashboard.kpi_prev_value", {

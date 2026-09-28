@@ -307,6 +307,10 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     others3Amt: num(raw.others3Amt ?? raw.others3_amt, defaults.others3Amt),
     others4Amt: num(raw.others4Amt ?? raw.others4_amt, defaults.others4Amt),
     others5Amt: num(raw.others5Amt ?? raw.others5_amt, defaults.others5Amt),
+    others2Name: str(raw.others2Name ?? raw.others2_name ?? defaults.others2Name ?? ""),
+    others3Name: str(raw.others3Name ?? raw.others3_name ?? defaults.others3Name ?? ""),
+    others4Name: str(raw.others4Name ?? raw.others4_name ?? defaults.others4Name ?? ""),
+    others5Name: str(raw.others5Name ?? raw.others5_name ?? defaults.others5Name ?? ""),
     deleted: Boolean(raw.deleted ?? defaults.deleted),
     deletedReason: raw.deletedReason != null ? str(raw.deletedReason) : defaults.deletedReason,
     approvedBy: raw.approvedBy != null ? str(raw.approvedBy) : defaults.approvedBy,
@@ -428,6 +432,9 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   for (const key of EXPENSE_KEYS) {
     const x = n(trip[key]);
     payload[key] = x;
+  }
+  for (const key of ["others2Name", "others3Name", "others4Name", "others5Name"] as const) {
+    payload[key] = String(trip[key] ?? "").trim().slice(0, 120);
   }
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;

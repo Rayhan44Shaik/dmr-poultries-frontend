@@ -20,6 +20,7 @@ import { uniqueTripsById } from "../services/tripHeaderApiService";
 import { BrandRefreshButton } from "../../../../ui";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { isOrderContainer } from "../../../orders/utils/ordersUtils";
+import { sumFlattenedDieselLitres } from "../../../../shared/trip/calculations";
 
 interface Props {
   trips?: Trip[];
@@ -562,7 +563,10 @@ function TripRecentTable({
                         {localizeTripViewText(trip.tripNo, language)}
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">
+                        <div>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-cyan-600">{sumFlattenedDieselLitres(trip as Trip & Record<string, unknown>).toFixed(2)} L</div>
+                      </td>
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.driverName, language)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.supervisorName, language)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600 font-medium">{localizeTripViewText(trip.sourceFarm, language)}</td>

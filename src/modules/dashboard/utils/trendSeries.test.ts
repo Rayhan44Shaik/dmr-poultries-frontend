@@ -78,3 +78,22 @@ test("custom range guard excludes invalid and out-of-range trip dates", () => {
   assert.equal(isOperationalRowInRange("2026-09-12", range), false);
   assert.equal(isOperationalRowInRange("not-a-date", range), false);
 });
+
+test("weight loss is derived from displayed weights and never uses a stale negative value", () => {
+  const buckets = aggregateOperational(
+    [{
+      tripDate: "2026-09-28",
+      farmBirds: 27,
+      farmWeight: 76352,
+      deliveredBirds: 27,
+      deliveredWeight: 73780,
+      mortalityCount: 34,
+      mortalityWeight: 68,
+      weightLoss: -57621,
+    }],
+    "daily",
+  );
+
+  assert.equal(buckets[0]?.weightLoss, 2504);
+  assert.equal(summariseOperational(buckets).weightLoss, 2504);
+});

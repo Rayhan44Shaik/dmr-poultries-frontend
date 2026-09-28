@@ -70,11 +70,11 @@ const expensePairs = (trip: Trip): Array<[string, number]> => [
   ["Meals / Tiffin", Number(trip.mealsTiffin || 0)],
   ["Vehicle Maintenance", Number(trip.vehicleMaintenance || 0)],
   ["Tea", Number(trip.othersRC || 0)],
-  ["Driver", Number(trip.others1Amt || 0)],
-  ["Supervisor", Number(trip.others2Amt || 0)],
-  ["Helper & loader", Number(trip.others3Amt || 0)],
-  ["Others", Number(trip.others4Amt || 0)],
-  ["Others", Number(trip.others5Amt || 0)],
+  ["RTO", Number(trip.others1Amt || 0)],
+  [String(trip.others2Name || "Other"), Number(trip.others2Amt || 0)],
+  [String(trip.others3Name || "Other"), Number(trip.others3Amt || 0)],
+  [String(trip.others4Name || "Other"), Number(trip.others4Amt || 0)],
+  [String(trip.others5Name || "Other"), Number(trip.others5Amt || 0)],
 ];
 
 const submittedDiesel = (trip: Trip) =>

@@ -10,6 +10,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { parseBoxSelectionQuery } from "./boxSelectionQuery";
 
 /** How many option rows are visible before the list scrolls. */
 const VISIBLE_ITEMS = 5;
@@ -176,6 +177,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   invalid,
   onChange,
   matchMode = "includes",
+  tabIndex = 0,
 }: {
   value: string;
   options: DropdownOption[];
@@ -186,6 +188,8 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   onChange: (value: string) => void;
   /** "prefix" → match only from the first letter (shop name search). */
   matchMode?: "includes" | "prefix";
+  /** Allows a form to omit already-prefilled controls from its Tab flow. */
+  tabIndex?: number;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel(matchMode);
   const { t } = useI18n();
@@ -208,6 +212,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
     <div className="relative" ref={ref}>
       <button
         type="button"
+        tabIndex={tabIndex}
         disabled={disabled}
         onClick={() => {
           if (!open) setQuery("");
@@ -290,6 +295,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   renderOptionLabel,
   selectAllLabel,
   numericRangeSelection = false,
+  tabIndex = 0,
 }: {
   selected: string[];
   options: DropdownOption[];
@@ -307,8 +313,11 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   renderOptionLabel?: (option: DropdownOption) => React.ReactNode;
   /** When provided, a pinned "select all" row appears above the options. */
   selectAllLabel?: string;
-  /** Enter accepts `68 to 70`, `68-70`, or a single numeric option. */
+  /** Enter accepts individual boxes and mixed comma-separated ranges, such as
+   * `44,56,46` or `44, 46-56, 60 to 62`. */
   numericRangeSelection?: boolean;
+  /** Allows a form to omit already-prefilled controls from its Tab flow. */
+  tabIndex?: number;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
   const { t } = useI18n();
@@ -331,7 +340,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
     <div className="relative" ref={ref}>
       <div
         role="button"
-        tabIndex={disabled ? -1 : 0}
+        tabIndex={disabled ? -1 : tabIndex}
         aria-disabled={disabled}
         onClick={() => {
           if (disabled) return;
@@ -398,21 +407,15 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             searchPlaceholder={searchPlaceholder}
             onKeyDown={(event) => {
               if (!numericRangeSelection || event.key !== "Enter") return;
-              const match = query.trim().match(/^(\d+)\s*(?:to|-)\s*(\d+)$/i);
-              const single = query.trim().match(/^\d+$/);
-              if (!match && !single) return;
+              const additions = parseBoxSelectionQuery(
+                query,
+                options
+                  .filter((option) => !option.disabled)
+                  .map((option) => option.value),
+              );
+              if (!additions.length) return;
               event.preventDefault();
-              const start = Number(match?.[1] ?? single?.[0]);
-              const end = Number(match?.[2] ?? single?.[0]);
-              const low = Math.min(start, end);
-              const high = Math.max(start, end);
-              const available = new Set(options.filter((option) => !option.disabled).map((option) => option.value));
-              const additions: string[] = [];
-              for (let value = low; value <= high; value += 1) {
-                const key = String(value);
-                if (available.has(key)) additions.push(key);
-              }
-              if (additions.length) onChange(Array.from(new Set([...selectedValues, ...additions])));
+              onChange(Array.from(new Set([...selectedValues, ...additions])));
               setQuery("");
             }}
           />

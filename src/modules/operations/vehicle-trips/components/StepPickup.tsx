@@ -123,14 +123,20 @@ export default function StepPickup({
   const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
   const [selectedBoxNo, setSelectedBoxNo] = useState("");
 
-  // Temporary session default for NEW box bird counts only — never persisted,
-  // never shown on Trip List / Recent Activity. Changing 18→15 does not rewrite
-  // boxes that already have birds or weight entered.
-  const [defaultBoxSizeDraft, setDefaultBoxSizeDraft] = useState("");
-  const [appliedDefaultBoxSize, setAppliedDefaultBoxSize] = useState(0);
+  // Local operator preference for NEW box bird counts. It is intentionally not
+  // trip/backend data, but survives refreshes on this device.
+  const DEFAULT_BOX_SIZE_KEY = "dmr-trip-step3-default-box-size";
+  const storedDefaultBoxSize = () => {
+    try {
+      const n = Number(globalThis.localStorage?.getItem(DEFAULT_BOX_SIZE_KEY) ?? 0);
+      return Number.isInteger(n) && n > 0 && n <= 999 ? n : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const [defaultBoxSizeDraft, setDefaultBoxSizeDraft] = useState(() => String(storedDefaultBoxSize() || ""));
+  const [appliedDefaultBoxSize, setAppliedDefaultBoxSize] = useState(storedDefaultBoxSize);
   useEffect(() => {
-    setDefaultBoxSizeDraft("");
-    setAppliedDefaultBoxSize(0);
     setSelectedBoxNo("");
   }, [trip.id]);
 
@@ -158,6 +164,11 @@ export default function StepPickup({
     }
     setAppliedDefaultBoxSize(n);
     setDefaultBoxSizeDraft(String(n));
+    try {
+      globalThis.localStorage?.setItem(DEFAULT_BOX_SIZE_KEY, String(n));
+    } catch {
+      // The preference is optional; keep the active session working when storage is blocked.
+    }
     // Only fill blank draft rows (no birds and no weight yet). Already-entered
     // boxes keep whatever the user typed.
     let focusUid: string | null = null;

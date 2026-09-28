@@ -10,6 +10,7 @@ import { maintenanceApi } from '../../services/maintenanceApi';
 import { opsFilterLabelClass, opsInputClass } from '../../../../shared/ui/operationsStyles';
 import { localizeMaintenanceText } from '../../utils/maintenanceLocalization';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
+import type { LatestVehicleMeter } from '../../services/maintenanceApi';
 
 export interface FormDocumentItem {
   key: string;
@@ -54,6 +55,7 @@ interface MaintenanceFormProps {
   onRemoveDocument: (key: string) => void;
   onMarkDocumentRemoval: (key: string) => void;
   validateKM?: (km: number) => { valid: boolean; message?: string };
+  latestMeter?: LatestVehicleMeter | null;
 }
 
 const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
@@ -73,9 +75,19 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   onRemoveDocument,
   onMarkDocumentRemoval,
   validateKM,
+  latestMeter,
 }) => {
   const { t, language } = useI18n();
   const [kmError, setKmError] = useState<string | null>(null);
+
+  const latestMeterSource = latestMeter
+    ? ({
+        TRIP_START: 'Trip start',
+        TRIP_END: 'Trip end',
+        FUEL: 'Fuel bill',
+        MAINTENANCE: 'Maintenance entry',
+      } as const)[latestMeter.sourceType]
+    : '';
 
   const inputClass = `${opsInputClass} pl-10`;
 
@@ -273,6 +285,13 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             />
           </div>
           {kmError && <p className="mt-1 text-xs text-red-500">{kmError}</p>}
+          {!kmError && latestMeter && (
+            <p className="mt-1.5 text-xs font-medium text-slate-500">
+              Latest recorded reading: <span className="text-slate-700">{latestMeter.meter.toLocaleString()} km</span>
+              {' · '}{latestMeterSource} {latestMeter.ref}
+              {latestMeter.tripStatus ? ` (${latestMeter.tripStatus})` : ''}
+            </p>
+          )}
         </div>
 
         {/* 7. Garage */}

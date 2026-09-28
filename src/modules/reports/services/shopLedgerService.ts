@@ -12,6 +12,8 @@ export interface ShopLedgerRow {
   id: number;
   shopId: number | null;
   shopName: string;
+  subShopName: string;
+  remarks: string;
   date: string;
   type: ShopLedgerEntryType;
   referenceType: string;
@@ -95,8 +97,14 @@ export async function fetchShopLedger(
         id: Number(row.id),
         shopId: row.shopId == null ? null : Number(row.shopId),
         shopName: String(row.shopName ?? ""),
+        subShopName: String(row.subShopName ?? ""),
+        remarks: String(row.remarks ?? ""),
         date: String(row.date ?? ""),
-        type: (row.type ?? "correction") as ShopLedgerEntryType,
+        type: (row.type === "correction"
+          ? row.referenceType === "collection"
+            ? "collection"
+            : "sale"
+          : row.type ?? "sale") as ShopLedgerEntryType,
         referenceType: String(row.referenceType ?? ""),
         referenceId: Number(row.referenceId ?? 0),
         referenceNo: String(row.referenceNo ?? ""),

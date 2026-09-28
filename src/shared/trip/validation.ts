@@ -32,13 +32,16 @@ export function validateStartStep(trip: Trip): TripValidationResult {
   if (required("loaders") && !trip.loaders?.length) {
     errors.push("Please add at least one Loader.");
   }
-  if (required("openingMeter") && (trip.openingMeter == null || Number.isNaN(trip.openingMeter))) {
+  if (
+    required("openingMeter") &&
+    (trip.openingMeter == null || !Number.isFinite(Number(trip.openingMeter)) || Number(trip.openingMeter) <= 0)
+  ) {
     errors.push("Valid Opening Meter reading is required.");
   } else if (
     trip.openingMeter != null &&
-    (Number.isNaN(Number(trip.openingMeter)) || Number(trip.openingMeter) < 0)
+    (!Number.isFinite(Number(trip.openingMeter)) || Number(trip.openingMeter) <= 0)
   ) {
-    errors.push("Opening Meter must be a valid non-negative number.");
+    errors.push("Opening Meter must be greater than zero.");
   }
   if (
     required("advanceAmount") && (

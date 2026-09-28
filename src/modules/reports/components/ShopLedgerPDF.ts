@@ -19,6 +19,8 @@ export interface LedgerTransaction {
   type: "sale" | "collection" | "correction";
   paymentMode?: string;
   collectionNo?: string;
+  subShopName?: string;
+  remarks?: string;
 }
 
 export interface GeneratedShopLedgerPdf {
@@ -245,12 +247,27 @@ export const generateShopLedgerPDF = async (
       let label = t.particulars;
       if (t.particulars !== "Opening Balance") {
         if (t.type === "sale") {
-          label = "Sale";
+          label = [t.particulars, t.subShopName, "Sale"]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(", ");
+          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
         } else if (t.type === "collection") {
           const paymentMode = normalizePaymentMode(t.paymentMode);
-          label = paymentMode ? `Collection - ${paymentMode}` : "Collection";
+          const collectionLabel = paymentMode
+            ? `Collection - ${paymentMode}`
+            : "Collection";
+          label = [t.particulars, t.subShopName, collectionLabel]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(", ");
+          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
         } else {
-          label = "Correction";
+          label = [t.particulars, t.subShopName, "Sale"]
+            .map((value) => value?.trim())
+            .filter(Boolean)
+            .join(", ");
+          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
         }
       }
 

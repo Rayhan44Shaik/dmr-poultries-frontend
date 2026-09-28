@@ -7,6 +7,7 @@ import { localizeTripViewText } from "../utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
 import { createPortal } from "react-dom";
+import { sumFlattenedDieselLitres } from "../../../../shared/trip/calculations";
 
 export type TripSortKey = TripListSortKey;
 
@@ -270,7 +271,10 @@ function TripMasterTable({
                     {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
                     <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{localizeTripViewText(trip.tripNo, language)}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                      <div>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
+                      <div className="mt-0.5 text-[10px] font-semibold text-cyan-600">{sumFlattenedDieselLitres(trip as Trip & Record<string, unknown>).toFixed(2)} L</div>
+                    </td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.driverName, language) || "-"}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.supervisorName, language)}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">{localizeTripViewText(trip.sourceFarm, language)}</td>

@@ -60,6 +60,7 @@ test("shared workflow and validation preserve current Step 1 to Step 5 behavior"
     supervisorName: "Supervisor",
     helpers: ["Helper"],
     loaders: ["Loader"],
+    openingMeter: 100,
     startStepSubmitted: true,
   };
   assert.equal(validateStartStep(started).valid, true);
@@ -94,7 +95,7 @@ test("Step 2 submit validation: GPS required, address optional, meter > start; t
   assert.equal(getNextIncompleteTripStep({ ...farmTrip, startStepSubmitted: true, farmStepSubmitted: true }), 2);
 });
 
-test("Step 1 treats empty KM/Advance as valid and keeps explicit zero", () => {
+test("Step 1 requires a positive opening meter while Advance remains optional", () => {
   const base = createEmptyTrip({
     tripDate: "2026-08-16",
     vehicleId: 1,
@@ -108,9 +109,11 @@ test("Step 1 treats empty KM/Advance as valid and keeps explicit zero", () => {
     openingMeter: null,
     advanceAmount: null,
   });
-  assert.equal(validateStartStep(base).valid, true);
+  assert.equal(validateStartStep(base).valid, false);
 
-  assert.equal(validateStartStep({ ...base, openingMeter: 0, advanceAmount: 0 }).valid, true);
+  assert.equal(validateStartStep({ ...base, openingMeter: 0, advanceAmount: 0 }).valid, false);
+  assert.equal(validateStartStep({ ...base, openingMeter: null, advanceAmount: 0 }).valid, false);
+  assert.equal(validateStartStep({ ...base, openingMeter: 1, advanceAmount: 0 }).valid, true);
   assert.equal(validateStartStep({ ...base, openingMeter: -1 }).valid, false);
   assert.equal(validateStartStep({ ...base, advanceAmount: -5 }).valid, false);
 });

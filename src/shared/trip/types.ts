@@ -188,6 +188,10 @@ export interface Trip {
   others3Amt?: number;
   others4Amt?: number;
   others5Amt?: number;
+  others2Name?: string;
+  others3Name?: string;
+  others4Name?: string;
+  others5Name?: string;
   submittedAtTimestamp?: string;
   endStepSubmitted?: boolean;
   expensesStepSubmitted?: boolean;

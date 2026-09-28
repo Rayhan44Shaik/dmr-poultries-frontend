@@ -871,7 +871,7 @@ function StepStart({
     const patch = formToTripPatch(form);
     const meterValue = Number(form.openingMeterText);
     const meterNumericBad =
-      form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
+      form.openingMeterText.trim() === "" || !Number.isFinite(meterValue) || meterValue <= 0;
     // Field-level live rule: the opening reading cannot be LESS than the
     // vehicle's latest recorded reading (equal is allowed). This is the ONLY
     // field with live validation — all other Step 1 fields only flag after a
@@ -887,8 +887,6 @@ function StepStart({
       vehicle: showErrors && (!patch.vehicleId || !patch.vehicleNo),
       supervisor: showErrors && (!patch.supervisorId || !patch.supervisorName),
       driver: showErrors && (!patch.driverId || !patch.driverName),
-      // KM / Advance are OPTIONAL — an empty value is valid (saved as NULL).
-      // Only a non-empty value that is not a valid non-negative number is flagged.
       openingMeter: (showErrors && meterNumericBad) || meterBelowLatest,
       advance:
         showErrors &&
@@ -902,7 +900,7 @@ function StepStart({
   const openingMeterError = useMemo(() => {
     const meterValue = Number(form.openingMeterText);
     const meterNumericBad =
-      form.openingMeterText.trim() !== "" && (!Number.isFinite(meterValue) || meterValue < 0);
+      form.openingMeterText.trim() === "" || !Number.isFinite(meterValue) || meterValue <= 0;
     if (showErrors && meterNumericBad) {
       return t("ops.trip.invalid_meter_reading");
     }

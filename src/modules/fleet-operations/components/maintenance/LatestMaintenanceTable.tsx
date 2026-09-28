@@ -323,26 +323,26 @@ const LatestMaintenanceTable = ({
                       <span>{t('operations.maintenance_garage')}</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
+                  <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5">
                       <User size={13} className="text-indigo-500 shrink-0" />
                       <span>{t('fleet.maintenance_form.mechanic')}</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
+                  <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5">
                       <Gauge size={13} className="text-orange-500 shrink-0" />
                       <span>{t('fleet.maintenance_form.current_km')}</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
+                  <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5">
                       <Clock size={13} className="text-cyan-500 shrink-0" />
                       <span>{t('fleet.maintenance_table.next_service')}</span>
                     </div>
                   </th>
-                  <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-1.5">
+                  <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5">
                       <Wallet size={13} className="text-emerald-600 shrink-0" />
                       <span>{t('fleet.parts.total_cost')}</span>
                     </div>
@@ -442,19 +442,19 @@ const LatestMaintenanceTable = ({
                         <span className="text-xs text-slate-600">{localizeMaintenanceName(rec.garage || '-', language) || '-'}</span>
                       </td>
 
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
                         <span className="text-xs text-slate-600">{localizeMaintenanceName(rec.mechanic || '-', language) || '-'}</span>
                       </td>
 
-                      <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700 whitespace-nowrap tabular-nums">
+                      <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 whitespace-nowrap tabular-nums">
                         {rec.currentKM.toLocaleString()}
                       </td>
 
-                      <td className="px-4 py-3 text-right text-xs text-slate-600 whitespace-nowrap tabular-nums">
+                      <td className="px-4 py-3 text-center text-xs text-slate-600 whitespace-nowrap tabular-nums">
                         {rec.nextServiceKM?.toLocaleString() || '-'}
                       </td>
 
-                      <td className="px-4 py-3 text-right text-xs font-bold text-blue-700 whitespace-nowrap tabular-nums">
+                      <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap tabular-nums">
                         ₹{rec.totalCost?.toFixed(2) || '0.00'}
                       </td>
 

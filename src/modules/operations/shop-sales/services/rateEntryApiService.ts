@@ -101,7 +101,7 @@ function num(value: unknown, fallback = 0): number {
  * the backend detail; list rows carry empty deliveries (loaded on demand
  * when the user opens the modal via GET /operations/rate-entry/:tripId).
  */
-function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
+export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
   const now = new Date().toISOString();
   return {
     id: row.id,
@@ -151,7 +151,7 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
           mortality: num(d.mortality),
           rate: d.rate,
           amount: num(d.amount),
-          remarks: d.remarks,
+          remarks: d.remarks, deliveryMode: d.deliveryMode ?? "box",
           autoCaptureTime: d.autoCaptureTime ?? undefined,
           // Carry the backend market/reference rate for display (read-only).
           marketRate: d.marketRate,

@@ -238,6 +238,13 @@ describe('Fleet Operations active scope', () => {
     assert.doesNotMatch(source, /tab=\$\{activeTab\}/);
   });
 
+  it('uses the same content width and page gutters as Operations', () => {
+    const fleet = read('pages/FleetPages.tsx');
+    assert.match(fleet, /px-4 pb-8 pt-6 sm:px-5 lg:px-6/);
+    assert.match(fleet, /max-w-\[1600px\]/);
+    assert.doesNotMatch(fleet, /max-w-\[1480px\]/);
+  });
+
   it('Maintenance Entry does not load Operations fuel-expenses until a vehicle is selected', () => {
     const entry = read('pages/MaintenanceEntryPage.tsx');
     const form = read('components/maintenance/MaintenanceForm.tsx');
@@ -247,8 +254,9 @@ describe('Fleet Operations active scope', () => {
     assert.doesNotMatch(entry, /useFuelExpenses/);
     assert.doesNotMatch(form, /useFuelKMValidator/);
     assert.doesNotMatch(form, /useFuelExpenses/);
-    assert.match(guard, /if \(!vehicle\)/);
+    assert.match(guard, /if \(!vehicle \|\| !vehicleId\)/);
     assert.match(guard, /fuelExpenseService/);
+    assert.match(guard, /latestVehicleMeter/);
   });
 
   it('AppRoutes lazy-loads FleetPages so other modules do not evaluate Fleet tabs', () => {

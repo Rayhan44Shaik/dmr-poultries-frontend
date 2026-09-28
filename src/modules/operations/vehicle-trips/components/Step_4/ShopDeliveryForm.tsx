@@ -254,6 +254,7 @@ export default function ShopDeliveryForm({
             placeholder={birdOptions.length > 0 ? t("ops.trip.select_bird") : t("ops.trip.no_bird_types_available")}
             searchPlaceholder={t("ops.trip.search_bird_type")}
             disabled={birdOptions.length === 0 || birdOptions[0]?.isDisabled}
+            tabIndex={!isEditing && formData.birdTypeId ? -1 : 0}
             onChange={(value) => {
               if (!value) {
                 handleBirdSelect(null);
@@ -269,6 +270,7 @@ export default function ShopDeliveryForm({
         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
               type="button"
+              tabIndex={-1}
               onClick={() => setMode("box")}
               aria-label={t("ops.trip.box_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
@@ -282,6 +284,7 @@ export default function ShopDeliveryForm({
             </button>
             <button
               type="button"
+              tabIndex={-1}
               onClick={() => setMode("weight")}
               aria-label={t("ops.trip.weight_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
@@ -297,6 +300,7 @@ export default function ShopDeliveryForm({
 
         <button
           type="button"
+          tabIndex={-1}
           onClick={onClose}
           className="h-8 w-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
           aria-label={t("common.close")}
@@ -320,6 +324,7 @@ export default function ShopDeliveryForm({
               placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
               searchPlaceholder={t("ops.trip.search_shop_bird")}
               disabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
+              tabIndex={!isEditing && formData.shopId ? -1 : 0}
               matchMode="prefix"
               onChange={(value) => {
                 if (!value) {
@@ -343,6 +348,7 @@ export default function ShopDeliveryForm({
                 placeholder={t("ops.trip.select_boxes_from_pickup")}
                 searchPlaceholder={t("ops.trip.search_box_number")}
                 disabled={readOnly}
+                tabIndex={!isEditing && formData.selectedBoxIds.length > 0 ? -1 : 0}
                 chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
                 renderOptionLabel={renderBoxOptionLabel}
                 selectAllLabel={t("ops.trip.select_all_boxes")}
@@ -371,6 +377,7 @@ export default function ShopDeliveryForm({
             {selectedBoxIds.length > 0 && !readOnly && (
               <button
                 type="button"
+                tabIndex={-1}
                 onClick={() => handleBoxSelection([])}
                 className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-500 transition-colors hover:border-rose-100 hover:bg-rose-50/70 hover:text-rose-500"
               >
@@ -398,6 +405,7 @@ export default function ShopDeliveryForm({
                   {!readOnly && (
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
                       className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
                       aria-label={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
@@ -661,6 +669,7 @@ export default function ShopDeliveryForm({
         <div className="flex items-center gap-2 ml-auto">
           <button
             type="button"
+            tabIndex={-1}
             onClick={onClose}
             className="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-800 text-xs font-semibold transition-all active:scale-95"
           >

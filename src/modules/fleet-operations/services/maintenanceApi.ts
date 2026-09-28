@@ -30,6 +30,17 @@ export interface MaintenanceListParams {
   limit?: number;
 }
 
+export interface LatestVehicleMeter {
+  vehicleId: number;
+  sourceType: 'TRIP_START' | 'TRIP_END' | 'FUEL' | 'MAINTENANCE';
+  recordId: string;
+  ref: string;
+  meter: number;
+  eventDate: string;
+  eventInstant: string;
+  tripStatus?: string;
+}
+
 /**
  * Server-generated bill number format, e.g. MNT-20260813-0045.
  *
@@ -150,6 +161,12 @@ export function mapMaintenanceToEvent(value: unknown): MaintenanceEvent {
 }
 
 export const maintenanceApi = {
+  /** Universal latest accepted reading (trip, fuel, or maintenance). */
+  async latestVehicleMeter(vehicleId: string | number): Promise<LatestVehicleMeter | null> {
+    const res = await apiClient.get<LatestVehicleMeter | null>(`/fleet/vehicles/${vehicleId}/latest-meter`);
+    return res.data;
+  },
+
   /** GET /fleet/maintenance — history list (array or { data, meta }). */
   async list(params: MaintenanceListParams = {}) {
     const res = await apiClient.get(BASE, { params });

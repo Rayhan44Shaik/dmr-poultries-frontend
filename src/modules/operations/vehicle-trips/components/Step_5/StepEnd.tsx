@@ -56,6 +56,10 @@ interface SheetData extends Record<string, any> {
   others3Amt: number | string;
   others4Amt: number | string;
   others5Amt: number | string;
+  others2Name: string;
+  others3Name: string;
+  others4Name: string;
+  others5Name: string;
   startMeter: number | string;
   endMeter: number | string;
   destinationTolls: number | string;
@@ -144,8 +148,16 @@ export default function StepEnd({
       others4Amt: (tripData as any).others4Amt ?? "",
       others5Amt: (tripData as any).others5Amt ?? "",
       startMeter: tripData.openingMeter || 0,
-      endMeter: (tripData as any).endMeter ?? (tripData as any).closingMeter ?? "",
+      // An unsubmitted End Meter is never authoritative and must not be
+      // restored from an older autosave. Only final Step 5 submission hydrates it.
+      endMeter: (tripData as any).expensesStepSubmitted || (tripData as any).endStepSubmitted
+        ? ((tripData as any).endMeter ?? (tripData as any).closingMeter ?? "")
+        : "",
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
+      others2Name: (tripData as any).others2Name ?? "",
+      others3Name: (tripData as any).others3Name ?? "",
+      others4Name: (tripData as any).others4Name ?? "",
+      others5Name: (tripData as any).others5Name ?? "",
       // Only free-text notes in the editable field — keep order: tags aside.
       remarks: splitRemarks((tripData as any).remarks).userNotes,
     };
@@ -284,21 +296,33 @@ export default function StepEnd({
   });
   const { restoredFields, recordEdit, saveProgress, discardDraft, isOffline } = step5Draft;
 
+  const withoutEndMeter = useCallback((fields: Record<string, unknown>) => {
+    const safe = { ...fields };
+    delete safe.endMeter;
+    delete safe.closingMeter;
+    return safe;
+  }, []);
+
   // Restore unsaved local Step 5 edits (refresh / remount / tab return).
   useEffect(() => {
     if (!restoredFields) return;
-    setSheetData((prev) => ({ ...prev, ...(restoredFields as Partial<SheetData>) }));
+    setSheetData((prev) => ({
+      ...prev,
+      ...(withoutEndMeter(restoredFields as Record<string, unknown>) as Partial<SheetData>),
+    }));
     userTouchedRef.current = true;
     if (!restoredNotifiedRef.current) {
       restoredNotifiedRef.current = true;
       setToast({ message: t("ops.trip.draft_restored"), type: "info" });
     }
-  }, [restoredFields, t]);
+  }, [restoredFields, t, withoutEndMeter]);
 
   // Persist every edit to the durable draft (debounced inside the hook).
   useEffect(() => {
-    if (userTouchedRef.current) recordEdit(sheetData as Step5DraftFields);
-  }, [sheetData, recordEdit]);
+    if (userTouchedRef.current) {
+      recordEdit(withoutEndMeter(sheetData) as Step5DraftFields);
+    }
+  }, [sheetData, recordEdit, withoutEndMeter]);
 
   // ─── Compute Distance & Average ──────────────────────────────────
   const openingMeter = trip.openingMeter || 0;
@@ -344,8 +368,9 @@ export default function StepEnd({
     averageKmLtr = (totalDistanceCovered / totalDieselLiters).toFixed(2);
   }
 
-  const savedSheetRef = useRef(JSON.stringify(buildSheetDataFromTrip(trip)));
-  const hasUnsavedChanges = JSON.stringify(sheetData) !== savedSheetRef.current;
+  const savedSheetRef = useRef(JSON.stringify(withoutEndMeter(buildSheetDataFromTrip(trip))));
+  const autosaveFingerprint = JSON.stringify(withoutEndMeter(sheetData));
+  const hasUnsavedChanges = autosaveFingerprint !== savedSheetRef.current;
   const expensesLocked = Boolean(trip.expensesStepSubmitted) && !editable && !isLocalEditing;
   const expensesAutosaveTimerRef = useRef<number | undefined>(undefined);
   const expensesAutosaveBusyRef = useRef(false);
@@ -443,6 +468,10 @@ export default function StepEnd({
 
     return {
       ...expenses,
+      others2Name: String(sheetData.others2Name ?? "").trim(),
+      others3Name: String(sheetData.others3Name ?? "").trim(),
+      others4Name: String(sheetData.others4Name ?? "").trim(),
+      others5Name: String(sheetData.others5Name ?? "").trim(),
       endMeter: sheetData.endMeter,
       closingMeter: Number(sheetData.endMeter) || 0,
       destinationTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
@@ -466,9 +495,9 @@ export default function StepEnd({
     window.clearTimeout(expensesAutosaveTimerRef.current);
     expensesAutosaveTimerRef.current = window.setTimeout(() => {
       if (expensesAutosaveBusyRef.current) return;
-      const fingerprint = JSON.stringify(sheetData);
+      const fingerprint = autosaveFingerprint;
       if (fingerprint === savedSheetRef.current) return;
-      const payload = prepareFinalPayload(false) as Partial<Trip>;
+      const payload = withoutEndMeter(prepareFinalPayload(false)) as Partial<Trip>;
       expensesAutosaveBusyRef.current = true;
       void (async () => {
         try {
@@ -506,22 +535,22 @@ export default function StepEnd({
       const result = await withMinSaveDuration(async () => {
         const canonical = prepareFinalPayload(false);
         if (canDurable) {
-          const fullFields = { ...sheetData, ...canonical } as Step5DraftFields;
+          const fullFields = withoutEndMeter({ ...sheetData, ...canonical }) as Step5DraftFields;
           const res = await saveProgress(fullFields);
           if (res.mode === "queued") {
-            savedSheetRef.current = JSON.stringify(sheetData);
+            savedSheetRef.current = autosaveFingerprint;
             return { tone: "info" as const, message: t("ops.trip.saved_locally") };
           }
           if (res.ok) {
-            savedSheetRef.current = JSON.stringify(sheetData);
+            savedSheetRef.current = autosaveFingerprint;
             return { tone: "success" as const, message: t("ops.trip.end_saved_ok") };
           }
           return { tone: "error" as const, message: res.error || t("ops.trip.failed_save_end") };
         }
         if (saveEndProgress) {
-          const success = await saveEndProgress(canonical as Partial<Trip>);
+          const success = await saveEndProgress(withoutEndMeter(canonical) as Partial<Trip>);
           if (success) {
-            savedSheetRef.current = JSON.stringify(sheetData);
+            savedSheetRef.current = autosaveFingerprint;
             return { tone: "success" as const, message: t("ops.trip.end_saved_ok") };
           }
           return { tone: "error" as const, message: t("ops.trip.failed_save_end") };
@@ -542,7 +571,9 @@ export default function StepEnd({
     // locally, keep the trip's existing authoritative status, and do NOT set
     // Pending / endStepSubmitted / expensesStepSubmitted / submittedAt.
     if (canDurable && isOffline) {
-      void step5Draft.saveProgress({ ...sheetData, ...prepareFinalPayload(false) } as Step5DraftFields);
+      void step5Draft.saveProgress(
+        withoutEndMeter({ ...sheetData, ...prepareFinalPayload(false) }) as Step5DraftFields,
+      );
       setErrorMsg(t("ops.trip.submit_offline"));
       return;
     }
@@ -550,6 +581,16 @@ export default function StepEnd({
     if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
       setErrorMsg(t("ops.trip.end_meter_required"));
       return;
+    }
+
+    for (const index of [2, 3, 4, 5] as const) {
+      if (
+        Number(sheetData[`others${index}Amt`] || 0) > 0 &&
+        !String(sheetData[`others${index}Name`] || "").trim()
+      ) {
+        setErrorMsg(t("ops.trip.other_expense_description_required"));
+        return;
+      }
     }
 
     const actualDestMeter = destMeter || 0;
@@ -775,6 +816,11 @@ export default function StepEnd({
                 tone: "border-blue-100 bg-blue-50/40 text-blue-500",
               },
               {
+                label: t("ops.trip.total_diesel_litres"),
+                value: `${totalDieselLiters.toFixed(2)} L`,
+                tone: "border-cyan-100 bg-cyan-50/40 text-cyan-600",
+              },
+              {
                 label: t("ops.trip.field_total_all"),
                 value: formatInr(totalAllExpenses + totalDieselAmount),
                 tone: "border-slate-200 bg-slate-50/60 text-slate-700",
@@ -867,6 +913,11 @@ export default function StepEnd({
                 label: t("ops.trip.total_diesel"),
                 value: formatInr(totalDieselAmount),
                 tone: "border-blue-100 bg-blue-50/40 text-blue-500",
+              },
+              {
+                label: t("ops.trip.total_diesel_litres"),
+                value: `${totalDieselLiters.toFixed(2)} L`,
+                tone: "border-cyan-100 bg-cyan-50/40 text-cyan-600",
               },
               {
                 label: t("ops.trip.field_total_all"),

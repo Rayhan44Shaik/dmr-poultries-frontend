@@ -88,7 +88,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   );
   const vehicleNumber = selectedVehicle?.vehicleNumber || '';
 
-  const kmGuard = useFleetFuelKmGuard(vehicleNumber);
+  const kmGuard = useFleetFuelKmGuard(String(form.vehicleId || ''), vehicleNumber);
   const pendingWarning = kmGuard.pendingWarning;
 
   // --- Record Filtering (Pending vs Approved vs Deleted) ---
@@ -116,13 +116,13 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
 
   // --- Options ---
   const vehicleOptions = useMemo(() => {
-    return vehicles.map((v: any) => ({ value: v.id, label: formatVehicleNumber(String(v.vehicleNumber || v.vehicleNo || '')) }));
+    return vehicles.map((v: any) => ({ value: String(v.id ?? ''), label: formatVehicleNumber(String(v.vehicleNumber || v.vehicleNo || '')) }));
   }, [vehicles]);
 
   const driverOptions = useMemo(() => {
     return employees
       .filter((e: any) => e.department?.toLowerCase() === 'driver')
-      .map((e: any) => ({ value: e.id, label: e.employeeName }));
+      .map((e: any) => ({ value: String(e.id ?? ''), label: String(e.employeeName ?? '') }));
   }, [employees]);
 
   const maintenanceOptions = useMemo(() => {
@@ -161,10 +161,9 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   };
 
   const handleEdit = (record: MaintenanceEvent) => {
-    // Anchored on the record's business date (matches the backend's 10-day
-    // lock in fleetMaintenanceLock.ts — "10 days after this maintenance
-    // happened", not 10 days after it was typed in).
-    if (!isEditable(record.date)) {
+    // Corrections remain open for ten days from when the bill was entered,
+    // regardless of the historical maintenance date printed on that bill.
+    if (!isEditable(record.createdAt)) {
       showNotification(t('fleet.maintenance_entry.older_than_10_days'), 'error');
       return;
     }
@@ -376,6 +375,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
               onRemoveDocument={removeDocument}
               onMarkDocumentRemoval={markDocumentRemoval}
               validateKM={kmGuard.validateKM}
+              latestMeter={kmGuard.latestMeter}
             />
           </div>
         </div>

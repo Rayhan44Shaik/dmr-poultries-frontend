@@ -225,6 +225,8 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
     type: row.type,
     paymentMode: row.paymentMode ?? undefined,
     collectionNo: row.referenceNo || undefined,
+    subShopName: row.subShopName?.trim() || undefined,
+    remarks: row.remarks?.trim() || undefined,
   };
 };
 
@@ -2618,8 +2620,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               color: "text-blue-600",
                             }
                           : {
-                              text: t("shop_ledger.tx_type.correction"),
-                              color: "text-rose-600",
+                              text: t("shop_ledger.tx_type.sale"),
+                              color: "text-emerald-600",
                             };
                     const isSelected = activeSelectedLedgerRowIndex === idx;
                     return (
@@ -2665,14 +2667,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <td className="px-4 py-3 text-xs font-medium text-slate-700">
                           {/* Opening row label follows the UI language; raw
                                 particulars stay untouched (searchable data). */}
-                          {isOpening
-                            ? t("shop_ledger.opening_balance")
-                            : tx.particulars}
-                          {!isOpening && (
-                            <span
-                              className={`ml-2 text-[10px] font-semibold ${typeLabel.color}`}
-                            >
-                              {typeLabel.text}
+                          {isOpening ? (
+                            t("shop_ledger.opening_balance")
+                          ) : (
+                            <span className="whitespace-nowrap">
+                              {[tx.particulars, tx.subShopName]
+                                .filter(Boolean)
+                                .join(", ")}
+                              <span className={`font-semibold ${typeLabel.color}`}>
+                                {`, ${typeLabel.text}`}
+                              </span>
+                              {tx.remarks ? (
+                                <span className="font-normal italic text-slate-500">
+                                  {` — ${tx.remarks}`}
+                                </span>
+                              ) : null}
                             </span>
                           )}
                         </td>

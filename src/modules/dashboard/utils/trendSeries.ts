@@ -340,7 +340,12 @@ export function aggregateOperational(
     acc.deliveredWeight += num(row.deliveredWeight);
     acc.mortalityCount += num(row.mortalityCount);
     acc.mortalityWeight += num(row.mortalityWeight);
-    acc.weightLoss += num(row.weightLoss);
+    // Keep loss aligned with the farm/delivered weights displayed beside it.
+    // Legacy stored weight_loss values may be stale and can even be negative.
+    acc.weightLoss += Math.max(
+      0,
+      num(row.farmWeight) - num(row.deliveredWeight) - num(row.mortalityWeight),
+    );
     groups.set(key, acc);
   }
 

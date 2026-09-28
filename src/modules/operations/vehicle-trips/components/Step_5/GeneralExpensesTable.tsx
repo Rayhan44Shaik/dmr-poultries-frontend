@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/Step_5/GeneralExpensesTable.tsx
 
 import React, { useRef } from "react";
-import { Lock, UtensilsCrossed, Package, Coffee, Wrench, User, UserCheck, Users, MoreHorizontal } from "lucide-react";
+import { Lock, UtensilsCrossed, Package, Coffee, Wrench, Landmark, Users, MoreHorizontal } from "lucide-react";
 import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import { useI18n } from "../../../../../i18n";
 
@@ -196,12 +196,13 @@ export default function GeneralExpensesTable({
               Icon: React.ComponentType<{ size?: number; className?: string }>;
               field?: string;
               rightBg?: string;
+              nameField?: string;
             }> = [
-              { key: "others1Amt", label: t("ops.trip.exp_driver"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: User, field: "others1Amt", rightBg: "bg-indigo-50/40" },
-              { key: "others2Amt", label: t("ops.trip.exp_supervisor"), value: sheetData.others2Amt, tone: "bg-violet-50/70 text-violet-500", Icon: UserCheck, field: "others2Amt", rightBg: "bg-violet-50/40" },
-              { key: "others3Amt", label: t("ops.trip.exp_helper_loader"), value: sheetData.others3Amt, tone: "bg-teal-50/70 text-teal-500", Icon: Users, field: "others3Amt", rightBg: "bg-teal-50/40" },
-              { key: "others4Amt", label: t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", rightBg: "bg-slate-50/50" },
-              { key: "others5Amt", label: t("common.other"), value: sheetData.others5Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others5Amt", rightBg: "bg-slate-50/50" },
+              { key: "others1Amt", label: t("ops.trip.exp_rto"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
+              { key: "others2Amt", label: sheetData.others2Name || t("common.other"), value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", nameField: "others2Name", rightBg: "bg-slate-50/50" },
+              { key: "others3Amt", label: sheetData.others3Name || t("common.other"), value: sheetData.others3Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others3Amt", nameField: "others3Name", rightBg: "bg-slate-50/50" },
+              { key: "others4Amt", label: sheetData.others4Name || t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", nameField: "others4Name", rightBg: "bg-slate-50/50" },
+              { key: "others5Amt", label: sheetData.others5Name || t("common.other"), value: sheetData.others5Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others5Amt", nameField: "others5Name", rightBg: "bg-slate-50/50" },
             ];
 
             const rowCount = Math.max(leftItems.length, rightItems.length);
@@ -255,7 +256,16 @@ export default function GeneralExpensesTable({
                     {right ? (
                       <span className="inline-flex items-center gap-2">
                         <CatIcon icon={right.Icon} tone={right.tone} />
-                        {right.label}
+                        {right.nameField && !readOnly ? (
+                          <input
+                            type="text"
+                            maxLength={120}
+                            value={sheetData[right.nameField] || ""}
+                            onChange={(event) => handleChange(right.nameField!, event.target.value)}
+                            placeholder={t("ops.trip.other_expense_name")}
+                            className="min-w-0 w-full bg-transparent text-xs font-medium text-slate-700 outline-none placeholder:text-slate-400"
+                          />
+                        ) : right.label}
                       </span>
                     ) : null}
                   </td>

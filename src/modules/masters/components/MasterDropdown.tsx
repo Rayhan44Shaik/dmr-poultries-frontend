@@ -67,6 +67,9 @@ interface MasterDropdownProps {
   portal?: boolean;
 }
 
+const lowerOptionText = (value: unknown): string =>
+  String(value ?? "").toLocaleLowerCase();
+
 /**
  * Salary Register's Department / Employee reference, shared by every master:
  * 36px white control, 12px corners, compact type, 36px menu rows, optional
@@ -112,9 +115,16 @@ export default function MasterDropdown({
   const isOpen = open && !disabled;
 
   const items = useMemo<MasterDropdownOption[]>(() => {
-    const normalized = options.map((option) =>
-      typeof option === "string" ? { value: option, label: option } : option,
-    );
+    const normalized = options.map((option) => {
+      if (typeof option === "string") return { value: option, label: option };
+      return {
+        ...option,
+        value: String(option.value ?? ""),
+        label: String(option.label ?? option.value ?? ""),
+        searchText: option.searchText == null ? undefined : String(option.searchText),
+        keywords: option.keywords == null ? undefined : String(option.keywords),
+      };
+    });
     return allowClear
       ? [
           { value: "", label: placeholder },
@@ -128,10 +138,10 @@ export default function MasterDropdown({
       if (allowClear && option.value === "") return true;
       if (!keyword) return true;
       return (
-        option.label.toLocaleLowerCase().includes(keyword) ||
-        option.searchText?.toLocaleLowerCase().includes(keyword) ||
-        option.value.toLocaleLowerCase().includes(keyword) ||
-        (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false)
+        lowerOptionText(option.label).includes(keyword) ||
+        lowerOptionText(option.searchText).includes(keyword) ||
+        lowerOptionText(option.value).includes(keyword) ||
+        lowerOptionText(option.keywords).includes(keyword)
       );
     });
   }, [items, query, allowClear]);
@@ -184,7 +194,7 @@ export default function MasterDropdown({
     const raw = query.trim();
     if (!raw) return null;
     if (
-      items.some((o) => o.label.toLocaleLowerCase() === raw.toLocaleLowerCase())
+      items.some((o) => lowerOptionText(o.label) === raw.toLocaleLowerCase())
     )
       return null;
     return validateCustom ? validateCustom(raw) : raw;
@@ -358,8 +368,8 @@ export default function MasterDropdown({
       const index = items.findIndex(
         (option) =>
           !option.disabled &&
-          (option.label.toLocaleLowerCase().startsWith(text) ||
-            option.value.toLocaleLowerCase().startsWith(text)),
+          (lowerOptionText(option.label).startsWith(text) ||
+            lowerOptionText(option.value).startsWith(text)),
       );
       if (index >= 0) setActive(index);
     }
@@ -398,11 +408,10 @@ export default function MasterDropdown({
                   (option) =>
                     (allowClear && option.value === "") ||
                     !keyword ||
-                    option.label.toLocaleLowerCase().includes(keyword) ||
-                    option.searchText?.toLocaleLowerCase().includes(keyword) ||
-                    option.value.toLocaleLowerCase().includes(keyword) ||
-                    (option.keywords?.toLocaleLowerCase().includes(keyword) ??
-                      false),
+                    lowerOptionText(option.label).includes(keyword) ||
+                    lowerOptionText(option.searchText).includes(keyword) ||
+                    lowerOptionText(option.value).includes(keyword) ||
+                    lowerOptionText(option.keywords).includes(keyword),
                 );
                 setActive(
                   matches.findIndex(
