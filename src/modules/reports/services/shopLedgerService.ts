@@ -45,6 +45,11 @@ export interface ShopLedgerResponse {
   shopName: string;
   /** Backend-computed balance at the START of the requested range. */
   openingBalance: number;
+  openingBalances?: Array<{
+    shopId: number;
+    shopName: string;
+    openingBalance: number;
+  }>;
   data: ShopLedgerRow[];
   meta?: ShopLedgerMeta;
 }
@@ -93,6 +98,11 @@ export async function fetchShopLedger(
       shopId: data.shopId ?? null,
       shopName: data.shopName ?? "",
       openingBalance: Number(data.openingBalance ?? 0),
+      openingBalances: (data.openingBalances ?? []).map((row) => ({
+        shopId: Number(row.shopId),
+        shopName: String(row.shopName ?? ""),
+        openingBalance: Number(row.openingBalance ?? 0),
+      })),
       data: (data.data ?? []).map((row) => ({
         id: Number(row.id),
         shopId: row.shopId == null ? null : Number(row.shopId),

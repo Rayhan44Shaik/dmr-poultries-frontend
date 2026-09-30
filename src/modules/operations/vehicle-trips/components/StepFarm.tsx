@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar } from "./WizardStepUI";
-import { TripNoBadge } from "./TripNoBadge";
+import { TripContextBadges } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
 import { formatIstStamp } from "../services/tripHeaderApiService";
@@ -324,7 +324,7 @@ export default function StepFarm({
               <MapPin size={18} className="text-indigo-500" />
               {t("ops.trip.title.farm")}
             </h3>
-            <TripNoBadge tripNo={trip.tripNo} />
+            <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -444,7 +444,7 @@ export default function StepFarm({
               <MapPin size={18} className="text-indigo-500" />
               {t("ops.trip.title.farm")}
             </h3>
-            <TripNoBadge tripNo={trip.tripNo} />
+            <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Edit mode only: animated Close X → locked submitted view */}

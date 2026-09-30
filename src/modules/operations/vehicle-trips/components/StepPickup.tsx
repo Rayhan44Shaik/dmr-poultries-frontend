@@ -7,7 +7,7 @@ import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles, loadVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar } from "./WizardStepUI";
-import { TripNoBadge } from "./TripNoBadge";
+import { TripContextBadges } from "./TripNoBadge";
 import { StepKpiCard } from "./WizardControls";
 import TripStepConfirmDialog from "./TripStepConfirmDialog";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
@@ -823,7 +823,7 @@ export default function StepPickup({
               <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
-            <TripNoBadge tripNo={trip.tripNo} />
+            <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
@@ -1087,7 +1087,7 @@ export default function StepPickup({
               <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
-            <TripNoBadge tripNo={trip.tripNo} />
+            <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Edit mode only: animated Close X → locked submitted view */}

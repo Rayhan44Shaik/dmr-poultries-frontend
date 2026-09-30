@@ -199,8 +199,8 @@ export function buildShopBulkImportConfig({
         address: String(record["Address"] ?? "").trim(),
         latitude: String(record["Latitude"] ?? "").trim(),
         longitude: String(record["Longitude"] ?? "").trim(),
-        paperRate: parseInt(String(record["Paper Rate"] ?? "1"), 10) || 1,
-        associationType: String(record["Association Type"] ?? "").trim(),
+        paperRate: parseInt(String(record["Paper Rate"] ?? "10"), 10) || 10,
+        associationType: String(record["Association Type"] ?? "Ass Gun").trim() || "Ass Gun",
         openingBalance:
           parseFloat(String(record["Opening Balance"] ?? "0")) || 0,
         status: status === "Inactive" ? "Inactive" : "Active",

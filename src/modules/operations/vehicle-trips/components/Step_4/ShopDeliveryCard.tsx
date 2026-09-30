@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { createPortal } from "react-dom";
 import { FileText, Loader2, Mail, Package, Pencil, Scale } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
@@ -43,7 +43,7 @@ function BoxDetailsTooltip({ boxes, row, emptyLabel }: { boxes: number[]; row: S
   </span>;
 }
 
-export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled = false, emailStatus = "pending", emailSending = false, emailSendCount = 0, emailDisabled = false, onSendEmail, whatsappStatus = "pending", whatsappSending = false, whatsappSendCount = 0, whatsappDisabled = false, onSendWhatsApp }: Props) {
+function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled = false, emailStatus = "pending", emailSending = false, emailSendCount = 0, emailDisabled = false, onSendEmail, whatsappStatus = "pending", whatsappSending = false, whatsappSendCount = 0, whatsappDisabled = false, onSendWhatsApp }: Props) {
   const { t, language } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const boxes = row.selectedBoxIds ?? [];
@@ -104,3 +104,22 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communi
     </div>
   );
 }
+
+// Popup field edits happen in the Step 4 parent. Existing delivery rows are
+// immutable during those keystrokes, so do not repaint every card behind the
+// dialog unless its row or communication state actually changes.
+export default memo(ShopDeliveryCard, (previous, next) =>
+  previous.row === next.row &&
+  previous.readOnly === next.readOnly &&
+  previous.communicationEnabled === next.communicationEnabled &&
+  previous.emailStatus === next.emailStatus &&
+  previous.emailSending === next.emailSending &&
+  previous.emailSendCount === next.emailSendCount &&
+  previous.emailDisabled === next.emailDisabled &&
+  previous.emailFailureReason === next.emailFailureReason &&
+  previous.whatsappStatus === next.whatsappStatus &&
+  previous.whatsappSending === next.whatsappSending &&
+  previous.whatsappSendCount === next.whatsappSendCount &&
+  previous.whatsappDisabled === next.whatsappDisabled &&
+  previous.whatsappFailureReason === next.whatsappFailureReason
+);

@@ -350,8 +350,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
-  // After Step 1: close wizard (resume later). After Loads 2–4: stay on the
-  // same Draft trip so another load or shared expenses can continue.
+  // First submission of every operational step closes the wizard and returns
+  // to Create New Trip. The hook invokes these callbacks only when the step
+  // was not submitted before, so Update keeps the existing locked-step flow.
   useEffect(() => {
     registerStep1SuccessCallback(() => {
       clearForm();
@@ -360,27 +361,21 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   useEffect(() => {
     registerStep2SuccessCallback(() => {
-      setEntryScreen("form");
-      setViewStepIndex(2);
-      setEditingSubmittedStep(null);
+      clearForm();
     });
-  }, [registerStep2SuccessCallback]);
+  }, [registerStep2SuccessCallback, clearForm]);
 
   useEffect(() => {
     registerStep3SuccessCallback(() => {
-      setEntryScreen("form");
-      setViewStepIndex(3);
-      setEditingSubmittedStep(null);
+      clearForm();
     });
-  }, [registerStep3SuccessCallback]);
+  }, [registerStep3SuccessCallback, clearForm]);
 
   useEffect(() => {
     registerStep4SuccessCallback(() => {
-      setEntryScreen("form");
-      setViewStepIndex(4);
-      setEditingSubmittedStep(null);
+      clearForm();
     });
-  }, [registerStep4SuccessCallback]);
+  }, [registerStep4SuccessCallback, clearForm]);
 
   /**
    * Common edit navigation (all steps 1–5):

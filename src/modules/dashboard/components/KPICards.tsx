@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 
 import { useI18n } from "../../../i18n";
-import henImage from "../../../assets/dmr-hen-cut-256.png";
 
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
@@ -374,17 +373,11 @@ const KPICard = memo(function KPICard({
       <span className={`absolute inset-x-3 top-0 h-0.5 rounded-full ${config.bg}`} />
       <div className="relative z-20 flex items-start justify-between gap-1.5">
         <div className={`${config.chip} flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl shadow-sm ring-1 ring-inset ring-white/70 transition-transform duration-200 ease-out group-hover:scale-110 group-hover:-rotate-3 motion-reduce:transform-none`}>
-          {label === "Total Birds" ? (
-            <img
-              src={henImage}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="h-8 w-8 select-none object-contain drop-shadow-sm"
-            />
-          ) : (
-            <Icon className="h-4 w-4" size={16} strokeWidth={2.25} />
-          )}
+          <Icon
+            className={label === "Total Birds" ? "h-5 w-5" : "h-4 w-4"}
+            size={label === "Total Birds" ? 20 : 16}
+            strokeWidth={label === "Total Birds" ? 2.15 : 2.25}
+          />
         </div>
         <span
           className={trendChipClasses}

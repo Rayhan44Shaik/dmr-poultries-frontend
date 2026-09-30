@@ -122,17 +122,28 @@ export default function useCollectionEntry() {
 
   useEffect(() => {
     loadMasterData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The displayed period must follow the date field. Previously weekBounds was
+  // loaded only once, so changing the date refreshed the financial rows but
+  // left the card heading on today's week.
+  useEffect(() => {
+    let cancelled = false;
     collectionService
-      .fetchWeekBounds()
+      .fetchWeekBounds(entry.collectionDate || undefined)
       .then((bounds) => {
+        if (cancelled) return;
         setWeekBounds(bounds);
         setEntry((prev) =>
           prev.collectionDate ? prev : { ...prev, collectionDate: bounds.asOfDate }
         );
       })
       .catch(() => undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.collectionDate]);
 
   function findPendingShop(shopName: string): PendingCollection | null {
     return pendingCollections.find((shop) => shop.shopName === shopName) ?? null;
@@ -301,8 +312,9 @@ export default function useCollectionEntry() {
   // rendered verbatim in the summary subtitle, so an English joining word here
   // would survive into a Telugu session. The dash matches every other range in
   // the app (pagination, trip list) and reads the same in both languages.
-  const weekRangeFormatted = weekBounds.weekStart
-    ? `${fmtWeekDate(weekBounds.weekStart)} – ${fmtWeekDate(weekBounds.weekEnd)}`
+  const displayedWeek = ledgerLoaded && weeklySummary.weekStart ? weeklySummary : weekBounds;
+  const weekRangeFormatted = displayedWeek.weekStart
+    ? `${fmtWeekDate(displayedWeek.weekStart)} – ${fmtWeekDate(displayedWeek.weekEnd)}`
     : "";
 
   // Also compute week range from weeklySummary when ledger is loaded (for backward compat)

@@ -26,6 +26,18 @@ export const AUTH_USER_KEY = "dmr-auth-user";
  */
 const memoryBag = new Map<string, string>();
 
+// Keep the memory-first layer coherent across tabs/windows. A successful
+// login in one tab replaces the server session; without this listener an
+// already-open tab keeps its old in-memory token forever and floods every
+// mounted dashboard query with 401s even though localStorage has the new one.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== AUTH_TOKEN_KEY && event.key !== AUTH_USER_KEY) return;
+    if (event.newValue == null) memoryBag.delete(event.key);
+    else memoryBag.set(event.key, event.newValue);
+  });
+}
+
 /** Layers that ever failed a write are masked on reads from then on. */
 const UNRELIABLE = { ls: false, ss: false };
 const LS_BAD_KEY = "dmr-ls-unreliable";

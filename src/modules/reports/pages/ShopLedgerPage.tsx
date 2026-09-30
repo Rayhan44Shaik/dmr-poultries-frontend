@@ -7,9 +7,7 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import {
-  ArrowDown,
   ArrowDownLeft,
-  ArrowUp,
   ArrowUpDown,
   ArrowUpRight,
   BarChart3,
@@ -17,7 +15,6 @@ import {
   BookOpen,
   Calendar,
   CalendarDays,
-  CalendarRange,
   CheckSquare,
   Download,
   Eye,
@@ -72,14 +69,21 @@ import {
 } from "../services/shopLedgerService";
 import {
   generateShopLedgerPDF,
+  buildShopLedgerCumulativeRows,
   prepareShopLedgerPdfAssets,
 } from "../components/ShopLedgerPDF";
 import type {
   LedgerTransaction,
+  ShopLedgerCumulativeRow,
   ShopLedgerPdfEntry,
 } from "../components/ShopLedgerPDF";
 import PdfBlobPreview from "../components/PdfBlobPreview";
 import { prefetchPdfJs } from "../components/pdfJsLoader";
+import { formatLedgerNumber, roundLedgerValue } from "../utils/shopLedgerRounding";
+import {
+  filterStatementByType,
+  recalculateStatementBalances,
+} from "../utils/shopLedgerBalances";
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -87,23 +91,7 @@ interface ShopLedgerProps {
 
 type ReportTypeFilter = "all" | "sales" | "collection";
 type WaReportType = "All" | "Sales" | "Collection";
-
-const filterStatementByType = (
-  data: LedgerTransaction[],
-  reportType: ReportTypeFilter | WaReportType,
-): LedgerTransaction[] => {
-  if (data.length === 0) return [];
-  const normalized = reportType.toLowerCase();
-  if (normalized === "all") return data;
-
-  const opening = { ...data[0] };
-  const transactionType = normalized === "sales" ? "sale" : "collection";
-  // Type filtering selects rows only. Every kept row retains its authoritative
-  // backend balance — recomputing a progression here would print false
-  // "Balance" figures (and a false closing) on type-filtered statements.
-  const rows = data.slice(1).filter((row) => row.type === transactionType);
-  return [opening, ...rows];
-};
+type LedgerViewMode = "transactions" | "cumulative";
 
 interface WhatsAppSendPayload {
   reportType: WaReportType;
@@ -156,36 +144,6 @@ function compareLedgerTx(
   return (a[key] ?? 0) - (b[key] ?? 0);
 }
 
-/** The Trip List's two-tone sort arrows, reused verbatim on ledger headers. */
-function LedgerSortArrows({
-  active,
-  dir,
-}: {
-  active: boolean;
-  dir?: "asc" | "desc";
-}) {
-  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
-  const on = "text-emerald-600";
-  const off = "text-slate-400 group-hover/sort:text-slate-600";
-  return (
-    <span
-      className="inline-flex items-center gap-0.5 shrink-0"
-      aria-hidden="true"
-    >
-      <ArrowUp
-        size={13}
-        strokeWidth={2.7}
-        className={`${base} ${active && dir === "asc" ? on : off}`}
-      />
-      <ArrowDown
-        size={13}
-        strokeWidth={2.7}
-        className={`${base} ${active && dir === "desc" ? on : off}`}
-      />
-    </span>
-  );
-}
-
 function ShopLedgerWhatsAppIcon({ size = 16 }: { size?: number }) {
   return (
     <svg
@@ -230,30 +188,15 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
   };
 };
 
-/** ISO week start — the Monday (local time) of the week containing `date`. */
-function mondayOf(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const day = d.getDay(); // 0 = Sun … 6 = Sat
-  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return d;
-}
-
 /**
- * Default ledger window — the complete CURRENT week, Monday → Sunday.
- * Future days naturally contain no transactions, while keeping the filter,
- * PDF and WhatsApp statement period on one consistent business week.
+ * Fixed Shop Ledger reporting window requested for the current reconciliation.
+ * Keep ISO values internally; the calendar renders these as 02/08/2026 and
+ * 09/08/2026. Initial load, Reset, and clearing the date pill all use it.
  */
 function defaultWeekRange(): { from: string; to: string } {
-  const now = new Date();
-  const monday = mondayOf(now);
-  const sunday = new Date(
-    monday.getFullYear(),
-    monday.getMonth(),
-    monday.getDate() + 6,
-  );
   return {
-    from: format(monday, "yyyy-MM-dd"),
-    to: format(sunday, "yyyy-MM-dd"),
+    from: "2026-08-02",
+    to: "2026-08-09",
   };
 }
 
@@ -295,6 +238,20 @@ const weekdayOf = (value: string, language: "en" | "te" = "en"): string => {
   const [year, month, day] = parts;
   const dow = new Date(year, month - 1, day).getDay();
   return (language === "te" ? WEEKDAY_SHORT_TE : WEEKDAY_SHORT)[dow];
+};
+
+/** Compact ledger date: "Sun, 9 Aug 2026" (weekday follows UI language). */
+const formatLedgerDateWithDay = (
+  value: string,
+  language: "en" | "te" = "en",
+): string => {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return value;
+  const [year, month, day] = parts;
+  const monthLabel = new Intl.DateTimeFormat("en", { month: "short" }).format(
+    new Date(year, month - 1, day),
+  );
+  return `${weekdayOf(value, language)}, ${day} ${monthLabel} ${year}`;
 };
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
@@ -349,10 +306,7 @@ const normalizePaymentMode = (value?: string): string => {
 };
 
 const formatAmount = (value: number): string =>
-  `₹ ${new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value || 0)}`;
+  `₹ ${formatLedgerNumber(value)}`;
 
 // ─── Weekly send tracking (Monday-start week) ───────────────────────────────
 // Counts are keyed by "<weekStart>:<shop>" so last week's numbers drop out
@@ -523,6 +477,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [selectedShop, setSelectedShop] = useState("All Shops");
   const [reportType, setReportType] = useState<ReportTypeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
+  const [viewMode, setViewMode] = useState<LedgerViewMode>("transactions");
+  const [selectedCumulativeShop, setSelectedCumulativeShop] = useState<string | null>(null);
 
   // Applied values are committed only when the user clicks Search. The input
   // controls above are draft values; changing them does not affect the table
@@ -539,9 +495,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [selectedLedgerRowIndex, setSelectedLedgerRowIndex] = useState(-1);
   const ledgerRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   /** Trip-List style explicit sort — null means natural ledger order.
-   *  Default view is LATEST FIRST (newest transactions on top). */
+   *  A ledger statement reads chronologically, so filtered results default to
+   *  oldest first. Users can still explicitly choose another sort afterward. */
   const [sortBy, setSortBy] = useState<LedgerSortKey | null>("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
@@ -584,44 +541,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         openingTotal = Number(res.openingBalance) || 0;
         body = res.data.map(mapRowToTx);
       } else {
-        // ALL SHOPS — derive each opening from the live Shop Master balance
-        // minus activity since `from`. For the normal Monday→Sunday window,
-        // the already-loaded period rows are sufficient: no second historical
-        // download. Historical custom ranges need only one bulk catch-up read.
-        const today = format(new Date(), "yyyy-MM-dd");
-        const balanceRows =
-          to >= today
-            ? res.data
-            : (await fetchAllLedgerPages({ fromDate: from, toDate: today }))
-                .data;
-        const netSinceFrom = new Map<number, number>();
-        for (const row of balanceRows) {
-          const sid = Number(row.shopId ?? 0);
-          netSinceFrom.set(
-            sid,
-            (netSinceFrom.get(sid) ?? 0) + row.debit - row.credit,
-          );
-        }
-        const openingByShop = new Map<number, number>();
-        let aggregateOpening = 0;
-        for (const shop of shops) {
-          const opening = round2(
-            (Number(shop.currentBalance) || 0) -
-              (netSinceFrom.get(shop.id) ?? 0),
-          );
-          openingByShop.set(shop.id, opening);
-          aggregateOpening += opening;
-        }
-        const running = new Map<number, number>(openingByShop);
-        body = res.data.map((row) => {
-          const sid = Number(row.shopId ?? 0);
-          const next = round2((running.get(sid) ?? 0) + row.debit - row.credit);
-          running.set(sid, next);
-          const tx = mapRowToTx(row);
-          tx.balance = next;
-          return tx;
-        });
-        openingTotal = round2(aggregateOpening);
+        // ALL SHOPS uses the same backend-authoritative historical opening as
+        // a single-shop request. Never reconstruct it from the mutable Shop
+        // Master current balance.
+        openingTotal = Number(res.openingBalance) || 0;
+        body = res.data.map(mapRowToTx);
       }
 
       const openingRow: LedgerTransaction = {
@@ -637,7 +561,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       };
       return [openingRow, ...body];
     },
-    [shops],
+    [],
   );
 
   useEffect(() => {
@@ -728,7 +652,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         .some((v) => String(v).toLowerCase().includes(needle));
     });
 
-    return [...opening, ...scoped];
+    return recalculateStatementBalances([...opening, ...scoped]);
   }, [ledgerData, appliedReportType, appliedSearchTerm]);
 
   /** Body rows (opening row excluded) with the applied search/type filters
@@ -828,34 +752,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     };
   }, [filteredLedger]);
 
-  /** STATEMENT OVERVIEW — always the FULL ledger for the applied dates + shop
-   *  scope, independent of Report Type / Search. Those filters narrow the
-   *  TABLE (and its TOTAL row) but must never silently zero the headline
-   *  Opening → Sales → Collections → Closing statement, which is what made the
-   *  overview look frozen when a filter was applied. Date / shop changes
-   *  re-fetch `ledgerData`, so Opening and Closing visibly move with them. */
-  const scopeSummary = useMemo(() => {
-    const tx = ledgerData.slice(1);
-    const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
-    const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
-    const totalBirds = tx
-      .filter((t) => t.type === "sale")
-      .reduce((sum, t) => sum + t.birds, 0);
-    const totalWeight = tx
-      .filter((t) => t.type === "sale")
-      .reduce((sum, t) => sum + t.weight, 0);
-    const openingBalance = ledgerData.length > 0 ? ledgerData[0].balance : 0;
-    const closingBalance = round2(openingBalance + totalDebit - totalCredit);
-    return {
-      openingBalance,
-      totalDebit,
-      totalCredit,
-      totalBirds,
-      totalWeight,
-      closingBalance,
-    };
-  }, [ledgerData]);
-
   /** Rows in the full scope (excluding the pinned Opening row) — used to
    *  show "X of Y transactions" so every filter visibly does something. */
   const scopeRows = Math.max(0, ledgerData.length - 1);
@@ -904,10 +800,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const cached = bulkPdfLedgerCacheRef.current.get(key);
       if (cached) return cached;
 
-      // A shop's current master balance minus its net activity from `from`
-      // through today is its exact opening balance at `from`. One bulk read can
-      // therefore reconstruct every per-shop statement without trusting the
-      // all-shops endpoint's mixed running-balance column.
+      // The all-shops response includes backend-authoritative historical
+      // openings per shop, identical to individual shop requests.
       const today = format(new Date(), "yyyy-MM-dd");
       const balanceThrough = to > today ? to : today;
       const request = fetchAllLedgerPages({
@@ -915,6 +809,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         toDate: balanceThrough,
       })
         .then((response) => {
+          const openingByShopId = new Map(
+            (response.openingBalances ?? []).map((row) => [row.shopId, row.openingBalance]),
+          );
           const allRowsByShop = new Map<string, ShopLedgerRow[]>();
           const seenRows = new Set<string>();
           for (const row of response.data) {
@@ -927,25 +824,22 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             allRowsByShop.set(row.shopName, rows);
           }
 
-          return [...allRowsByShop.entries()]
-            .map(
-              ([shop, allRows]) =>
-                [shop, allRows.filter((row) => row.date <= to)] as const,
-            )
-            .filter(([, periodRows]) => periodRows.length > 0)
+          // Include every shop in the chosen scope, even when the period has
+          // no sale/collection. Its carried opening and closing balance still
+          // belong in the cumulative statement.
+          return shops
+            .map((master) => {
+              const shop = master.shopName;
+              const allRows = allRowsByShop.get(shop) ?? [];
+              return [shop, allRows.filter((row) => row.date <= to)] as const;
+            })
             .sort(([a], [b]) =>
               a.localeCompare(b, "en", { sensitivity: "base" }),
             )
             .map(([shop, periodRows]) => {
               const master = shopMasterMap.get(shop);
               const allRows = allRowsByShop.get(shop) ?? [];
-              const activitySinceFrom = allRows.reduce(
-                (sum, row) => sum + row.debit - row.credit,
-                0,
-              );
-              const openingBalance = round2(
-                (Number(master?.currentBalance) || 0) - activitySinceFrom,
-              );
+              const openingBalance = round2(openingByShopId.get(master?.id ?? 0) ?? 0);
               periodRows.sort(
                 (a, b) => a.date.localeCompare(b.date) || a.id - b.id,
               );
@@ -989,7 +883,95 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       return request;
     },
-    [refreshNonce, shopMasterMap],
+    [refreshNonce, shopMasterMap, shops],
+  );
+
+  const [cumulativeRows, setCumulativeRows] = useState<ShopLedgerCumulativeRow[]>([]);
+  const [cumulativeLoading, setCumulativeLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      if (appliedSelectedShop === "All Shops") {
+        const statements = await getBulkPdfLedgers(appliedDateFrom, appliedDateTo);
+        return buildShopLedgerCumulativeRows(
+          statements.map((entry) => ({
+            ...entry,
+            // Keep the carried opening row, but aggregate only the activity
+            // selected by the report filter for this date span.
+            data: filterStatementByType(entry.data, appliedReportType),
+          })),
+        );
+      }
+      return buildShopLedgerCumulativeRows([
+        {
+          shop: appliedSelectedShop,
+          data: filterStatementByType(ledgerData, appliedReportType),
+        },
+      ]);
+    };
+    setCumulativeLoading(true);
+    void load()
+      .then((rows) => {
+        if (!cancelled) setCumulativeRows(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCumulativeRows([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCumulativeLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    appliedDateFrom,
+    appliedDateTo,
+    appliedSelectedShop,
+    appliedReportType,
+    ledgerData,
+    getBulkPdfLedgers,
+  ]);
+
+  const visibleCumulativeRows = useMemo(() => {
+    const needle = appliedSearchTerm.trim().toLowerCase();
+    if (!needle) return cumulativeRows;
+    return cumulativeRows.filter((row) =>
+      [
+        row.shop,
+        row.birds,
+        row.weight,
+        row.openingBalance,
+        row.sale,
+        row.collection,
+        row.closingBalance,
+      ].some((value) => String(value).toLowerCase().includes(needle)),
+    );
+  }, [cumulativeRows, appliedSearchTerm]);
+
+  const cumulativeTotalPages = Math.max(
+    1,
+    Math.ceil(visibleCumulativeRows.length / pageSize),
+  );
+  const cumulativeSafePage = Math.min(currentPage, cumulativeTotalPages);
+  const pagedCumulativeRows = useMemo(() => {
+    const start = (cumulativeSafePage - 1) * pageSize;
+    return visibleCumulativeRows.slice(start, start + pageSize);
+  }, [visibleCumulativeRows, cumulativeSafePage, pageSize]);
+
+  const cumulativeTotals = useMemo(
+    () =>
+      visibleCumulativeRows.reduce(
+        (sum, row) => ({
+          birds: sum.birds + row.birds,
+          weight: sum.weight + row.weight,
+          openingBalance: sum.openingBalance + row.openingBalance,
+          sale: sum.sale + row.sale,
+          collection: sum.collection + row.collection,
+          closingBalance: sum.closingBalance + row.closingBalance,
+        }),
+        { birds: 0, weight: 0, openingBalance: 0, sale: 0, collection: 0, closingBalance: 0 },
+      ),
+    [visibleCumulativeRows],
   );
 
   // ─── PDF preview modal state ────────────────────────────────
@@ -1064,7 +1046,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 appliedDateTo,
                 appliedSelectedShop,
               );
-              if (!ledger || ledger.length <= 1) return [];
+              if (!ledger || ledger.length === 0) return [];
               const master = shopMasterMap.get(appliedSelectedShop);
               return [
                 {
@@ -1200,6 +1182,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           appliedDateTo,
           shop,
           assets,
+          undefined,
+          { includeCumulativeSummary: true },
         );
         if (
           exportSessionRef.current !== sessionAtStart ||
@@ -1331,6 +1315,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       appliedDateTo,
       label,
       assets,
+      undefined,
+      { includeCumulativeSummary: true },
     );
     downloadFile(generated.url, generated.filename);
     window.setTimeout(() => URL.revokeObjectURL(generated.url), 10_000);
@@ -1348,13 +1334,20 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       dateFrom !== appliedDateFrom ||
       dateTo !== appliedDateTo ||
       selectedShop !== appliedSelectedShop;
-    if (needsLedgerRead) setLedgerLoading(true);
+    if (needsLedgerRead) {
+      setLedgerLoading(true);
+      setCumulativeLoading(true);
+    }
 
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedSelectedShop(selectedShop);
     setAppliedReportType(reportType);
     setAppliedSearchTerm(searchValue);
+    // Every newly applied ledger filter starts in accounting order: earliest
+    // transaction first, latest transaction last.
+    setSortBy("date");
+    setSortDir("asc");
     resetPage();
   }, [
     dateFrom,
@@ -1376,7 +1369,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       appliedDateFrom !== defaultFrom ||
       appliedDateTo !== defaultTo ||
       appliedSelectedShop !== "All Shops";
-    if (needsLedgerRead) setLedgerLoading(true);
+    if (needsLedgerRead) {
+      setLedgerLoading(true);
+      setCumulativeLoading(true);
+    }
 
     setDateFrom(defaultFrom);
     setDateTo(defaultTo);
@@ -1390,29 +1386,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setAppliedReportType("all");
     setAppliedSearchTerm("");
 
-    // Reset returns to the page's standard state: latest-first date order.
+    // Reset returns to the page's standard chronological ledger order.
     setSortBy("date");
-    setSortDir("desc");
+    setSortDir("asc");
     setCurrentPage(1);
   }, [appliedDateFrom, appliedDateTo, appliedSelectedShop]);
-
-  /** First click sorts ascending; second flips to descending; a third click
-   *  on the active column clears the sort (Trip List contract, same here). */
-  const handleSortChange = useCallback(
-    (key: LedgerSortKey) => {
-      if (sortBy !== key) {
-        setSortBy(key);
-        setSortDir("asc");
-      } else if (sortDir === "asc") {
-        setSortDir("desc");
-      } else {
-        setSortBy(null);
-        setSortDir("asc");
-      }
-      setCurrentPage(1);
-    },
-    [sortBy, sortDir],
-  );
 
   /** The Sort By dropdown commits a `key:dir` pair (or "" to clear). */
   const handleSortValueChange = useCallback((value: string) => {
@@ -1473,11 +1451,62 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setRefreshNonce((n) => n + 1);
   }, []);
 
-  /** Excel export — the exact rows on screen (applied filters + sort), in the
-   *  same shape as the ledger table. Trip List uses the same shared util. */
+  /** Excel export follows the active view toggle exactly. Transactions and
+   * cumulative summary deliberately have separate schemas and filenames. */
   const handleExportExcel = useCallback(() => {
-    const rows = sortedBody;
-    if (rows.length === 0) {
+    const shopLabel =
+      appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop;
+    const safeShopFilename =
+      appliedSelectedShop === "All Shops"
+        ? "All_Shops"
+        : appliedSelectedShop.replace(/\s+/g, "_");
+
+    if (viewMode === "cumulative") {
+      if (visibleCumulativeRows.length === 0) {
+        showNotification(t("shop_ledger.no_export_rows"), "error");
+        return;
+      }
+      const headers = [
+        "S.No",
+        "Shop Name",
+        "Birds",
+        "Weight (KG)",
+        "Opening Balance",
+        "Sales",
+        "Collections",
+        "Closing Balance",
+      ];
+      const data: (string | number)[][] = visibleCumulativeRows.map((row, index) => [
+        index + 1,
+        row.shop,
+        row.birds,
+        roundLedgerValue(row.weight),
+        roundLedgerValue(row.openingBalance),
+        roundLedgerValue(row.sale),
+        roundLedgerValue(row.collection),
+        roundLedgerValue(row.closingBalance),
+      ]);
+      data.push([
+        "",
+        "TOTAL",
+        cumulativeTotals.birds,
+        roundLedgerValue(cumulativeTotals.weight),
+        roundLedgerValue(cumulativeTotals.openingBalance),
+        roundLedgerValue(cumulativeTotals.sale),
+        roundLedgerValue(cumulativeTotals.collection),
+        roundLedgerValue(cumulativeTotals.closingBalance),
+      ]);
+      exportToExcel(
+        `Shop Ledger — Cumulative — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`,
+        headers,
+        data,
+        `Shop_Ledger_Cumulative_${safeShopFilename}_${appliedDateFrom}_to_${appliedDateTo}`,
+      );
+      showNotification(t("shop_ledger.excel_exported"), "success");
+      return;
+    }
+
+    if (sortedBody.length === 0) {
       showNotification(t("shop_ledger.no_export_rows"), "error");
       return;
     }
@@ -1494,7 +1523,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       "Credit",
       "Balance",
     ];
-    const data = rows.map((tx) => [
+    const data = sortedBody.map((tx) => [
       formatDisplayDate(tx.date),
       weekdayOf(tx.date),
       tx.particulars,
@@ -1507,18 +1536,19 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       tx.type === "sale" ? tx.birds : 0,
       tx.type === "sale" ? Number(tx.weight.toFixed(2)) : 0,
       tx.type === "sale" ? Number(tx.rate.toFixed(2)) : 0,
-      Number(tx.debit.toFixed(2)),
-      Number(tx.credit.toFixed(2)),
-      Number(tx.balance.toFixed(2)),
+      roundLedgerValue(tx.debit),
+      roundLedgerValue(tx.credit),
+      roundLedgerValue(tx.balance),
     ]);
-    const shopLabel =
-      appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop;
-    const title = `Shop Ledger — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
-    const filename = `Shop_Ledger_${appliedSelectedShop === "All Shops" ? "All_Shops" : appliedSelectedShop.replace(/\s+/g, "_")}_${appliedDateFrom}_to_${appliedDateTo}`;
+    const title = `Shop Ledger — Transactions — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
+    const filename = `Shop_Ledger_Transactions_${safeShopFilename}_${appliedDateFrom}_to_${appliedDateTo}`;
     exportToExcel(title, headers, data, filename);
     showNotification(t("shop_ledger.excel_exported"), "success");
   }, [
     sortedBody,
+    viewMode,
+    visibleCumulativeRows,
+    cumulativeTotals,
     appliedSelectedShop,
     appliedDateFrom,
     appliedDateTo,
@@ -2093,30 +2123,24 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     t,
   ]);
 
-  /** Clickable column header — Trip List's three-state sort contract:
-   *  first click asc, second desc, third clears back to ledger order. */
+  /** Static column header. Sorting is controlled centrally by Sort By so the
+   *  transaction and cumulative header rows keep one clean visual language. */
   const sortableHeader = (
     key: LedgerSortKey,
     icon: React.ReactNode,
     label: string,
     center = false,
   ) => {
-    const active = sortBy === key;
+    void key;
     return (
-      <button
-        type="button"
-        onClick={() => handleSortChange(key)}
-        aria-sort={
-          active ? (sortDir === "asc" ? "ascending" : "descending") : "none"
-        }
-        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
+      <span
+        className={`flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] ${
           center ? "justify-center" : ""
-        } ${active ? "text-emerald-700" : ""}`}
+        }`}
       >
         {icon}
-        <span>{label}</span>
-        <LedgerSortArrows active={active} dir={sortDir} />
-      </button>
+        <span className="whitespace-nowrap">{label}</span>
+      </span>
     );
   };
 
@@ -2293,12 +2317,20 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             <button
               type="button"
               onClick={handleExportExcel}
-              disabled={sortedBody.length === 0}
+              disabled={
+                viewMode === "cumulative"
+                  ? cumulativeLoading || visibleCumulativeRows.length === 0
+                  : sortedBody.length === 0
+              }
               className={`group relative ${opsExcelButtonClass} disabled:opacity-60`}
               aria-label="Excel"
             >
               <span
-                className={`inline-flex ${sortedBody.length > 0 ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}
+                className={`inline-flex ${
+                  (viewMode === "cumulative" ? visibleCumulativeRows.length > 0 : sortedBody.length > 0)
+                    ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]"
+                    : ""
+                }`}
               >
                 <FileSpreadsheet size={15} />
               </span>
@@ -2400,7 +2432,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               {t("shop_ledger.opening_balance")}
             </p>
             <p className="text-xl font-bold text-indigo-600 tabular-nums">
-              {formatAmount(scopeSummary.openingBalance)}
+              {formatAmount(summary.openingBalance)}
             </p>
           </div>
           {appliedSelectedShop !== "All Shops" && (
@@ -2411,7 +2443,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {t("shop_ledger.total_sales_debit")}
                 </p>
                 <p className="text-xl font-bold text-emerald-600 tabular-nums">
-                  {formatAmount(scopeSummary.totalDebit)}
+                  {formatAmount(summary.totalDebit)}
                 </p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
@@ -2420,7 +2452,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {t("shop_ledger.total_collections_credit")}
                 </p>
                 <p className="text-xl font-bold text-blue-600 tabular-nums">
-                  {formatAmount(scopeSummary.totalCredit)}
+                  {formatAmount(summary.totalCredit)}
                 </p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
@@ -2429,7 +2461,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {t("shop_ledger.total_birds")}
                 </p>
                 <p className="text-xl font-bold text-slate-800 tabular-nums">
-                  {scopeSummary.totalBirds.toLocaleString()}
+                  {summary.totalBirds.toLocaleString()}
                 </p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
@@ -2438,7 +2470,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {t("shop_ledger.total_weight_kg")}
                 </p>
                 <p className="text-xl font-bold text-slate-800 tabular-nums">
-                  {scopeSummary.totalWeight.toFixed(2)}
+                  {summary.totalWeight.toFixed(2)}
                 </p>
               </div>
             </>
@@ -2449,9 +2481,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               {t("shop_ledger.closing_balance")}
             </p>
             <p
-              className={`text-xl font-bold tabular-nums ${scopeSummary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+              className={`text-xl font-bold tabular-nums ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}
             >
-              {formatAmount(scopeSummary.closingBalance)}
+              {formatAmount(summary.closingBalance)}
             </p>
           </div>
         </div>
@@ -2460,7 +2492,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       {/* ── TABLE — same card & header treatment as the Trip List ────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
-        <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+        <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-teal-50/80 border border-teal-100 flex items-center justify-center text-teal-600 shadow-inner">
               <BookOpen className="w-5 h-5" aria-hidden="true" />
@@ -2469,26 +2501,79 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               {t("shop_ledger.title")}
             </h3>
           </div>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={viewMode === "cumulative"}
+              aria-label={t("shop_ledger.view_mode")}
+              onClick={() => {
+                const nextMode = viewMode === "transactions" ? "cumulative" : "transactions";
+                setViewMode(nextMode);
+                setCurrentPage(1);
+                if (nextMode === "transactions") setSelectedCumulativeShop(null);
+                else setSelectedLedgerRowIndex(-1);
+              }}
+              className={`group relative grid min-h-11 min-w-[272px] grid-cols-2 overflow-hidden rounded-full border p-1 outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-offset-2 ${
+                viewMode === "transactions"
+                  ? "border-emerald-300/70 bg-emerald-50/90 shadow-inner shadow-emerald-200/70 focus-visible:ring-emerald-400/60"
+                  : "border-indigo-300/70 bg-indigo-50/90 shadow-inner shadow-indigo-200/70 focus-visible:ring-indigo-400/60"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  viewMode === "transactions"
+                    ? "left-1 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/30"
+                    : "left-[50%] bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-500/30"
+                }`}
+              />
+              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "transactions" ? "text-white" : "text-emerald-700"}`}>
+                <ListChecks size={15} strokeWidth={2.5} aria-hidden="true" />
+                {t("shop_ledger.view.transactions")}
+              </span>
+              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "cumulative" ? "text-white" : "text-indigo-700"}`}>
+                <Layers size={15} strokeWidth={2.5} aria-hidden="true" />
+                {t("shop_ledger.view.cumulative")}
+              </span>
+            </button>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
               {formatDisplayDate(appliedDateFrom)} →{" "}
               {formatDisplayDate(appliedDateTo)}
             </span>
             <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
-              {totalRows === 0
+              {(viewMode === "cumulative" ? visibleCumulativeRows.length : totalRows) === 0
                 ? t("shop_ledger.no_rows")
-                : t("shop_ledger.row_count", { count: totalRows })}
+                : t("shop_ledger.row_count", {
+                    count: viewMode === "cumulative" ? visibleCumulativeRows.length : totalRows,
+                  })}
               {appliedSelectedShop !== "All Shops"
                 ? ` · ${appliedSelectedShop}`
                 : ""}
             </span>
           </div>
         </div>
-        <div className="overflow-x-auto max-h-[70vh]">
-          <table className="min-w-full text-sm">
-            <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
+        <div className={`${viewMode === "transactions" ? "block" : "hidden"} max-h-[70vh] overflow-auto`}>
+          <table className="w-full min-w-[1180px] table-fixed text-sm">
+            {/* S.No and the combined Day/Date stay compact. The six operational
+                and amount columns retain their existing widths unchanged. */}
+            <colgroup>
+              <col className="w-[4%]" />
+              <col className="w-[12%]" />
+              <col className="w-[17.34%]" />
+              <col className="w-[11.11%]" />
+              <col className="w-[11.11%]" />
+              <col className="w-[11.11%]" />
+              <col className="w-[11.11%]" />
+              <col className="w-[11.11%]" />
+              <col className="w-[11.12%]" />
+            </colgroup>
+            <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-sm">
               <tr>
                 {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
+                <th className="px-2 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                  {t("shop_ledger.col.s_no")}
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "date",
@@ -2496,18 +2581,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       size={16}
                       className="text-indigo-500 shrink-0"
                     />,
-                    t("common.date"),
+                    t("shop_ledger.col.date_day"),
                   )}
-                </th>
-                {/* Day of week — a quick glance column beside the date */}
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                  <span className="inline-flex items-center gap-1.5 justify-center">
-                    <CalendarRange
-                      size={16}
-                      className="text-blue-500 shrink-0"
-                    />
-                    {t("common.day")}
-                  </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                   {sortableHeader(
@@ -2528,7 +2603,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {sortableHeader(
                     "weight",
                     <Weight size={16} className="text-cyan-500 shrink-0" />,
-                    t("shop_ledger.col.weight_kg"),
+                    t("shop_ledger.col.weight_short_kg"),
                     true,
                   )}
                 </th>
@@ -2658,19 +2733,27 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               : "hover:bg-emerald-50 hover:shadow-[inset_3px_0_0_#6ee7b7]"
                         }`}
                       >
-                        <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">
-                          {formatDisplayDate(tx.date)}
+                        <td className="px-2 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
+                          {isOpening ? "-" : (safePage - 1) * pageSize + idx}
                         </td>
-                        <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500">
-                          {weekdayOf(tx.date, language)}
+                        <td className="px-4 py-3 text-left text-xs font-medium text-slate-600 whitespace-nowrap tabular-nums">
+                          {formatLedgerDateWithDay(tx.date, language)}
                         </td>
-                        <td className="px-4 py-3 text-xs font-medium text-slate-700">
+                        <td className="overflow-hidden px-4 py-3 text-xs font-medium text-slate-700">
                           {/* Opening row label follows the UI language; raw
                                 particulars stay untouched (searchable data). */}
                           {isOpening ? (
                             t("shop_ledger.opening_balance")
                           ) : (
-                            <span className="whitespace-nowrap">
+                            <span
+                              className="block truncate whitespace-nowrap"
+                              title={[
+                                tx.particulars,
+                                tx.subShopName,
+                                typeLabel.text,
+                                tx.remarks,
+                              ].filter(Boolean).join(", ")}
+                            >
                               {[tx.particulars, tx.subShopName]
                                 .filter(Boolean)
                                 .join(", ")}
@@ -2733,7 +2816,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         {formatAmount(summary.totalCredit)}
                       </td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">
-                        {formatAmount(scopeSummary.closingBalance)}
+                        {formatAmount(summary.closingBalance)}
                       </td>
                     </tr>
                   )}
@@ -2743,9 +2826,76 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           </table>
         </div>
 
+        {viewMode === "cumulative" && (
+          <div className="max-h-[70vh] overflow-auto animate-in fade-in slide-in-from-right-1 duration-200">
+            <table className="w-full min-w-[1180px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-[7%]" />
+                <col className="w-[12.5%]" />
+                <col className="w-[13.41%]" />
+                <col className="w-[13.41%]" />
+                <col className="w-[13.41%]" />
+                <col className="w-[13.41%]" />
+                <col className="w-[13.41%]" />
+                <col className="w-[13.45%]" />
+              </colgroup>
+              <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-sm">
+                <tr className="text-xs font-bold uppercase tracking-wider">
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><ListChecks size={15} className="text-indigo-500" />{t("shop_ledger.col.s_no")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={15} className="text-emerald-500" />{t("common.shop")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Bird size={15} className="text-amber-500" />{t("common.birds")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Weight size={15} className="text-cyan-500" />{t("shop_ledger.col.weight_short_kg")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Scale size={15} className="text-indigo-500" />{t("shop_ledger.col.opening")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowUpRight size={15} className="text-emerald-500" />{t("shop_ledger.col.sale")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowDownLeft size={15} className="text-blue-500" />{t("shop_ledger.col.collection")}</span></th>
+                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><IndianRupee size={15} className="text-violet-500" />{t("shop_ledger.col.closing")}</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {cumulativeLoading ? (
+                  <tr><td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><LoaderCircle size={16} className="animate-spin text-emerald-600" />{t("shop_ledger.loading_records")}</span></td></tr>
+                ) : visibleCumulativeRows.length === 0 ? (
+                  <tr><td colSpan={8} className="py-12 text-center text-slate-400">{t("shop_ledger.no_transactions")}</td></tr>
+                ) : (
+                  <>
+                    {pagedCumulativeRows.map((row, index) => {
+                      const selected = selectedCumulativeShop === row.shop;
+                      return (
+                      <tr
+                        key={row.shop}
+                        onClick={() => setSelectedCumulativeShop(selected ? null : row.shop)}
+                        className={`cursor-pointer transition-colors ${selected ? "bg-emerald-100/80 shadow-[inset_4px_0_0_#10b981]" : "hover:bg-emerald-50/80"}`}
+                      >
+                        <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{(cumulativeSafePage - 1) * pageSize + index + 1}</td>
+                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={row.shop}>{row.shop}</td>
+                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.birds.toLocaleString()}</td>
+                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.weight.toFixed(2)}</td>
+                        {[row.openingBalance, row.sale, row.collection, row.closingBalance].map((value, valueIndex) => (
+                          <td key={valueIndex} className={`px-3 py-3 text-right text-xs font-bold whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : valueIndex === 2 ? "text-blue-600" : valueIndex === 1 ? "text-emerald-600" : "text-slate-800"}`}>
+                            {formatAmount(value)}
+                          </td>
+                        ))}
+                      </tr>
+                    )})}
+                    <tr className="border-t-2 border-slate-300 bg-slate-100/90 font-bold">
+                      <td className="px-3 py-3" />
+                      <td className="px-3 py-3 text-xs text-slate-800">{t("shop_ledger.total_row")}</td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.birds.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.weight.toFixed(2)}</td>
+                      {[cumulativeTotals.openingBalance, cumulativeTotals.sale, cumulativeTotals.collection, cumulativeTotals.closingBalance].map((value, valueIndex) => (
+                        <td key={valueIndex} className={`px-3 py-3 text-right text-xs whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : "text-slate-800"}`}>{formatAmount(value)}</td>
+                      ))}
+                    </tr>
+                  </>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* ── GLOBAL PAGINATION — the shared app-wide pager (Trip List,
                  Collections and Shop Ledger all render this one) ───────── */}
-        {shouldShowPagination(totalRows) && (
+        {viewMode === "transactions" && shouldShowPagination(totalRows) && (
           <Pagination
             page={safePage}
             pageSize={pageSize}
@@ -2756,6 +2906,23 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               setCurrentPage(1);
             }}
             disabled={ledgerLoading || ledgerRefreshing}
+          />
+        )}
+        {viewMode === "cumulative" && shouldShowPagination(visibleCumulativeRows.length) && (
+          <Pagination
+            page={cumulativeSafePage}
+            pageSize={pageSize}
+            totalItems={visibleCumulativeRows.length}
+            onPageChange={(page) => {
+              setCurrentPage(page);
+              setSelectedCumulativeShop(null);
+            }}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+              setSelectedCumulativeShop(null);
+            }}
+            disabled={cumulativeLoading || ledgerRefreshing}
           />
         )}
       </div>

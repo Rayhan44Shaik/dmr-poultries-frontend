@@ -168,6 +168,8 @@ export function useShopDeliveryForm(
   }, [remainingByBox]);
 
   const availableBoxDetails = useMemo<BoxDetail[]>(() => {
+    const used = new Set(usedBoxIds);
+    const selected = new Set(formData.selectedBoxIds);
     return safeBoxDetails
       .map((b: BoxDetail) => {
         const remain = remainingByBox.get(b.boxNo) ?? { birds: b.birds, weight: b.weight };
@@ -175,20 +177,24 @@ export function useShopDeliveryForm(
       })
       .filter(
         (b: BoxDetail) =>
-          (b.birds > 0 && (!usedBoxIds.includes(b.boxNo) || formData.selectedBoxIds.includes(b.boxNo)))
+          (b.birds > 0 && (!used.has(b.boxNo) || selected.has(b.boxNo)))
       );
   }, [safeBoxDetails, usedBoxIds, formData.selectedBoxIds, remainingByBox]);
 
   // ─── Farm values ──────────────────────────────────────────────
-  const farmBirds = useMemo<number>(() => {
-    const selected = availableBoxDetails.filter((b: BoxDetail) => formData.selectedBoxIds.includes(b.boxNo));
-    return selected.reduce((sum: number, b: BoxDetail) => sum + b.birds, 0);
+  const selectedFarmTotals = useMemo(() => {
+    const selected = new Set(formData.selectedBoxIds);
+    let birds = 0;
+    let weight = 0;
+    for (const box of availableBoxDetails) {
+      if (!selected.has(box.boxNo)) continue;
+      birds += Number(box.birds || 0);
+      weight += Number(box.weight || 0);
+    }
+    return { birds, weight: roundWeight(weight) };
   }, [availableBoxDetails, formData.selectedBoxIds]);
-
-  const farmWeight = useMemo<number>(() => {
-    const selected = availableBoxDetails.filter((b: BoxDetail) => formData.selectedBoxIds.includes(b.boxNo));
-    return roundWeight(selected.reduce((sum: number, b: BoxDetail) => sum + Number(b.weight || 0), 0));
-  }, [availableBoxDetails, formData.selectedBoxIds]);
+  const farmBirds = selectedFarmTotals.birds;
+  const farmWeight = selectedFarmTotals.weight;
 
   const boxCount = formData.selectedBoxIds.length;
 

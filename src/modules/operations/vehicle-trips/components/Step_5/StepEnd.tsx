@@ -8,7 +8,7 @@ import {
 import type { Trip } from "../../types/trip";
 import { StepCloseButton, WizardActionBar } from "../WizardStepUI";
 import TripStepConfirmDialog from "../TripStepConfirmDialog";
-import { TripNoBadge } from "../TripNoBadge";
+import { TripContextBadges } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
@@ -675,6 +675,7 @@ export default function StepEnd({
 
   const executeSubmit = async () => {
     if (submitLockRef.current || isSubmitting) return;
+    const wasSubmitted = isSubmitted;
     submitLockRef.current = true;
     setIsSubmitting(true);
     setErrorMsg("");
@@ -693,10 +694,12 @@ export default function StepEnd({
         // and any queued Save op for this trip are now obsolete.
         void discardDraft();
         setToast({ message: t("ops.trip.step5_submitted"), type: "success" });
-        // Close wizard → Create New Trip landing (same as steps 1–4).
-        // Prefer clearForm so Recent Trips can pick up the finished trip.
-        if (clearForm) {
+        // First submit closes to Create New Trip. An update keeps the existing
+        // trip open and returns to its locked view, matching Steps 1–4.
+        if (!wasSubmitted && clearForm) {
           clearForm();
+        } else if (wasSubmitted) {
+          onExitEdit?.();
         }
       } else {
         // Single inline presentation — the inline error box below shows the
@@ -756,7 +759,7 @@ export default function StepEnd({
                 <Receipt size={18} className="text-orange-500" />
                 {t("ops.trip.title.expenses")}
               </h3>
-              <TripNoBadge tripNo={trip.tripNo} />
+              <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
@@ -870,7 +873,7 @@ export default function StepEnd({
                 <Receipt size={18} className="text-orange-500" />
                 {t("ops.trip.title.expenses")}
               </h3>
-              <TripNoBadge tripNo={trip.tripNo} />
+              <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
             </div>
             <div className="flex items-center gap-2">
               {/* Edit mode only: animated Close X → locked submitted view */}

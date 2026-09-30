@@ -1,4 +1,4 @@
-import { Hash } from "lucide-react";
+import { Hash, Truck, UserRound, UserRoundCog } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 
 /**
@@ -35,6 +35,49 @@ export function TripNoBadge({
         {provisional ? t("ops.trip.next_trip_no") : t("operations.trip_no")}
       </span>
       <span className="truncate">{value}</span>
+    </span>
+  );
+}
+
+/** Compact, read-only trip identity used consistently in every step header. */
+export function TripContextBadges({
+  tripNo,
+  vehicleNo,
+  supervisorName,
+  driverName,
+  provisional = false,
+}: {
+  tripNo?: string | null;
+  vehicleNo?: string | null;
+  supervisorName?: string | null;
+  driverName?: string | null;
+  provisional?: boolean;
+}) {
+  const { t } = useI18n();
+  const details = [
+    { label: t("operations.vehicle_no"), value: vehicleNo, Icon: Truck },
+    { label: t("operations.supervisor_name"), value: supervisorName, Icon: UserRoundCog },
+    { label: t("operations.driver_name"), value: driverName, Icon: UserRound },
+  ];
+
+  return (
+    <span className="contents">
+      <TripNoBadge tripNo={tripNo} provisional={provisional} />
+      {details.map(({ label, value, Icon }) => {
+        const text = String(value || "").trim();
+        if (!text) return null;
+        return (
+          <span
+            key={label}
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-sm"
+            aria-label={`${label} ${text}`}
+          >
+            <Icon size={11} className="shrink-0 text-slate-500" strokeWidth={2.5} />
+            <span className="text-[10px] font-semibold text-slate-500">{label}</span>
+            <span className="max-w-36 truncate">{text}</span>
+          </span>
+        );
+      })}
     </span>
   );
 }

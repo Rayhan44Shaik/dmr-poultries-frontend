@@ -171,26 +171,39 @@ export default function ShopDeliveryForm({
 
   // Wizard-native (Salary-Register / Shop-Register style) dropdown options —
   // the same searchable dropdowns used by Step 1 / Step 2.
-  const shopDropdownOptions: DropdownOption[] = shopOptions
-    .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
-    .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label }));
+  const shopDropdownOptions: DropdownOption[] = React.useMemo(
+    () => shopOptions
+      .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
+      .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label })),
+    [shopOptions],
+  );
 
-  const birdDropdownOptions: DropdownOption[] = birdOptions
-    .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
-    .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label }));
+  const birdDropdownOptions: DropdownOption[] = React.useMemo(
+    () => birdOptions
+      .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
+      .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label })),
+    [birdOptions],
+  );
 
   // Same availability rule as the old BoxSelector: boxes already consumed by
   // another delivery stay hidden unless they are currently selected.
-  const availableBoxDetails = (safeBoxDetails || []).filter(
-    (b: any) => !usedBoxIds.includes(b.boxNo) || selectedBoxIds.includes(b.boxNo)
+  const availableBoxDetails = React.useMemo(() => {
+    const used = new Set(usedBoxIds);
+    const selected = new Set(selectedBoxIds);
+    return (safeBoxDetails || []).filter(
+      (b: any) => !used.has(b.boxNo) || selected.has(b.boxNo),
+    );
+  }, [safeBoxDetails, usedBoxIds, selectedBoxIds]);
+  const boxDropdownOptions: DropdownOption[] = React.useMemo(
+    () => availableBoxDetails.map((b: any) => ({
+      value: String(b.boxNo),
+      label: `${String(b.boxNo).padStart(2, "0")} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
+      chipLabel: `${String(b.boxNo).padStart(2, "0")}`,
+      // Search by box number only — typing "44" must not match weight 44.xx kg.
+      searchText: `${String(b.boxNo)} ${String(b.boxNo).padStart(2, "0")}`,
+    })),
+    [availableBoxDetails, t],
   );
-  const boxDropdownOptions: DropdownOption[] = availableBoxDetails.map((b: any) => ({
-    value: String(b.boxNo),
-    label: `${String(b.boxNo).padStart(2, "0")} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
-    chipLabel: `${String(b.boxNo).padStart(2, "0")}`,
-    // Search by box number only — typing "44" must not match weight 44.xx kg.
-    searchText: `${String(b.boxNo)} ${String(b.boxNo).padStart(2, "0")}`,
-  }));
 
   // Bright, eye-friendly coloured box-number chips for the box dropdown list.
   const boxTileClass = (boxNo: number) =>
@@ -220,9 +233,9 @@ export default function ShopDeliveryForm({
     }`;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
       {/* ─── Header — title · bird type · mode toggle ─────────────────── */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-5 py-4 border-b border-slate-100">
+      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-3 px-6 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3 min-w-0 mr-auto">
           <div className="h-10 w-10 rounded-xl bg-blue-500 text-white shadow-md shadow-blue-400/20 flex items-center justify-center shrink-0">
             {isEditing ? <CheckCircle2 size={20} /> : <Store size={20} />}
@@ -246,8 +259,8 @@ export default function ShopDeliveryForm({
         </div>
 
         {/* Bird type + mode toggle + close — grouped on the right */}
-        <div className="flex items-center gap-3 shrink-0">
-        <div className="w-64 shrink-0">
+        <div className="flex flex-wrap items-center justify-end gap-4 shrink-0">
+        <div className="w-72 shrink-0">
           <SearchDropdown
             value={formData.birdTypeId ? String(formData.birdTypeId) : ""}
             options={birdDropdownOptions}
@@ -311,9 +324,9 @@ export default function ShopDeliveryForm({
       </div>
 
       {/* ─── Body ────────────────────────────────────────────────────── */}
-      <div className="p-5 space-y-5">
+      <div className="p-6 space-y-6">
         {/* Shop name + select boxes (side by side) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <FormLabel icon={ShoppingCart} tone="bg-sky-50/70 text-sky-500" required>
               {t("operations.shop_name")}
@@ -425,7 +438,7 @@ export default function ShopDeliveryForm({
 
         {/* Mode-specific breakdown */}
         {mode === "box" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Farm — birds above weight */}
             <div className="space-y-3">
               <SimpleMetric
@@ -494,7 +507,7 @@ export default function ShopDeliveryForm({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {/* Farm — cumulative birds above weight */}
             <div className="space-y-3">
               <SimpleMetric
@@ -612,7 +625,7 @@ export default function ShopDeliveryForm({
 
         {/* Weight loss, optional sub-shop and remarks stay on one row. */}
         <div
-          className={`grid gap-3 ${
+          className={`grid gap-5 ${
             mode === "weight"
               ? "grid-cols-1 lg:grid-cols-[minmax(13rem,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]"
               : "grid-cols-1 sm:grid-cols-2"
@@ -660,7 +673,7 @@ export default function ShopDeliveryForm({
       </div>
 
       {/* ─── Footer actions ──────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
+      <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 bg-slate-50/60">
         <span className="text-[11px] text-slate-400 hidden sm:block">
           {isFormValid
             ? t("ops.trip.ready_to_save")

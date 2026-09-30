@@ -28,7 +28,7 @@ import {
 } from "../services/tripHeaderApiService";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { StepCloseButton, WizardActionBar, type WizardNoticeState } from "./WizardStepUI";
-import { TripNoBadge } from "./TripNoBadge";
+import { TripContextBadges } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { translateValidationMessage } from "../utils/translateValidation";
 import {
@@ -1105,7 +1105,7 @@ function StepStart({
               <Clock size={18} className="text-indigo-500" />
               {t("ops.trip.title.start")}
             </h3>
-            <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
+            <TripContextBadges tripNo={loadSnapshot.tripNo || tripNo} vehicleNo={loadSnapshot.vehicleNo} supervisorName={loadSnapshot.supervisorName} driverName={loadSnapshot.driverName} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Locked / view: Close X → Create New Trip (Trip Entry only) */}
@@ -1231,8 +1231,11 @@ function StepStart({
               <Clock size={18} className="text-indigo-500" />
               {t("ops.trip.title.start")}
             </h3>
-            <TripNoBadge
+            <TripContextBadges
               tripNo={previewTripNo || tripNo || loadSnapshot.tripNo}
+              vehicleNo={loadSnapshot.vehicleNo}
+              supervisorName={loadSnapshot.supervisorName}
+              driverName={loadSnapshot.driverName}
               provisional={Boolean(previewTripNo)}
             />
           </div>

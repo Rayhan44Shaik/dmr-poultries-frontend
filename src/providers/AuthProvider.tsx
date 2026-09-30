@@ -46,11 +46,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (demoMode) return DEMO_USER;
     return getStoredToken() ? getCachedUser() : null;
   });
-  // The splash only ever shows when a token exists but no cached user —
-  // i.e. a browser that signed in before this optimisation existed.
+  // A restored token must be verified before mounting the dashboard. Mounting
+  // first lets every dashboard hook fire with an expired/revoked token and
+  // creates a large burst of 401s before /auth/me can redirect to sign-in.
   const [loading, setLoading] = useState(() => {
     if (demoMode) return false;
-    return !!getStoredToken() && !getCachedUser();
+    return !!getStoredToken();
   });
 
   /** Soft land on the sign-in screen — no full document reload (that caused
@@ -90,9 +91,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
       if (probing) return;
       probing = true;
+      // Stop every dashboard hook immediately while the token is checked.
+      // Leaving the authenticated tree mounted here allowed all widgets to
+      // continue issuing requests with the same rejected token, producing a
+      // wall of 401 responses from one expired session.
+      setLoading(true);
       currentUserRequest()
-        .then(() => {
+        .then((value) => {
           // Server confirms the session is ALIVE — the 401 was transient.
+          setCachedUser(value);
+          setUser(value);
         })
         .catch((cause) => {
           if (isSigningOut()) return;
@@ -102,6 +110,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         })
         .finally(() => {
           probing = false;
+          if (!isSigningOut()) setLoading(false);
         });
     };
     window.addEventListener('dmr:auth-expired', expired);

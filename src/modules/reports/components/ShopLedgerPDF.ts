@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { formatLedgerNumber } from "../utils/shopLedgerRounding";
 import henImage from "../../../assets/dmr-hen.jpg";
 import {
   drawPreparedDmrPoultryHeader,
@@ -39,6 +40,41 @@ export interface ShopLedgerPdfEntry {
   city?: string;
 }
 
+export interface ShopLedgerCumulativeRow {
+  shop: string;
+  birds: number;
+  weight: number;
+  openingBalance: number;
+  sale: number;
+  collection: number;
+  closingBalance: number;
+}
+
+/** Build one financially complete row per shop from canonical ledger rows. */
+export const buildShopLedgerCumulativeRows = (
+  entries: ShopLedgerPdfEntry[],
+): ShopLedgerCumulativeRow[] =>
+  entries
+    .map(({ shop, data }) => {
+      const transactions = data.slice(1);
+      const openingBalance = Number(data[0]?.balance ?? 0);
+      const saleRows = transactions.filter((row) => row.type === "sale");
+      const sale = saleRows.reduce((sum, row) => sum + row.debit, 0);
+      const collection = transactions
+        .filter((row) => row.type === "collection")
+        .reduce((sum, row) => sum + row.credit, 0);
+      return {
+        shop,
+        birds: saleRows.reduce((sum, row) => sum + row.birds, 0),
+        weight: saleRows.reduce((sum, row) => sum + row.weight, 0),
+        openingBalance,
+        sale,
+        collection,
+        closingBalance: openingBalance + sale - collection,
+      };
+    })
+    .sort((a, b) => a.shop.localeCompare(b.shop, "en", { sensitivity: "base" }));
+
 /** Ledger dates are stored as yyyy-MM-dd; the PDF prints dd-MM-yyyy. */
 export const formatPdfDate = (value: string): string => {
   const parts = value.split("-");
@@ -59,10 +95,7 @@ const normalizePaymentMode = (value?: string): string => {
 };
 
 const formatAmount = (value: number): string =>
-  new Intl.NumberFormat("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value || 0);
+  formatLedgerNumber(value);
 
 // Shared branded palette (matches the Step-4 delivery receipt).
 type RGB = [number, number, number];
@@ -217,6 +250,7 @@ export const generateShopLedgerPDF = async (
   selectedShop: string,
   preparedAssets?: DmrPoultryHeaderAssets,
   onProgress?: (done: number, total: number) => void,
+  options?: { includeCumulativeSummary?: boolean },
 ): Promise<GeneratedShopLedgerPdf> => {
   // Prepare the letterhead hen once per call (canvas cut-out); callers that
   // generate many PDFs in a batch pass their own prepared assets.
@@ -234,6 +268,87 @@ export const generateShopLedgerPDF = async (
   });
 
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
+
+  if (options?.includeCumulativeSummary && allLedgers.length > 0) {
+    const cumulative = buildShopLedgerCumulativeRows(allLedgers);
+    const totals = cumulative.reduce(
+      (sum, row) => ({
+        birds: sum.birds + row.birds,
+        weight: sum.weight + row.weight,
+        openingBalance: sum.openingBalance + row.openingBalance,
+        sale: sum.sale + row.sale,
+        collection: sum.collection + row.collection,
+        closingBalance: sum.closingBalance + row.closingBalance,
+      }),
+      { birds: 0, weight: 0, openingBalance: 0, sale: 0, collection: 0, closingBalance: 0 },
+    );
+    const summaryRows: (string | number)[][] = cumulative.map((row, index) => [
+      index + 1,
+      row.shop,
+      String(row.birds),
+      row.weight.toFixed(2),
+      formatAmount(row.openingBalance),
+      formatAmount(row.sale),
+      formatAmount(row.collection),
+      formatAmount(row.closingBalance),
+    ]);
+    summaryRows.push([
+      "",
+      "TOTAL",
+      String(totals.birds),
+      totals.weight.toFixed(2),
+      formatAmount(totals.openingBalance),
+      formatAmount(totals.sale),
+      formatAmount(totals.collection),
+      formatAmount(totals.closingBalance),
+    ]);
+
+    const drawSummaryChrome = (): void => {
+      drawPreparedDmrPoultryHeader(doc, { margin: PAGE_MARGIN, top: LETTERHEAD_TOP }, assets);
+      const pageWidth = doc.internal.pageSize.getWidth();
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+      doc.text("SHOP LEDGER - CUMULATIVE SUMMARY", pageWidth / 2, 48, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(40, 40, 40);
+      doc.text(`${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, pageWidth / 2, 53, { align: "center" });
+    };
+
+    autoTable(doc, {
+      head: [["S.No", "Shop Name", "Birds", "Weight", "Opening", "Sale", "Collection", "Closing"]],
+      body: summaryRows,
+      startY: 58,
+      margin: { top: 58, bottom: 16, left: PAGE_MARGIN, right: PAGE_MARGIN },
+      theme: "grid",
+      showHead: "everyPage",
+      headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontStyle: "bold", halign: "center", fontSize: 7, cellPadding: 1.8 },
+      bodyStyles: { fontSize: 7, textColor: [20, 20, 20], cellPadding: 1.8, lineColor: BORDER_LIGHT, lineWidth: 0.2 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 38, halign: "left" },
+        2: { cellWidth: 23, halign: "right" },
+        3: { cellWidth: 23, halign: "right" },
+        4: { cellWidth: 23, halign: "right" },
+        5: { cellWidth: 23, halign: "right" },
+        6: { cellWidth: 23, halign: "right" },
+        7: { cellWidth: 23, halign: "right" },
+      },
+      didParseCell: (cell) => {
+        if (cell.row.index === summaryRows.length - 1) {
+          cell.cell.styles.fillColor = [238, 242, 247];
+          cell.cell.styles.fontStyle = "bold";
+        }
+        const raw = String(cell.cell.raw ?? "");
+        if (cell.column.index >= 4 && raw.startsWith("-")) cell.cell.styles.textColor = [190, 24, 93];
+      },
+      didDrawPage: drawSummaryChrome,
+    });
+    // The cumulative report owns page one. Detailed shop statements begin on
+    // a clean second page, avoiding overlap regardless of the number of shops.
+    doc.addPage();
+  }
 
   const renderShopSection = (entry: ShopLedgerPdfEntry): void => {
     const { data } = entry;

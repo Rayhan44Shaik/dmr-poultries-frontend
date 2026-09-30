@@ -7,7 +7,7 @@ import UnLoadingTable from "./Step_4";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
-import { TripNoBadge } from "./TripNoBadge";
+import { TripContextBadges } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
@@ -179,7 +179,7 @@ export default function StepDeliveries({
             <Package size={18} className="text-emerald-500" />
             {t("ops.trip.title.deliveries")}
           </h3>
-          <TripNoBadge tripNo={trip.tripNo} />
+          <TripContextBadges tripNo={trip.tripNo} vehicleNo={trip.vehicleNo} supervisorName={trip.supervisorName} driverName={trip.driverName} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
@@ -247,7 +247,7 @@ export default function StepDeliveries({
         updateDeliveries={updateDeliveries}
         saveDeliveries={
           saveDeliveriesProgress
-            ? async (opts) => saveDeliveriesProgress(rows, opts)
+            ? async (opts, rowsOverride) => saveDeliveriesProgress(rowsOverride ?? rows, opts)
             : undefined
         }
         submitDeliveries={handleLockDeliveries}

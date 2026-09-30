@@ -11,7 +11,7 @@ import { ArrowRight, AlertCircle, Building2, Eye, EyeOff, Info, Lock, ShieldChec
 import BrandMark from "../../ui/BrandMark";
 import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
-import { loginRequest } from "./authApi";
+import { currentUserRequest, loginRequest } from "./authApi";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
@@ -82,20 +82,25 @@ export default function LoginPage() {
     setFieldErrors({});
     try {
       const signedIn = await loginRequest(user, pass);
+      // Do not mount the dashboard until the exact token just issued by the
+      // backend has passed an authenticated request through the same proxy.
+      // This closes the gap where a bad/stale token could launch every
+      // dashboard query at once and turn one auth failure into many 401s.
+      const verifiedUser = await currentUserRequest();
       const previous = getLastUsername();
-      if (previous !== signedIn.user.username) sweepWorkspaceCaches();
-      setLastUsername(signedIn.user.username);
+      if (previous !== verifiedUser.username) sweepWorkspaceCaches();
+      setLastUsername(verifiedUser.username);
       try {
-        if (rememberMe) localStorage.setItem(REMEMBER_KEY, signedIn.user.username);
+        if (rememberMe) localStorage.setItem(REMEMBER_KEY, verifiedUser.username);
         else localStorage.removeItem(REMEMBER_KEY);
       } catch {
         // remember-me is best-effort
       }
-      adoptSession(signedIn.user);
+      adoptSession(verifiedUser);
       if (signedIn.previousSessionsEnded) {
         notify.info(t("auth.login.sessions_replaced"));
       }
-      navigate(landingPathForRole(signedIn.user.role), { replace: true });
+      navigate(landingPathForRole(verifiedUser.role), { replace: true });
     } catch (cause) {
       setError(loginErrorMessage(cause, t("auth.login.failed")));
       setBusy(false);

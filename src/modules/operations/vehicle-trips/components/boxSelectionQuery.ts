@@ -1,6 +1,7 @@
 /**
  * Expands a Step 4 box-selection entry such as:
  *   44,56,46
+ *   16 024
  *   46-56
  *   44, 46 to 56, 60
  *
@@ -21,7 +22,13 @@ export function parseBoxSelectionQuery(
   );
   const selected: string[] = [];
   const seen = new Set<string>();
-  const groups = query.split(/[,;]+/).map((part) => part.trim());
+  // Operators commonly enter scanner/keypad values separated by commas or
+  // spaces, and may zero-pad a box number (024). Normalize range separators
+  // first so "16 to 24" and "16 - 24" remain one group.
+  const normalized = query
+    .replace(/\s+to\s+/gi, "-")
+    .replace(/\s*-\s*/g, "-");
+  const groups = normalized.split(/[,;\s]+/).map((part) => part.trim());
   if (groups.some((part) => !part)) return [];
 
   for (const group of groups) {

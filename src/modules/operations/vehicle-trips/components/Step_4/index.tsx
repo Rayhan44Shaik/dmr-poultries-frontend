@@ -3,6 +3,7 @@
 
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
   FileText, Box
@@ -63,7 +64,7 @@ interface Props {
   tripDate?: string;
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
-  saveDeliveries?: (opts?: { silent?: boolean }) => Promise<boolean>;
+  saveDeliveries?: (opts?: { silent?: boolean }, rowsOverride?: ShopDelivery[]) => Promise<boolean>;
   submitDeliveries?: () => boolean | string | Promise<boolean | string>;
   onClose?: () => void;
   persistedRows?: ShopDelivery[];
@@ -253,7 +254,10 @@ export default function UnLoadingTable({
   const { showNotification } = useSafeNotification();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
-  const safeBirdTypes = (birdTypes ?? []).filter((bird: any) => !bird.category || bird.category === "Bird");
+  const safeBirdTypes = useMemo(
+    () => (birdTypes ?? []).filter((bird: any) => !bird.category || bird.category === "Bird"),
+    [birdTypes],
+  );
   const safeTrip = trip ?? null;
 
   // Cache the last known good boxDetails to prevent stale/empty boxDetails from API responses
@@ -268,6 +272,44 @@ export default function UnLoadingTable({
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
+  const [modalLeftInset, setModalLeftInset] = useState(0);
+
+  // The Add/Edit Shop card is a modal surface. Keep the underlying trip page
+  // fixed while it is open, matching the master Shop form behaviour.
+  useEffect(() => {
+    if (!showForm) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [showForm]);
+
+  // Centre the shop dialog inside the application CONTENT column, not across
+  // the sidebar. Recompute when the persistent sidebar changes shape.
+  useEffect(() => {
+    if (!showForm) return;
+    const insetForMode = (mode: unknown) => mode === "expanded" ? 260 : mode === "rail" ? 72 : 0;
+    const syncInset = () => {
+      if (!window.matchMedia("(min-width: 1024px)").matches) {
+        setModalLeftInset(0);
+        return;
+      }
+      const mode = document.querySelector<HTMLElement>("[data-sidebar-mode]")?.dataset.sidebarMode;
+      setModalLeftInset(insetForMode(mode));
+    };
+    const onSidebarModeChange = (event: Event) => {
+      const mode = (event as CustomEvent<unknown>).detail;
+      setModalLeftInset(window.matchMedia("(min-width: 1024px)").matches ? insetForMode(mode) : 0);
+    };
+    syncInset();
+    window.addEventListener("resize", syncInset);
+    window.addEventListener("dmr-sidebar-mode-change", onSidebarModeChange);
+    return () => {
+      window.removeEventListener("resize", syncInset);
+      window.removeEventListener("dmr-sidebar-mode-change", onSidebarModeChange);
+    };
+  }, [showForm]);
 
   // ─── Submission Status Tracking ─────────────────────────────────
   const [hasBeenSubmitted, setHasBeenSubmitted] = useState<boolean>(isSubmitted);
@@ -284,6 +326,9 @@ export default function UnLoadingTable({
   const submitLockRef = useRef(false);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const autosaveInFlightRef = useRef(false);
+  const formAutosaveTimerRef = useRef<number | undefined>(undefined);
+  const formAutosaveInFlightRef = useRef(false);
+  const draftIdentityRef = useRef<{ id: number; clientKey: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
   // Background autosave for Step 4 — same silent pattern as Step 3 Pickup:
@@ -381,6 +426,73 @@ export default function UnLoadingTable({
     weightLoss,
     validate,
   } = useShopDeliveryForm(safeRows, safeBoxDetails, editingId);
+
+  // Persist the open Add/Edit Shop form itself after 2.5 seconds of inactivity.
+  // Previously the row-level autosave was disabled while this form was open,
+  // which meant the values users were actively entering never reached the API.
+  const formDraftFingerprint = useMemo(
+    () => JSON.stringify({ mode, editingId, formData }),
+    [mode, editingId, formData],
+  );
+  useEffect(() => {
+    if (readOnly || !showForm || !saveDeliveries || isSubmitting || isSaving) return;
+    if (Number(formData.shopId) <= 0) return; // backend requires a real shop
+
+    window.clearTimeout(formAutosaveTimerRef.current);
+    formAutosaveTimerRef.current = window.setTimeout(() => {
+      if (formAutosaveInFlightRef.current) return;
+      const identity = draftIdentityRef.current;
+      if (!identity) return;
+
+      const selectedBoxIds = [...formData.selectedBoxIds];
+      const isBoxMode = mode === "box";
+      const birds = isBoxMode ? Math.max(0, farmBirds - Number(formData.mortality || 0)) : Number(formData.birds || 0);
+      const weight = Number((isBoxMode ? Math.max(0, farmWeight - mortKg) : Number(formData.weight || 0)).toFixed(2));
+      const existing = editingId == null ? undefined : safeRows.find((row) => Number(row.id) === Number(editingId));
+      const capturedAt = String((existing as any)?.autoCaptureTime ?? autoCaptureTime ?? "").trim();
+      const draftRow = {
+        ...(existing ?? {}),
+        id: identity.id,
+        clientKey: identity.clientKey,
+        serialNo: existing?.serialNo ?? safeRows.reduce((max, row) => Math.max(max, Number(row.serialNo || 0)), 0) + 1,
+        shopId: Number(formData.shopId),
+        shopName: formData.shopName,
+        subShopName: formData.subShopName.trim(),
+        birdTypeId: Number(formData.birdTypeId || 0),
+        birdType: formData.birdType,
+        boxNo: selectedBoxIds.length,
+        birds,
+        weight,
+        mortality: Number(formData.mortality || 0),
+        mortKg: Number((isBoxMode ? mortKg : Number(formData.mortWeight || 0)).toFixed(2)),
+        rate: Number(existing?.rate || 0),
+        amount: Number(existing?.amount || 0),
+        remarks: captureRemarksFor(safeRows, Number(formData.shopId), formData.remarks),
+        deliveryMode: mode,
+        selectedBoxIds,
+        farmBirds,
+        farmWeight,
+        perBoxData: isBoxMode ? formData.perBoxData : [],
+        // Autosave is draft persistence only. The official per-shop capture
+        // timestamp is still created by the explicit Save Shop action.
+        autoCaptureTime: capturedAt || undefined,
+      } as ShopDelivery;
+      const rowsToSave = existing
+        ? safeRows.map((row) => Number(row.id) === Number(existing.id) ? draftRow : row)
+        : [draftRow, ...safeRows];
+
+      formAutosaveInFlightRef.current = true;
+      void saveDeliveries({ silent: true }, rowsToSave).finally(() => {
+        formAutosaveInFlightRef.current = false;
+      });
+    }, 2500);
+
+    return () => window.clearTimeout(formAutosaveTimerRef.current);
+  }, [
+    autoCaptureTime, editingId, farmBirds, farmWeight, formData,
+    formDraftFingerprint, isSaving, isSubmitting, mode, mortKg, readOnly,
+    safeRows, saveDeliveries, showForm,
+  ]);
 
   // Sync editing ID from parent
   useEffect(() => {
@@ -504,7 +616,9 @@ export default function UnLoadingTable({
     try {
       const success = await withMinSaveDuration(() => saveDeliveries());
       if (success) {
-        setLastSavedDeliveriesFingerprint(JSON.stringify(safeRows));
+        setLastSavedDeliveriesFingerprint(
+          JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: safeRows })
+        );
         showNotification(t("ops.trip.progress_saved"), "success");
       } else {
         showNotification(t("ops.trip.failed_save_delivery"), "error");
@@ -651,6 +765,11 @@ export default function UnLoadingTable({
     setAutoCaptureTime("");
     const birdTypeId = tripBirdTypeId || 0;
     const birdType = tripBirdType || "";
+    const draftId = Date.now();
+    draftIdentityRef.current = {
+      id: draftId,
+      clientKey: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${draftId}`,
+    };
     setFormData({ ...EMPTY_DELIVERY_FORM, birdTypeId, birdType });
     setShowForm(true);
   };
@@ -663,6 +782,10 @@ export default function UnLoadingTable({
       !rowWithExtra.deliveredAt &&
       !rowWithExtra.deliveryTime;
     setEditingId(row.id);
+    draftIdentityRef.current = {
+      id: Number(row.id),
+      clientKey: row.clientKey || `ck-${row.id}`,
+    };
     setMode(rowWithExtra.deliveryMode || "box");
     setAutoCaptureTime(rowWithExtra.autoCaptureTime || "");
     setFormData({
@@ -791,7 +914,7 @@ export default function UnLoadingTable({
 
     const maxSerial = safeRows.reduce((max: number, r: ShopDelivery) => Math.max(max, r.serialNo || 0), 0);
     const newRow: any = {
-      id: editingId ?? Date.now(),
+      id: editingId ?? draftIdentityRef.current?.id ?? Date.now(),
       serialNo: editingId ? (safeRows.find((r) => r.id === editingId)?.serialNo || maxSerial + 1) : maxSerial + 1,
       shopId: formData.shopId,
       shopName: formData.shopName,
@@ -815,7 +938,7 @@ export default function UnLoadingTable({
       perBoxData: perBoxData,
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
-        : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
+        : draftIdentityRef.current?.clientKey || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
       // Persist ISO so the backend stores auto_capture_time. Display stays IST
       // via formatIstStamp. First capture of a plan row (editingId set, no prior
       // time) also stamps now — otherwise cards show "—".
@@ -1222,9 +1345,19 @@ export default function UnLoadingTable({
         </div>
       </div>
 
-      {/* ─── MAIN CONTENT VIEW (FORM VS TABLE CARDS) ─── */}
-      {showForm ? (
-        <ShopDeliveryForm
+      {/* Keep the delivery table mounted and visible beneath the modal. */}
+      {showForm && createPortal(
+        <div
+          className="fixed bottom-0 right-0 z-[70] flex items-center justify-center overflow-y-auto p-3 sm:p-5"
+          style={{
+            top: 64,
+            left: modalLeftInset,
+            backgroundColor: "rgba(15, 23, 42, 0.01)",
+          }}
+          role="presentation"
+        >
+          <div role="dialog" aria-modal="true" aria-label={editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")} className="my-auto w-full max-w-6xl max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl shadow-2xl shadow-slate-900/15">
+          <ShopDeliveryForm
           mode={mode}
           setMode={setMode}
           formData={formData}
@@ -1253,8 +1386,11 @@ export default function UnLoadingTable({
           birdOptions={birdOptions}
           isFormValid={isFormValid}
           showActions={true}
-        />
-      ) : (
+          />
+          </div>
+        </div>,
+        document.body,
+      )}
         <>
           <div className="p-3 sm:p-4 bg-slate-50/40 rounded-2xl border border-slate-200/80">
             {currentRows.length === 0 ? (
@@ -1341,7 +1477,6 @@ export default function UnLoadingTable({
           />
           )}
         </>
-      )}
 
       {/* ─── BOTTOM ACTION BAR (same as Steps 3 / 5 — no extra card) ─── */}
       {!showForm && !readOnly && (

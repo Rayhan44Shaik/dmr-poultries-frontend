@@ -45,10 +45,10 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     shop?.longitude !== undefined ? String(shop.longitude) : "",
   );
   const [paperRate, setPaperRate] = useState(
-    shop?.paperRate !== undefined ? String(shop.paperRate) : "1",
+    shop?.paperRate !== undefined ? String(shop.paperRate) : "10",
   );
   const [associationType, setAssociationType] = useState(
-    shop?.associationType ?? "",
+    shop?.associationType ?? "Ass Gun",
   );
   const [openingBalance, setOpeningBalance] = useState(
     shop?.openingBalance !== undefined ? String(shop.openingBalance) : "0",
