@@ -81,6 +81,18 @@ export function mapRawFarmPayment(raw: unknown): TripFarmPayment | null {
     referenceNo: typeof row.referenceNo === 'string' ? row.referenceNo : null,
     vehicleNo: optionalText(row.vehicleNo),
     supervisorName: optionalText(row.supervisorName),
+    loads: Array.isArray(row.loads)
+      ? row.loads.map((value) => {
+          const load = value as Record<string, unknown>;
+          return {
+            load: money(load.load),
+            farmName: typeof load.farmName === 'string' ? load.farmName : null,
+            birdType: typeof load.birdType === 'string' ? load.birdType : null,
+            totalBirds: money(load.totalBirds),
+            dcWeight: money(load.dcWeight),
+          };
+        })
+      : [],
   };
 }
 

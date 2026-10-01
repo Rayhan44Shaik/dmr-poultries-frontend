@@ -8,11 +8,12 @@ import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPayment
 import { loadTripFarmPayments, saveTripFarmPayments } from '../services/farmPaymentApiService'; import { farmPaymentRowDetails, isFarmPaymentTrip, mergeFarmPaymentRows, useQuietRefreshSignal } from '../utils/farmPaymentSync';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
-import { Save, RotateCcw, HandCoins } from 'lucide-react';
+import { Save, RotateCcw, HandCoins, FileText, FileSpreadsheet, LoaderCircle } from 'lucide-react';
 import { formatINR, formatINRExact, formatCount, formatKg } from '../components/farm-payment/farmPaymentFormat';
 import Pagination from '../../../ui/Pagination';
 import { shouldShowPagination } from '../../../shared/ui/paginationStyles';
 import { useI18n } from '../../../i18n';
+import type { FarmPaymentExportRow } from '../utils/farmPaymentExport';
 
 /** Pull a bare reference out of the legacy "Ref …" notes form field. */
 function referenceFromNotes(notes?: string): string | undefined {
@@ -25,15 +26,28 @@ function referenceFromNotes(notes?: string): string | undefined {
 function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayment> {
   const tripId = String(trip.id);
   if (!apiRow) {
+    const submittedLoads = (trip.legs ?? []).filter((leg) => leg.pickupStepSubmitted);
     return {
       tripId,
-      totalBirds: trip.totalBirds || 0,
-      dcWeight: trip.dcWeight || 0,
+      farmName: submittedLoads.length
+        ? [...new Set(submittedLoads.map((leg) => leg.sourceFarm).filter(Boolean))].join(', ')
+        : trip.sourceFarm,
+      birdType: submittedLoads.length
+        ? [...new Set(submittedLoads.map((leg) => leg.farmBirdType).filter(Boolean))].join(', ')
+        : trip.birdType,
+      totalBirds: submittedLoads.length
+        ? submittedLoads.reduce((sum, leg) => sum + Number(leg.totalBirds ?? 0), 0)
+        : trip.totalBirds || 0,
+      dcWeight: submittedLoads.length
+        ? submittedLoads.reduce((sum, leg) => sum + Number(leg.dcWeight ?? 0), 0)
+        : trip.dcWeight || 0,
       paymentStatus: 'Unpaid',
     };
   }
   return {
     tripId,
+    farmName: apiRow.farmName ?? trip.sourceFarm,
+    birdType: apiRow.birdType ?? trip.birdType,
     ...farmPaymentRowDetails(trip, apiRow),
 
     ratePerKg: apiRow.rate,
@@ -50,6 +64,7 @@ function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayme
     paidDate: apiRow.paymentDate ?? undefined,
     paymentMode: (apiRow.paymentMode as FarmPayment['paymentMode']) ?? undefined,
     notes: apiRow.referenceNo ? `Ref ${apiRow.referenceNo}` : undefined,
+    loads: apiRow.loads ?? [],
   };
 }
 
@@ -103,6 +118,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // Payment state management
   const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
   const [savingPayments, setSavingPayments] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // Backend farm payments, one row per completed trip (GET /accounts/farm-payments
   // — the same rows the Account Analysis charges to each trip). Held in a ref
@@ -235,40 +252,85 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
   // ----- compute unique farms -----
   const farms = useMemo(() => {
-    const farmSet = new Set(allTrips.map((t) => t.sourceFarm).filter(Boolean));
+    const farmSet = new Set<string>();
+    allTrips.forEach((trip) => {
+      const payment = paymentData[String(trip.id)];
+      (payment?.loads?.length ? payment.loads.map((load) => load.farmName) : [payment?.farmName ?? trip.sourceFarm])
+        .filter((farm): farm is string => Boolean(farm))
+        .forEach((farm) => farmSet.add(farm));
+    });
     return ['All', ...Array.from(farmSet)];
-  }, [allTrips]);
+  }, [allTrips, paymentData]);
 
   // ----- filter trips -----
   const filteredTrips = useMemo(() => {
     return allTrips.filter((trip) => {
+      const payment = paymentData[String(trip.id)] ?? {};
       if (dateFrom && trip.tripDate < dateFrom) return false;
       if (dateTo && trip.tripDate > dateTo) return false;
-      if (selectedFarm !== 'All' && trip.sourceFarm !== selectedFarm) return false;
+      if (selectedFarm !== 'All' && !(
+        payment.farmName === selectedFarm ||
+        payment.loads?.some((load) => load.farmName === selectedFarm)
+      )) return false;
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
+        const birds = Number(payment.totalBirds ?? trip.totalBirds ?? 0);
+        const weight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
+        const rate = Number(payment.ratePerKg ?? 0);
+        const amount = Number(payment.totalAmount ?? weight * rate);
         const match =
           trip.tripNo.toLowerCase().includes(q) ||
           trip.vehicleNo.toLowerCase().includes(q) ||
-          trip.sourceFarm.toLowerCase().includes(q) ||
+          String(payment.farmName ?? trip.sourceFarm).toLowerCase().includes(q) ||
           trip.driverName.toLowerCase().includes(q) ||
-          trip.supervisorName.toLowerCase().includes(q);
+          trip.supervisorName.toLowerCase().includes(q) ||
+          String(payment.birdType ?? trip.birdType ?? '').toLowerCase().includes(q) ||
+          (payment.loads ?? []).some((load) =>
+            [load.load, load.farmName, load.birdType, load.totalBirds, load.dcWeight]
+              .some((value) => String(value ?? '').toLowerCase().includes(q)),
+          ) ||
+          [birds, weight, rate, amount].some((value) =>
+            [String(value), value.toLocaleString('en-IN'), value.toFixed(2)].some((text) =>
+              text.toLowerCase().includes(q),
+            ),
+          );
         if (!match) return false;
       }
 
       return true;
     });
-  }, [allTrips, dateFrom, dateTo, selectedFarm, searchQuery]);
+  }, [allTrips, dateFrom, dateTo, selectedFarm, searchQuery, paymentData]);
+
+  const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+
+  const exportRows = useMemo<FarmPaymentExportRow[]>(() => filteredTrips.map((trip) => {
+    const payment = paymentData[String(trip.id)] ?? {};
+    const dcWeight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
+    const rate = Number(payment.ratePerKg ?? 0);
+    return {
+      tripNo: trip.tripNo,
+      tripDate: trip.tripDate,
+      farm: String(payment.farmName ?? trip.sourceFarm),
+      vehicle: trip.vehicleNo,
+      birdType: String(payment.birdType ?? trip.birdType ?? ''),
+      birds: Math.round(Number(payment.totalBirds ?? trip.totalBirds ?? 0)),
+      dcWeight,
+      rate,
+      totalAmount: Number(payment.totalAmount ?? dcWeight * rate),
+    };
+  }), [filteredTrips, paymentData]);
 
   // ----- compute KPI totals (based on filtered trips) -----
   const totalBirdsKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) => sum + (trip.totalBirds || 0), 0);
-  }, [filteredTrips]);
+    return filteredTrips.reduce((sum, trip) =>
+      sum + Number(paymentData[String(trip.id)]?.totalBirds ?? trip.totalBirds ?? 0), 0);
+  }, [filteredTrips, paymentData]);
 
   const totalWeightKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) => sum + (trip.dcWeight || 0), 0);
-  }, [filteredTrips]);
+    return filteredTrips.reduce((sum, trip) =>
+      sum + Number(paymentData[String(trip.id)]?.dcWeight ?? trip.dcWeight ?? 0), 0);
+  }, [filteredTrips, paymentData]);
 
   const totalAmountKPI = useMemo(() => {
     return filteredTrips.reduce((sum, trip) => {
@@ -276,7 +338,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       const ratePerKg = payment?.ratePerKg || 0;
       // Same weight-based pricing the table shows live, so the card and the
       // column it adds up can never disagree.
-      return sum + (payment?.totalAmount || (trip.dcWeight || 0) * ratePerKg);
+      const dcWeight = Number(payment?.dcWeight ?? trip.dcWeight ?? 0);
+      return sum + (payment?.totalAmount || dcWeight * ratePerKg);
     }, 0);
   }, [filteredTrips, paymentData]);
 
@@ -395,6 +458,39 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     showNotification(t('accounts.farmpay.notif_filters_cleared'), 'info');
   };
 
+  const exportScope = { from: dateFrom, to: dateTo, farm: selectedFarm, search: searchQuery.trim() };
+  const handleExportPdf = async () => {
+    if (exportingPdf || exportRows.length === 0) return;
+    setExportingPdf(true);
+    try {
+      const { exportFarmPaymentsPdf } = await import('../utils/farmPaymentExport');
+      await exportFarmPaymentsPdf(exportRows, exportScope);
+      showNotification(`PDF exported for ${exportRows.length} filtered trip(s).`, 'success');
+    } catch (error) {
+      console.error('Farm payment PDF export failed:', error);
+      showNotification('Unable to export Farm Payment PDF.', 'error');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const handleExportExcel = async () => {
+    if (exportingExcel || exportRows.length === 0) return;
+    setExportingExcel(true);
+    try {
+      // Yield once so the animated busy state paints before XLSX work starts.
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 40));
+      const { exportFarmPaymentsExcel } = await import('../utils/farmPaymentExport');
+      exportFarmPaymentsExcel(exportRows, exportScope);
+      showNotification(`Excel exported for ${exportRows.length} filtered trip(s).`, 'success');
+    } catch (error) {
+      console.error('Farm payment Excel export failed:', error);
+      showNotification('Unable to export Farm Payment Excel.', 'error');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
   // Unsaved rows = edited since the last load/save (same set Save Payments
   // persists), so the Save/Reset buttons enable exactly when there is
   // something new to save — never for rows restored from a previous save.
@@ -464,6 +560,24 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
             <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              disabled={loading || exportingPdf || exportRows.length === 0}
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {exportingPdf ? <LoaderCircle size={14} className="animate-spin" /> : <FileText size={14} className="motion-safe:group-hover:animate-pulse" />}
+              {exportingPdf ? 'Creating PDF…' : 'PDF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportExcel()}
+              disabled={loading || exportingExcel || exportRows.length === 0}
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {exportingExcel ? <LoaderCircle size={14} className="animate-spin" /> : <FileSpreadsheet size={14} className="motion-safe:group-hover:animate-pulse" />}
+              {exportingExcel ? 'Creating Excel…' : 'Excel'}
+            </button>
+            <button
               onClick={handleResetPayments}
               disabled={modifiedCount === 0}
               className="group px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
@@ -523,7 +637,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               onViewTrip={handleViewTrip}
               startIndex={(currentPage - 1) * pageSize}
               emptyMessage={
-                isFilterActive
+                hasInvalidDateRange
+                  ? t('accounts.payment.invalid_range')
+                  : isFilterActive
                   ? t('accounts.farmpay.empty_no_filters')
                   : t('accounts.farmpay.empty_no_data')
               }

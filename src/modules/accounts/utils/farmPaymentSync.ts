@@ -46,18 +46,18 @@ export function mergeFarmPaymentRows(
 /**
  * Farm-supplied figures for one payment row.
  *
- * The backend ledger carries the persisted pickup figures (total_birds /
- * dc_weight); the trip summary's totalBirds is the delivery-side aggregate,
- * net of in-transit mortality. Preferring the ledger keeps the row identical
- * to what Account Analysis charges for the same trip.
+ * The backend ledger carries the persisted Step 3 pickup figures
+ * (total_birds / dc_weight). Delivery birds, delivery weight and mortality
+ * are deliberately not inputs to Farm Payment. The trip fallback fields are
+ * the same Step 3 mirror used for legacy single-load trips.
  */
 export function farmPaymentRowDetails(
   trip: Pick<Trip, 'totalBirds' | 'dcWeight'>,
   apiRow?: TripFarmPayment,
 ): { totalBirds: number; dcWeight: number } {
   return {
-    totalBirds: apiRow?.totalBirds || trip.totalBirds || 0,
-    dcWeight: apiRow?.dcWeight || trip.dcWeight || 0,
+    totalBirds: apiRow?.totalBirds ?? trip.totalBirds ?? 0,
+    dcWeight: apiRow?.dcWeight ?? trip.dcWeight ?? 0,
   };
 }
 

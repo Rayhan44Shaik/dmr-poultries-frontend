@@ -128,6 +128,7 @@ export default {
   'accounts.farmpay.table_caption': 'Farm payment records for completed trips',
   'accounts.farmpay.all_farms': 'All Farms',
   'accounts.farmpay.search_placeholder': 'Search by Trip No, Vehicle, Farm, Driver, Supervisor…',
+  'accounts.farmpay.col_dc_birds': 'DC Birds',
   'accounts.farmpay.col_dc_weight': 'DC Wt (Kg)',
   'accounts.farmpay.col_rate': 'Rate/Kg (₹)',
   'accounts.farmpay.col_amount': 'Total Amount',
@@ -148,7 +149,7 @@ export default {
   'accounts.farmpay.notif_reset': 'All changes reset',
   'accounts.farmpay.notif_filters_cleared': 'Filters cleared. Showing the last complete week.',
   'accounts.farmpay.totals_for': 'Totals for all {count} filtered trips',
-  'accounts.farmpay.total_birds': 'Total Birds',
-  'accounts.farmpay.total_weight': 'Total Weight',
+  'accounts.farmpay.total_birds': 'Total DC Birds',
+  'accounts.farmpay.total_weight': 'Total DC Weight',
   'accounts.farmpay.total_amount': 'Total Amount',
 };

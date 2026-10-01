@@ -20,6 +20,8 @@ export interface ShopLedgerRow {
   referenceId: number;
   /** Trip no / sale no / collection no when the reference resolves. */
   referenceNo: string;
+  /** Load 1 / Load 2 represented by this sale row. */
+  loadLabel: string;
   description: string;
   debit: number;
   credit: number;
@@ -27,6 +29,11 @@ export interface ShopLedgerRow {
   balance: number;
   birds: number;
   weight: number;
+  farmBirds: number;
+  farmWeight: number;
+  mortalityBirds: number;
+  mortalityWeight: number;
+  weightLoss: number;
   rate: number;
   paymentMode: string | null;
   status: string | null;
@@ -52,6 +59,33 @@ export interface ShopLedgerResponse {
   }>;
   data: ShopLedgerRow[];
   meta?: ShopLedgerMeta;
+}
+
+export interface ShopLedgerCumulativeQuantity {
+  shopId: number;
+  shopName: string;
+  birds: number;
+  weight: number;
+  mortalityBirds: number;
+  mortalityWeight: number;
+  weightLoss: number;
+}
+
+export async function fetchShopLedgerCumulativeQuantities(filters: {
+  fromDate?: string;
+  toDate?: string;
+} = {}): Promise<ShopLedgerCumulativeQuantity[]> {
+  const { data } = await apiGet<ShopLedgerCumulativeQuantity[]>(
+    "/operations/shop-ledger/cumulative-quantities",
+    { params: filters },
+  );
+  return (data ?? []).map((row) => ({
+    shopId: Number(row.shopId), shopName: String(row.shopName ?? ""),
+    birds: Number(row.birds ?? 0), weight: Number(row.weight ?? 0),
+    mortalityBirds: Number(row.mortalityBirds ?? 0),
+    mortalityWeight: Number(row.mortalityWeight ?? 0),
+    weightLoss: Number(row.weightLoss ?? 0),
+  }));
 }
 
 /**
@@ -118,12 +152,18 @@ export async function fetchShopLedger(
         referenceType: String(row.referenceType ?? ""),
         referenceId: Number(row.referenceId ?? 0),
         referenceNo: String(row.referenceNo ?? ""),
+        loadLabel: String(row.loadLabel ?? ""),
         description: String(row.description ?? ""),
         debit: Number(row.debit ?? 0),
         credit: Number(row.credit ?? 0),
         balance: Number(row.balance ?? 0),
         birds: Number(row.birds ?? 0),
         weight: Number(row.weight ?? 0),
+        farmBirds: Number(row.farmBirds ?? 0),
+        farmWeight: Number(row.farmWeight ?? 0),
+        mortalityBirds: Number(row.mortalityBirds ?? 0),
+        mortalityWeight: Number(row.mortalityWeight ?? 0),
+        weightLoss: Number(row.weightLoss ?? 0),
         rate: Number(row.rate ?? 0),
         paymentMode: row.paymentMode == null ? null : String(row.paymentMode),
         status: row.status == null ? null : String(row.status),

@@ -128,6 +128,7 @@ export default {
   'accounts.farmpay.table_caption': 'పూర్తయిన ట్రిప్పుల ఫారం చెల్లింపు రికార్డులు',
   'accounts.farmpay.all_farms': 'అన్ని ఫారంలు',
   'accounts.farmpay.search_placeholder': 'ట్రిప్ నం, వాహనం, ఫారం, డ్రైవర్, సూపర్‌వైజర్ ద్వారా వెతకండి…',
+  'accounts.farmpay.col_dc_birds': 'DC కోళ్లు',
   'accounts.farmpay.col_dc_weight': 'DC బరువు (కి.గ్రా)',
   'accounts.farmpay.col_rate': 'ధర/కి.గ్రా (₹)',
   'accounts.farmpay.col_amount': 'మొత్తం సొమ్ము',
@@ -148,7 +149,7 @@ export default {
   'accounts.farmpay.notif_reset': 'అన్ని మార్పులు రీసెట్ అయ్యాయి',
   'accounts.farmpay.notif_filters_cleared': 'ఫిల్టర్లు తొలగించబడ్డాయి. గత పూర్తి వారం చూపిస్తున్నారు.',
   'accounts.farmpay.totals_for': 'ఫిల్టర్ అయిన మొత్తం {count} ట్రిప్పుల మొత్తాలు',
-  'accounts.farmpay.total_birds': 'మొత్తం కోళ్లు',
-  'accounts.farmpay.total_weight': 'మొత్తం బరువు',
+  'accounts.farmpay.total_birds': 'మొత్తం DC కోళ్లు',
+  'accounts.farmpay.total_weight': 'మొత్తం DC బరువు',
   'accounts.farmpay.total_amount': 'మొత్తం సొమ్ము',
 };

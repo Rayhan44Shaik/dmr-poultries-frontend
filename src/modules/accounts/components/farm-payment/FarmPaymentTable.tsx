@@ -91,7 +91,7 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
     { key: 'day', label: t('ops.trip.day'), icon: <Calendar size={14} className="text-blue-500 flex-shrink-0" /> },
     { key: 'farm', label: t('ops.trip.source_farm'), icon: <Warehouse size={14} className="text-amber-500 flex-shrink-0" /> },
     { key: 'vehicle', label: t('common.vehicle'), icon: <Truck size={14} className="text-indigo-500 flex-shrink-0" /> },
-    { key: 'birds', label: t('common.birds'), icon: <Bird size={14} className="text-blue-500 flex-shrink-0" />, align: 'right' },
+    { key: 'birds', label: t('accounts.farmpay.col_dc_birds'), icon: <Bird size={14} className="text-blue-500 flex-shrink-0" />, align: 'right' },
     { key: 'dcWeight', label: t('accounts.farmpay.col_dc_weight'), icon: <Scale size={14} className="text-orange-500 flex-shrink-0" />, align: 'right' },
     { key: 'rate', label: t('accounts.farmpay.col_rate'), icon: <IndianRupee size={14} className="text-emerald-500 flex-shrink-0" />, align: 'right' },
     { key: 'amount', label: t('accounts.farmpay.col_amount'), icon: <Wallet size={14} className="text-emerald-600 flex-shrink-0" />, align: 'right' },
@@ -157,8 +157,10 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
               trips.map((trip, index) => {
                 const payment = paymentData[String(trip.id)] || {};
 
-                const totalBirdsLoaded = trip.totalBirds || 0;
-                const dcWeight = trip.dcWeight || 0;
+                // The Farm Payments API is authoritative here: it reads the
+                // Step 3 pickup/DC columns directly for completed trips.
+                const totalBirdsLoaded = Number(payment.totalBirds ?? trip.totalBirds ?? 0);
+                const dcWeight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
                 const ratePerKg = payment.ratePerKg || 0;
                 // Weight-based pricing: Rate/Kg × DC weight.
                 const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
@@ -186,16 +188,30 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                       {formatTripListDay(trip.tripDate, language)}
                     </td>
                     <td className="px-4 py-4 text-[13px] font-medium text-slate-700 whitespace-nowrap">
-                      {localizeTripViewText(trip.sourceFarm, language)}
+                      {localizeTripViewText(payment.farmName ?? trip.sourceFarm, language)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-slate-600 whitespace-nowrap">
                       {formatVehicleNumber(trip.vehicleNo)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-bold text-blue-600 whitespace-nowrap tabular-nums">
-                      {formatCount(totalBirdsLoaded)}
+                      <div>{formatCount(totalBirdsLoaded)}</div>
+                      {(payment.loads?.length ?? 0) > 1 && (
+                        <div className="mt-1 space-y-0.5 text-[10px] font-semibold text-slate-400">
+                          {payment.loads?.map((load) => (
+                            <div key={load.load}>L{load.load}: {formatCount(load.totalBirds)}</div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-medium text-slate-700 whitespace-nowrap tabular-nums">
-                      {dcWeight > 0 ? dcWeight.toFixed(2) : '—'}
+                      <div>{dcWeight > 0 ? dcWeight.toFixed(2) : '—'}</div>
+                      {(payment.loads?.length ?? 0) > 1 && (
+                        <div className="mt-1 space-y-0.5 text-[10px] font-semibold text-slate-400">
+                          {payment.loads?.map((load) => (
+                            <div key={load.load}>L{load.load}: {Number(load.dcWeight).toFixed(2)}</div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end">

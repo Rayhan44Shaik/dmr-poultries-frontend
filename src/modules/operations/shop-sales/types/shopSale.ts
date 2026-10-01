@@ -114,7 +114,7 @@ export interface ShopSaleFilter {
    * Shop Name, Trip No and remarks (backend ILIKE). */
   search: string;
 
-  /** One of: latest | oldest | sale_asc | sale_desc | shop_asc | shop_desc | amount_desc | amount_asc */
+  /** Selected table/dropdown sort, including rate_asc and rate_desc. */
   sortBy: string;
 
 }

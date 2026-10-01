@@ -51,10 +51,15 @@ export async function listShopSales(filters: {
   if (filters.fromDate) params.fromDate = filters.fromDate;
   if (filters.toDate) params.toDate = filters.toDate;
   if (filters.search && filters.search.trim() !== "") params.search = filters.search.trim();
-  // The server supports the original coarse sort set. The table additionally
-  // offers instant client-side sorts (sale number, birds, weight, rate and remarks),
-  // which must not be sent as an unknown server enum during a manual refresh.
-  if (["latest", "oldest", "shop_asc", "shop_desc", "amount_desc", "amount_asc"].includes(filters.sortBy || "")) {
+  // The server and client share the complete sort vocabulary. Client sorting
+  // keeps header clicks instant; sending the same value makes refreshes and
+  // future server-side pagination preserve the selected order.
+  if ([
+    "latest", "oldest", "sale_asc", "sale_desc", "shop_asc", "shop_desc",
+    "birds_asc", "birds_desc", "weight_asc", "weight_desc",
+    "rate_asc", "rate_desc", "amount_asc", "amount_desc",
+    "remark_asc", "remark_desc",
+  ].includes(filters.sortBy || "")) {
     params.sortBy = filters.sortBy!;
   }
 

@@ -102,6 +102,7 @@ export function FarmerPaymentFilters({
             id={fromId}
             value={dateFrom}
             onChange={onDateFromChange}
+            maxDate={dateTo || undefined}
             placeholder={t('placeholder.enter_date')}
             className="w-full text-xs font-medium"
             language={language}
@@ -117,6 +118,7 @@ export function FarmerPaymentFilters({
             id={toId}
             value={dateTo}
             onChange={onDateToChange}
+            minDate={dateFrom || undefined}
             placeholder={t('placeholder.enter_date')}
             className="w-full text-xs font-medium"
             language={language}

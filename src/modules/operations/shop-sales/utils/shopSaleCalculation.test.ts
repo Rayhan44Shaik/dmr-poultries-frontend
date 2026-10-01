@@ -114,6 +114,7 @@ describe("filterShopSales", () => {
     assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "birds_desc" }).map((row) => row.id), ["a", "b"]);
     assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "weight_asc" }).map((row) => row.id), ["b", "a"]);
     assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "rate_desc" }).map((row) => row.id), ["b", "a"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "rate_asc" }).map((row) => row.id), ["a", "b"]);
     assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "remark_asc" }).map((row) => row.id), ["b", "a"]);
   });
 

@@ -88,6 +88,7 @@ function FarmPaymentTripView({ open, trip, onClose }: FarmPaymentTripViewModalPr
   const { t, language, toggleLanguage } = useI18n();
   // Opens on Step 2 (Farm Details) — the payment reviewer's primary step.
   const [step, setStep] = useState<1 | 2>(1);
+  const [selectedLoad, setSelectedLoad] = useState(1);
   const [lastTripId, setLastTripId] = useState<number | null>(trip?.id ?? null);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const displayTrip = useMemo(() => (trip ? localizeTripForView(trip, language) : null), [trip, language]);
@@ -96,15 +97,46 @@ function FarmPaymentTripView({ open, trip, onClose }: FarmPaymentTripViewModalPr
   if (trip && trip.id !== lastTripId) {
     setLastTripId(trip.id);
     setStep(1);
+    setSelectedLoad(1);
   }
 
   if (!open || !trip) return null;
   // Localize prose (farm, addresses, timestamps) but keep the identifiers —
   // trip number and vehicle number — in their stored Latin/numeric form in
   // every language: they are codes, never transliterated.
-  const viewTrip = displayTrip
+  const baseViewTrip = displayTrip
     ? { ...displayTrip, tripNo: trip.tripNo, vehicleNo: trip.vehicleNo }
     : trip;
+  const availableLoads = (trip.legs ?? [])
+    .filter((leg) => leg.farmStepSubmitted || leg.pickupStepSubmitted)
+    .sort((a, b) => a.legIndex - b.legIndex);
+  const activeLoad = availableLoads.find((leg) => leg.legIndex === selectedLoad) ?? availableLoads[0];
+  const viewTrip: Trip = activeLoad
+    ? {
+        ...baseViewTrip,
+        activeLegIndex: activeLoad.legIndex,
+        sourceFarmId: activeLoad.sourceFarmId ?? baseViewTrip.sourceFarmId,
+        sourceFarm: activeLoad.sourceFarm ?? baseViewTrip.sourceFarm,
+        reachedTime: activeLoad.reachedTime ?? baseViewTrip.reachedTime,
+        destMeter: activeLoad.destMeter ?? baseViewTrip.destMeter,
+        pickupTolls: activeLoad.pickupTolls ?? baseViewTrip.pickupTolls,
+        farmAddress: activeLoad.farmAddress ?? baseViewTrip.farmAddress,
+        avgBirdWeight: activeLoad.avgBirdWeight ?? baseViewTrip.avgBirdWeight,
+        birdTypeId: activeLoad.farmBirdTypeId ?? baseViewTrip.birdTypeId,
+        birdType: activeLoad.farmBirdType ?? baseViewTrip.birdType,
+        totalBirds: activeLoad.totalBirds,
+        dcWeight: activeLoad.dcWeight,
+        boxes: activeLoad.boxes,
+        avgWeight: activeLoad.avgWeight,
+        pickupLoadTime: activeLoad.pickupLoadTime ?? baseViewTrip.pickupLoadTime,
+        pickupStepSubmitted: activeLoad.pickupStepSubmitted,
+        pickupStepSubmittedAt: activeLoad.pickupStepSubmittedAt,
+        farmStepSubmitted: activeLoad.farmStepSubmitted,
+        farmStepSubmittedAt: activeLoad.farmStepSubmittedAt,
+        boxDetails: activeLoad.boxDetails ?? [],
+        deliveries: activeLoad.deliveries ?? [],
+      }
+    : baseViewTrip;
 
   const stepLabel = (index: 1 | 2) =>
     `${t('ops.trip.step_label', { step: index + 1 })} · ${t(`ops.trip.step.${STEP_OPTIONS[index - 1].key}`)}`;
@@ -212,6 +244,27 @@ function FarmPaymentTripView({ open, trip, onClose }: FarmPaymentTripViewModalPr
           </div>
 
           {/* Step 2 / Step 3 switcher — the only steps available here */}
+          {availableLoads.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-1.5">
+              <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">Load</span>
+              {availableLoads.map((load) => (
+                <button
+                  key={load.id}
+                  type="button"
+                  onClick={() => setSelectedLoad(load.legIndex)}
+                  className={`rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+                    activeLoad?.legIndex === load.legIndex
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:border-emerald-300'
+                  }`}
+                >
+                  Load {load.legIndex}
+                  <span className="ml-2 opacity-75">{load.totalBirds.toLocaleString()} birds · {load.dcWeight.toFixed(2)} kg</span>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-1.5 w-full sm:w-auto sm:self-start">
             {STEP_OPTIONS.map(({ index, icon: Icon, key }) => {
               const active = step === index;

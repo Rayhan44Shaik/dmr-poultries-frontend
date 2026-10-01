@@ -35,6 +35,10 @@ const RAW = {
   referenceNo: null,
   vehicleNo: "TS07UB1222",
   supervisorName: "Prakash Rao",
+  loads: [
+    { load: 1, farmName: "Venkateswara Hatchery Farm", birdType: "Country Chicken", totalBirds: 100, dcWeight: 250 },
+    { load: 2, farmName: "Second Farm", birdType: "Broiler", totalBirds: 164, dcWeight: 408.15 },
+  ],
 };
 
 test("mapRawFarmPayment maps every field the Analysis and the trip view read", () => {
@@ -53,6 +57,10 @@ test("mapRawFarmPayment maps every field the Analysis and the trip view read", (
   assert.equal(row.status, "Pending");
   assert.equal(row.paymentDate, null);
   assert.equal(row.vehicleNo, "TS07UB1222");
+  assert.deepEqual(row.loads, [
+    { load: 1, farmName: "Venkateswara Hatchery Farm", birdType: "Country Chicken", totalBirds: 100, dcWeight: 250 },
+    { load: 2, farmName: "Second Farm", birdType: "Broiler", totalBirds: 164, dcWeight: 408.15 },
+  ]);
 });
 
 test("a farm payment that cannot belong to a trip is dropped", () => {

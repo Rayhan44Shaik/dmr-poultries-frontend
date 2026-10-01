@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { format } from "date-fns";
 import {
   ArrowDownLeft,
   ArrowUpDown,
@@ -64,6 +63,7 @@ import {
 import { exportToExcel } from "../../../utils/exportUtils";
 import {
   fetchShopLedger,
+  fetchShopLedgerCumulativeQuantities,
   type ShopLedgerResponse,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
@@ -176,6 +176,11 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
     particulars: txParticulars(row),
     birds: isSale ? row.birds : 0,
     weight: isSale ? row.weight : 0,
+    farmBirds: isSale ? row.farmBirds : 0,
+    farmWeight: isSale ? row.farmWeight : 0,
+    mortalityBirds: isSale ? row.mortalityBirds : 0,
+    mortalityWeight: isSale ? row.mortalityWeight : 0,
+    weightLoss: isSale ? row.weightLoss : 0,
     rate: isSale ? row.rate : 0,
     debit: Number(row.debit) || 0,
     credit: Number(row.credit) || 0,
@@ -183,6 +188,7 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
     type: row.type,
     paymentMode: row.paymentMode ?? undefined,
     collectionNo: row.referenceNo || undefined,
+    loadLabel: isSale && row.loadLabel ? row.loadLabel : undefined,
     subShopName: row.subShopName?.trim() || undefined,
     remarks: row.remarks?.trim() || undefined,
   };
@@ -639,6 +645,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         tx.date,
         tx.particulars,
         tx.collectionNo,
+        tx.loadLabel,
         tx.paymentMode,
         tx.type,
         String(tx.birds || ""),
@@ -796,21 +803,27 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   >(new Map());
   const getBulkPdfLedgers = useCallback(
     (from: string, to: string): Promise<ShopLedgerPdfEntry[]> => {
-      const key = `${refreshNonce}|${from}|${to}`;
+      // Versioned so an older hot-reload cache that was built while Shop
+      // Master was empty can never keep serving an empty statement forever.
+      const key = `ledger-v3|${refreshNonce}|${from}|${to}`;
       const cached = bulkPdfLedgerCacheRef.current.get(key);
       if (cached) return cached;
 
       // The all-shops response includes backend-authoritative historical
       // openings per shop, identical to individual shop requests.
-      const today = format(new Date(), "yyyy-MM-dd");
-      const balanceThrough = to > today ? to : today;
       const request = fetchAllLedgerPages({
         fromDate: from,
-        toDate: balanceThrough,
+        // The cumulative view only needs the selected period. Fetching all
+        // activity through today made historical two-date filters download
+        // many unnecessary pages and could time out into a false empty state.
+        toDate: to,
       })
         .then((response) => {
           const openingByShopId = new Map(
             (response.openingBalances ?? []).map((row) => [row.shopId, row.openingBalance]),
+          );
+          const openingByShopName = new Map(
+            (response.openingBalances ?? []).map((row) => [row.shopName, row.openingBalance]),
           );
           const allRowsByShop = new Map<string, ShopLedgerRow[]>();
           const seenRows = new Set<string>();
@@ -824,12 +837,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             allRowsByShop.set(row.shopName, rows);
           }
 
-          // Include every shop in the chosen scope, even when the period has
-          // no sale/collection. Its carried opening and closing balance still
-          // belong in the cumulative statement.
-          return shops
-            .map((master) => {
-              const shop = master.shopName;
+          // The ledger response is authoritative and must render even if the
+          // separately loaded Shop Master request is still pending or failed.
+          // Master metadata only enriches rows; it never decides whether a
+          // valid backend ledger row exists.
+          const shopNames = new Set<string>([
+            ...shops.map((master) => master.shopName),
+            ...allRowsByShop.keys(),
+            ...(response.openingBalances ?? []).map((row) => row.shopName),
+          ]);
+          return [...shopNames]
+            .map((shop) => {
               const allRows = allRowsByShop.get(shop) ?? [];
               return [shop, allRows.filter((row) => row.date <= to)] as const;
             })
@@ -839,7 +857,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             .map(([shop, periodRows]) => {
               const master = shopMasterMap.get(shop);
               const allRows = allRowsByShop.get(shop) ?? [];
-              const openingBalance = round2(openingByShopId.get(master?.id ?? 0) ?? 0);
+              const rowShopId = allRows.find((row) => row.shopId != null)?.shopId;
+              const openingBalance = round2(
+                openingByShopId.get(master?.id ?? rowShopId ?? 0) ??
+                openingByShopName.get(shop) ??
+                0,
+              );
               periodRows.sort(
                 (a, b) => a.date.localeCompare(b.date) || a.id - b.id,
               );
@@ -888,12 +911,20 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const [cumulativeRows, setCumulativeRows] = useState<ShopLedgerCumulativeRow[]>([]);
   const [cumulativeLoading, setCumulativeLoading] = useState(true);
+  const [cumulativeError, setCumulativeError] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
+      const quantitiesPromise = appliedReportType === "collection"
+        ? Promise.resolve([])
+        : fetchShopLedgerCumulativeQuantities({
+            fromDate: appliedDateFrom,
+            toDate: appliedDateTo,
+          });
+      let rows: ShopLedgerCumulativeRow[];
       if (appliedSelectedShop === "All Shops") {
         const statements = await getBulkPdfLedgers(appliedDateFrom, appliedDateTo);
-        return buildShopLedgerCumulativeRows(
+        rows = buildShopLedgerCumulativeRows(
           statements.map((entry) => ({
             ...entry,
             // Keep the carried opening row, but aggregate only the activity
@@ -901,21 +932,61 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             data: filterStatementByType(entry.data, appliedReportType),
           })),
         );
+      } else {
+        rows = buildShopLedgerCumulativeRows([
+          {
+            shop: appliedSelectedShop,
+            data: filterStatementByType(ledgerData, appliedReportType),
+          },
+        ]);
       }
-      return buildShopLedgerCumulativeRows([
-        {
-          shop: appliedSelectedShop,
-          data: filterStatementByType(ledgerData, appliedReportType),
-        },
-      ]);
+      const quantities = await quantitiesPromise;
+      if (appliedReportType === "collection") return rows;
+      const byShop = new Map(quantities.map((item) => [item.shopName, item]));
+      const merged = rows.map((row) => {
+        const quantity = byShop.get(row.shop);
+        return quantity ? {
+          ...row,
+          birds: quantity.birds,
+          weight: quantity.weight,
+          mortalityBirds: quantity.mortalityBirds,
+          mortalityWeight: quantity.mortalityWeight,
+          weightLoss: quantity.weightLoss,
+        } : row;
+      });
+      const existing = new Set(merged.map((row) => row.shop));
+      for (const quantity of quantities) {
+        if (existing.has(quantity.shopName)) continue;
+        merged.push({
+          shop: quantity.shopName,
+          birds: quantity.birds,
+          weight: quantity.weight,
+          farmBirds: quantity.birds + quantity.mortalityBirds,
+          farmWeight: quantity.weight + quantity.mortalityWeight + quantity.weightLoss,
+          mortalityBirds: quantity.mortalityBirds,
+          mortalityWeight: quantity.mortalityWeight,
+          weightLoss: quantity.weightLoss,
+          openingBalance: 0,
+          sale: 0,
+          collection: 0,
+          closingBalance: 0,
+        });
+      }
+      return merged.sort((a, b) => a.shop.localeCompare(b.shop, "en", { sensitivity: "base" }));
     };
     setCumulativeLoading(true);
+    setCumulativeError(null);
     void load()
       .then((rows) => {
         if (!cancelled) setCumulativeRows(rows);
       })
-      .catch(() => {
-        if (!cancelled) setCumulativeRows([]);
+      .catch((cause) => {
+        if (!cancelled) {
+          setCumulativeRows([]);
+          setCumulativeError(
+            cause instanceof Error ? cause.message : "Unable to load the selected ledger range.",
+          );
+        }
       })
       .finally(() => {
         if (!cancelled) setCumulativeLoading(false);
@@ -938,8 +1009,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return cumulativeRows.filter((row) =>
       [
         row.shop,
+        row.farmBirds,
         row.birds,
+        row.mortalityBirds,
+        row.farmWeight,
         row.weight,
+        row.mortalityWeight,
+        row.weightLoss,
         row.openingBalance,
         row.sale,
         row.collection,
@@ -964,12 +1040,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         (sum, row) => ({
           birds: sum.birds + row.birds,
           weight: sum.weight + row.weight,
+          farmBirds: sum.farmBirds + row.farmBirds,
+          farmWeight: sum.farmWeight + row.farmWeight,
+          mortalityBirds: sum.mortalityBirds + row.mortalityBirds,
+          mortalityWeight: sum.mortalityWeight + row.mortalityWeight,
+          weightLoss: sum.weightLoss + row.weightLoss,
           openingBalance: sum.openingBalance + row.openingBalance,
           sale: sum.sale + row.sale,
           collection: sum.collection + row.collection,
           closingBalance: sum.closingBalance + row.closingBalance,
         }),
-        { birds: 0, weight: 0, openingBalance: 0, sale: 0, collection: 0, closingBalance: 0 },
+        {
+          birds: 0, weight: 0, farmBirds: 0, farmWeight: 0,
+          mortalityBirds: 0, mortalityWeight: 0, weightLoss: 0,
+          openingBalance: 0, sale: 0, collection: 0, closingBalance: 0,
+        },
       ),
     [visibleCumulativeRows],
   );
@@ -1183,7 +1268,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           shop,
           assets,
           undefined,
-          { includeCumulativeSummary: true },
+          {
+            includeCumulativeSummary: true,
+            cumulativeRows: cumulativeRows.filter((row) => row.shop === shop),
+          },
         );
         if (
           exportSessionRef.current !== sessionAtStart ||
@@ -1316,7 +1404,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       label,
       assets,
       undefined,
-      { includeCumulativeSummary: true },
+      {
+        includeCumulativeSummary: true,
+        cumulativeRows: cumulativeRows.filter((row) =>
+          current.selectedShops.includes(row.shop)),
+      },
     );
     downloadFile(generated.url, generated.filename);
     window.setTimeout(() => URL.revokeObjectURL(generated.url), 10_000);
@@ -1469,8 +1561,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const headers = [
         "S.No",
         "Shop Name",
-        "Birds",
-        "Weight (KG)",
+        "Delivered Birds",
+        "Mortality Birds",
+        "Delivered Weight (KG)",
+        "Mortality Weight (KG)",
+        "Weight Loss (KG)",
         "Opening Balance",
         "Sales",
         "Collections",
@@ -1480,7 +1575,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         index + 1,
         row.shop,
         row.birds,
+        row.mortalityBirds,
         roundLedgerValue(row.weight),
+        roundLedgerValue(row.mortalityWeight),
+        roundLedgerValue(row.weightLoss),
         roundLedgerValue(row.openingBalance),
         roundLedgerValue(row.sale),
         roundLedgerValue(row.collection),
@@ -1490,11 +1588,27 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         "",
         "TOTAL",
         cumulativeTotals.birds,
+        cumulativeTotals.mortalityBirds,
         roundLedgerValue(cumulativeTotals.weight),
+        roundLedgerValue(cumulativeTotals.mortalityWeight),
+        roundLedgerValue(cumulativeTotals.weightLoss),
         roundLedgerValue(cumulativeTotals.openingBalance),
         roundLedgerValue(cumulativeTotals.sale),
         roundLedgerValue(cumulativeTotals.collection),
         roundLedgerValue(cumulativeTotals.closingBalance),
+      ]);
+      data.push([
+        "",
+        "FARM TOTALS",
+        cumulativeTotals.birds + cumulativeTotals.mortalityBirds,
+        "",
+        roundLedgerValue(cumulativeTotals.weight + cumulativeTotals.mortalityWeight + cumulativeTotals.weightLoss),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
       ]);
       exportToExcel(
         `Shop Ledger — Cumulative — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`,
@@ -2828,23 +2942,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
         {viewMode === "cumulative" && (
           <div className="max-h-[70vh] overflow-auto animate-in fade-in slide-in-from-right-1 duration-200">
-            <table className="w-full min-w-[1180px] table-fixed text-sm">
-              <colgroup>
-                <col className="w-[7%]" />
-                <col className="w-[12.5%]" />
-                <col className="w-[13.41%]" />
-                <col className="w-[13.41%]" />
-                <col className="w-[13.41%]" />
-                <col className="w-[13.41%]" />
-                <col className="w-[13.41%]" />
-                <col className="w-[13.45%]" />
-              </colgroup>
+            <table className="w-full min-w-[1550px] text-sm">
               <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-sm">
                 <tr className="text-xs font-bold uppercase tracking-wider">
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><ListChecks size={15} className="text-indigo-500" />{t("shop_ledger.col.s_no")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={15} className="text-emerald-500" />{t("common.shop")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Bird size={15} className="text-amber-500" />{t("common.birds")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Weight size={15} className="text-cyan-500" />{t("shop_ledger.col.weight_short_kg")}</span></th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivered_birds")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.mortality")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivery_weight")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.mortality_weight")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.weight_loss")}</th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Scale size={15} className="text-indigo-500" />{t("shop_ledger.col.opening")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowUpRight size={15} className="text-emerald-500" />{t("shop_ledger.col.sale")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowDownLeft size={15} className="text-blue-500" />{t("shop_ledger.col.collection")}</span></th>
@@ -2853,9 +2960,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {cumulativeLoading ? (
-                  <tr><td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><LoaderCircle size={16} className="animate-spin text-emerald-600" />{t("shop_ledger.loading_records")}</span></td></tr>
+                  <tr><td colSpan={11} className="py-16 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><LoaderCircle size={16} className="animate-spin text-emerald-600" />{t("shop_ledger.loading_records")}</span></td></tr>
+                ) : cumulativeError ? (
+                  <tr><td colSpan={11} className="py-12 text-center text-rose-600 font-semibold">Could not load this ledger range: {cumulativeError}</td></tr>
                 ) : visibleCumulativeRows.length === 0 ? (
-                  <tr><td colSpan={8} className="py-12 text-center text-slate-400">{t("shop_ledger.no_transactions")}</td></tr>
+                  <tr><td colSpan={11} className="py-12 text-center text-slate-400">{t("shop_ledger.no_transactions")}</td></tr>
                 ) : (
                   <>
                     {pagedCumulativeRows.map((row, index) => {
@@ -2869,7 +2978,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{(cumulativeSafePage - 1) * pageSize + index + 1}</td>
                         <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={row.shop}>{row.shop}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.birds.toLocaleString()}</td>
+                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.mortalityBirds.toLocaleString()}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.weight.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.mortalityWeight.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right text-xs font-semibold tabular-nums text-amber-700">{row.weightLoss.toFixed(2)}</td>
                         {[row.openingBalance, row.sale, row.collection, row.closingBalance].map((value, valueIndex) => (
                           <td key={valueIndex} className={`px-3 py-3 text-right text-xs font-bold whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : valueIndex === 2 ? "text-blue-600" : valueIndex === 1 ? "text-emerald-600" : "text-slate-800"}`}>
                             {formatAmount(value)}
@@ -2880,8 +2992,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     <tr className="border-t-2 border-slate-300 bg-slate-100/90 font-bold">
                       <td className="px-3 py-3" />
                       <td className="px-3 py-3 text-xs text-slate-800">{t("shop_ledger.total_row")}</td>
-                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.birds.toLocaleString()}</td>
-                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.weight.toFixed(2)}</td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">
+                        <div>{formatLedgerNumber(cumulativeTotals.birds)}</div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Farm Birds {formatLedgerNumber(cumulativeTotals.birds + cumulativeTotals.mortalityBirds)}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.mortalityBirds.toLocaleString()}</td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">
+                        <div>{cumulativeTotals.weight.toFixed(2)}</div>
+                        <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Farm Weight {formatLedgerNumber(cumulativeTotals.weight + cumulativeTotals.mortalityWeight + cumulativeTotals.weightLoss)}</div>
+                      </td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.mortalityWeight.toFixed(2)}</td>
+                      <td className="px-3 py-3 text-right text-xs tabular-nums text-amber-700">{cumulativeTotals.weightLoss.toFixed(2)}</td>
                       {[cumulativeTotals.openingBalance, cumulativeTotals.sale, cumulativeTotals.collection, cumulativeTotals.closingBalance].map((value, valueIndex) => (
                         <td key={valueIndex} className={`px-3 py-3 text-right text-xs whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : "text-slate-800"}`}>{formatAmount(value)}</td>
                       ))}

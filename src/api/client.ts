@@ -6,7 +6,7 @@ import axios, {
 import { logger } from "../logger/logger";
 import { API_CONFIG } from "./config";
 import { toApiError } from "./errors";
-import { getStoredToken } from "../modules/auth/tokenStore";
+import { getStoredToken, storeToken } from "../modules/auth/tokenStore";
 import { isSigningOut } from "../modules/auth/signOutGate";
 
 declare module "axios" {
@@ -53,6 +53,10 @@ apiClient.interceptors.request.use(
 /** Response interceptor — normalize success logging and error shape */
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    const recoveredToken = response.headers["x-dmr-session-token"];
+    if (typeof recoveredToken === "string" && recoveredToken) {
+      storeToken(recoveredToken);
+    }
     const started = response.config.metadata?.startTime;
     const ms = started ? Date.now() - started : undefined;
 

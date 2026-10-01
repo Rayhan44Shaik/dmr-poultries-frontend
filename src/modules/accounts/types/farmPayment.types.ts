@@ -31,6 +31,15 @@ export interface TripFarmPayment {
   referenceNo?: string | null;
   vehicleNo?: string;
   supervisorName?: string;
+  loads?: FarmPaymentLoad[];
+}
+
+export interface FarmPaymentLoad {
+  load: number;
+  farmName?: string | null;
+  birdType?: string | null;
+  totalBirds: number;
+  dcWeight: number;
 }
 
 /** Money totals over a set of trip farm payments. */
@@ -48,6 +57,8 @@ export interface FarmPaymentTotals {
 export interface FarmPayment {
   id?: string;
   tripId: string;
+  farmName?: string;
+  birdType?: string;
   ratePerBird?: number;
   ratePerKg?: number;
   totalBirds?: number;
@@ -61,4 +72,5 @@ export interface FarmPayment {
   notes?: string;
   createdAt?: string;
   updatedAt?: string;
+  loads?: FarmPaymentLoad[];
 }

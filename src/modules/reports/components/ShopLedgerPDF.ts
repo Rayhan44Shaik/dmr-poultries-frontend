@@ -13,6 +13,11 @@ export interface LedgerTransaction {
   particulars: string;
   birds: number;
   weight: number;
+  farmBirds?: number;
+  farmWeight?: number;
+  mortalityBirds?: number;
+  mortalityWeight?: number;
+  weightLoss?: number;
   rate: number;
   debit: number;
   credit: number;
@@ -20,6 +25,7 @@ export interface LedgerTransaction {
   type: "sale" | "collection" | "correction";
   paymentMode?: string;
   collectionNo?: string;
+  loadLabel?: string;
   subShopName?: string;
   remarks?: string;
 }
@@ -44,6 +50,11 @@ export interface ShopLedgerCumulativeRow {
   shop: string;
   birds: number;
   weight: number;
+  farmBirds: number;
+  farmWeight: number;
+  mortalityBirds: number;
+  mortalityWeight: number;
+  weightLoss: number;
   openingBalance: number;
   sale: number;
   collection: number;
@@ -67,6 +78,11 @@ export const buildShopLedgerCumulativeRows = (
         shop,
         birds: saleRows.reduce((sum, row) => sum + row.birds, 0),
         weight: saleRows.reduce((sum, row) => sum + row.weight, 0),
+        farmBirds: saleRows.reduce((sum, row) => sum + Number(row.farmBirds ?? row.birds), 0),
+        farmWeight: saleRows.reduce((sum, row) => sum + Number(row.farmWeight ?? row.weight), 0),
+        mortalityBirds: saleRows.reduce((sum, row) => sum + Number(row.mortalityBirds ?? 0), 0),
+        mortalityWeight: saleRows.reduce((sum, row) => sum + Number(row.mortalityWeight ?? 0), 0),
+        weightLoss: saleRows.reduce((sum, row) => sum + Number(row.weightLoss ?? 0), 0),
         openingBalance,
         sale,
         collection,
@@ -250,7 +266,7 @@ export const generateShopLedgerPDF = async (
   selectedShop: string,
   preparedAssets?: DmrPoultryHeaderAssets,
   onProgress?: (done: number, total: number) => void,
-  options?: { includeCumulativeSummary?: boolean },
+  options?: { includeCumulativeSummary?: boolean; cumulativeRows?: ShopLedgerCumulativeRow[] },
 ): Promise<GeneratedShopLedgerPdf> => {
   // Prepare the letterhead hen once per call (canvas cut-out); callers that
   // generate many PDFs in a batch pass their own prepared assets.
@@ -258,7 +274,7 @@ export const generateShopLedgerPDF = async (
     preparedAssets ?? (await prepareShopLedgerPdfAssets());
 
   // Setup A4 Portrait
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  const doc = new jsPDF({ orientation: options?.includeCumulativeSummary ? "landscape" : "portrait", unit: "mm", format: "a4", compress: true });
 
   doc.setProperties({
     title: "Weekly Statement",
@@ -270,23 +286,29 @@ export const generateShopLedgerPDF = async (
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
   if (options?.includeCumulativeSummary && allLedgers.length > 0) {
-    const cumulative = buildShopLedgerCumulativeRows(allLedgers);
+    const cumulative = options.cumulativeRows ?? buildShopLedgerCumulativeRows(allLedgers);
     const totals = cumulative.reduce(
       (sum, row) => ({
         birds: sum.birds + row.birds,
         weight: sum.weight + row.weight,
+        mortalityBirds: sum.mortalityBirds + row.mortalityBirds,
+        mortalityWeight: sum.mortalityWeight + row.mortalityWeight,
+        weightLoss: sum.weightLoss + row.weightLoss,
         openingBalance: sum.openingBalance + row.openingBalance,
         sale: sum.sale + row.sale,
         collection: sum.collection + row.collection,
         closingBalance: sum.closingBalance + row.closingBalance,
       }),
-      { birds: 0, weight: 0, openingBalance: 0, sale: 0, collection: 0, closingBalance: 0 },
+      { birds: 0, weight: 0, mortalityBirds: 0, mortalityWeight: 0, weightLoss: 0, openingBalance: 0, sale: 0, collection: 0, closingBalance: 0 },
     );
     const summaryRows: (string | number)[][] = cumulative.map((row, index) => [
       index + 1,
       row.shop,
       String(row.birds),
+      String(row.mortalityBirds),
       row.weight.toFixed(2),
+      row.mortalityWeight.toFixed(2),
+      row.weightLoss.toFixed(2),
       formatAmount(row.openingBalance),
       formatAmount(row.sale),
       formatAmount(row.collection),
@@ -296,11 +318,27 @@ export const generateShopLedgerPDF = async (
       "",
       "TOTAL",
       String(totals.birds),
+      String(totals.mortalityBirds),
       totals.weight.toFixed(2),
+      totals.mortalityWeight.toFixed(2),
+      totals.weightLoss.toFixed(2),
       formatAmount(totals.openingBalance),
       formatAmount(totals.sale),
       formatAmount(totals.collection),
       formatAmount(totals.closingBalance),
+    ]);
+    summaryRows.push([
+      "",
+      "FARM TOTALS",
+      String(totals.birds + totals.mortalityBirds),
+      "",
+      (totals.weight + totals.mortalityWeight + totals.weightLoss).toFixed(2),
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
     ]);
 
     const drawSummaryChrome = (): void => {
@@ -317,7 +355,7 @@ export const generateShopLedgerPDF = async (
     };
 
     autoTable(doc, {
-      head: [["S.No", "Shop Name", "Birds", "Weight", "Opening", "Sale", "Collection", "Closing"]],
+      head: [["S.No", "Shop Name", "Del. Birds", "Mortality", "Del. Weight", "Mort. Weight", "Wt Loss", "Opening", "Sale", "Collection", "Closing"]],
       body: summaryRows,
       startY: 58,
       margin: { top: 58, bottom: 16, left: PAGE_MARGIN, right: PAGE_MARGIN },
@@ -327,27 +365,30 @@ export const generateShopLedgerPDF = async (
       bodyStyles: { fontSize: 7, textColor: [20, 20, 20], cellPadding: 1.8, lineColor: BORDER_LIGHT, lineWidth: 0.2 },
       columnStyles: {
         0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 38, halign: "left" },
-        2: { cellWidth: 23, halign: "right" },
-        3: { cellWidth: 23, halign: "right" },
+        1: { cellWidth: 43, halign: "left" },
+        2: { cellWidth: 20, halign: "right" },
+        3: { cellWidth: 18, halign: "right" },
         4: { cellWidth: 23, halign: "right" },
-        5: { cellWidth: 23, halign: "right" },
-        6: { cellWidth: 23, halign: "right" },
-        7: { cellWidth: 23, halign: "right" },
+        5: { cellWidth: 21, halign: "right" },
+        6: { cellWidth: 20, halign: "right" },
+        7: { cellWidth: 25, halign: "right" },
+        8: { cellWidth: 25, halign: "right" },
+        9: { cellWidth: 25, halign: "right" },
+        10: { cellWidth: 25, halign: "right" },
       },
       didParseCell: (cell) => {
-        if (cell.row.index === summaryRows.length - 1) {
+        if (cell.row.index >= summaryRows.length - 2) {
           cell.cell.styles.fillColor = [238, 242, 247];
           cell.cell.styles.fontStyle = "bold";
         }
         const raw = String(cell.cell.raw ?? "");
-        if (cell.column.index >= 4 && raw.startsWith("-")) cell.cell.styles.textColor = [190, 24, 93];
+        if (cell.column.index >= 7 && raw.startsWith("-")) cell.cell.styles.textColor = [190, 24, 93];
       },
       didDrawPage: drawSummaryChrome,
     });
     // The cumulative report owns page one. Detailed shop statements begin on
     // a clean second page, avoiding overlap regardless of the number of shops.
-    doc.addPage();
+    doc.addPage("a4", "portrait");
   }
 
   const renderShopSection = (entry: ShopLedgerPdfEntry): void => {
