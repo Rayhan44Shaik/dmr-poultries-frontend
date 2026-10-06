@@ -164,6 +164,15 @@ export async function mobileLogout(): Promise<void> {
   await client.post("/auth/logout");
 }
 
+export async function mobileMfaVerify(ticket: string, code: string) {
+  const { data } = await client.post<{
+    token: string;
+    expiresAt: string;
+    supervisor: MobileSupervisorProfile;
+  }>("/auth/mfa/verify", { ticket, code });
+  return data;
+}
+
 export async function mobileMe() {
   const { data } = await client.get<{
     supervisor: MobileSupervisorProfile;

@@ -30,14 +30,34 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
+const MUTATING = new Set(["post", "put", "patch", "delete"]);
+
+function newIdempotencyKey(): string {
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+}
+
 /** Request interceptor — attach auth/metadata later without touching callers */
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     config.metadata = { startTime: Date.now() };
 
-    // Bearer token issued by POST /auth/login (see modules/auth/authApi.ts).
+    // Bearer [REDACTED] issued by POST /auth/login (see modules/auth/authApi.ts).
     const token = getStoredToken();
     if (token) config.headers.Authorization = `Bearer ${token}`;
+
+    // Duplicate-transaction protection: every mutation carries a unique
+    // Idempotency-Key so a browser retry, double-click, or timeout replay
+    // can never create a second business record for one user action.
+    // Callers performing a deliberate retry of the SAME logical action reuse
+    // the key by setting the header themselves.
+    const method = String(config.method ?? "get").toLowerCase();
+    if (MUTATING.has(method) && !config.headers["Idempotency-Key"]) {
+      config.headers["Idempotency-Key"] = newIdempotencyKey();
+    }
 
     if (import.meta.env?.DEV) {
       logger.debug(
@@ -78,7 +98,8 @@ apiClient.interceptors.response.use(
       !isSigningOut() &&
       !url.includes("/auth/login") &&
       !url.includes("/auth/logout") &&
-      !url.includes("/auth/change-password")
+      !url.includes("/auth/change-password") &&
+      !url.includes("/auth/activity")
     ) {
       window.dispatchEvent(new Event("dmr:auth-expired"));
     }

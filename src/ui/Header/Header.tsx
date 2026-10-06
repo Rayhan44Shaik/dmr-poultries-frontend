@@ -26,6 +26,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  ShieldCheck,
   Sun,
   Truck,
   UserRound,
@@ -35,6 +36,7 @@ import { NAV_CHILD_GROUPS, quickActionsForRole, resolveRoute } from "../../route
 import { useAuth } from "../../providers/authContext";
 import { canAccessNavPath, hasCapability, CAPABILITIES } from "../../modules/auth/permissions";
 import ChangePasswordDialog from "../../modules/auth/ChangePasswordDialog";
+import MfaSettingsDialog from "../../modules/auth/MfaSettingsDialog";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
@@ -162,6 +164,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const { user, logout } = useAuth();
   const roleLabel = (role: string) => translateRole(t, role);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
@@ -688,6 +691,16 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               type="button"
               onClick={() => {
                 close();
+                setMfaOpen(true);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+            >
+              <ShieldCheck size={15} /> Two-factor authentication
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                close();
                 handleSignOut();
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
@@ -699,6 +712,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       </Dropdown>
       </div>
       <ChangePasswordDialog open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
+      <MfaSettingsDialog open={mfaOpen} onClose={() => setMfaOpen(false)} />
     </header>
   );
 }

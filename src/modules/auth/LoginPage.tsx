@@ -4,6 +4,8 @@
 // A single sign-in: enter username + password and the signed-in role
 // (Owner / Supervisor) decides which pages open. Client-side validation runs
 // before the network call; API errors are mapped to clear, safe messages.
+// Accounts with two-factor authentication enabled pause after the password
+// step for a 6-digit TOTP code — no session exists until the code verifies.
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,14 +13,19 @@ import { ArrowRight, AlertCircle, Building2, Eye, EyeOff, Info, Lock, ShieldChec
 import BrandMark from "../../ui/BrandMark";
 import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
-import { currentUserRequest, loginRequest } from "./authApi";
+import { currentUserRequest, loginRequest, mfaVerifyRequest } from "./authApi";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
 import { loginErrorMessage, validateLoginForm } from "./loginValidation";
 import { notify } from "../../ui/notifications/notificationStore";
+import ForgotPasswordPage from "./ForgotPasswordPage";
+import ResetPasswordPage from "./ResetPasswordPage";
 
 const REMEMBER_KEY = "dmr-remember-username";
+// Module-level submit lock: survives React remounts/StrictMode double-effects
+// so one user action issues one logical login (authApi dedupe covers the rest).
+let loginSubmitInFlight = false;
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
@@ -33,6 +40,19 @@ function readRememberedUsername(): string {
   }
 }
 
+function mfaErrorMessage(cause: unknown): string {
+  const status = (cause as { status?: number } | null)?.status;
+  const message = cause instanceof Error ? cause.message : "";
+  if (status === 429) return "Too many attempts. Please wait a few minutes and try again.";
+  if (/expired|ticket/i.test(message)) {
+    return "This sign-in expired. Please sign in again from the start.";
+  }
+  if (status === 401 || /invalid|incorrect|wrong|code/i.test(message)) {
+    return "That 6-digit code didn't work. Check your authenticator app and try again.";
+  }
+  return loginErrorMessage(cause, "Verification failed. Please try again.");
+}
+
 export default function LoginPage() {
   const { t } = useI18n();
   const { adoptSession } = useAuth();
@@ -45,6 +65,29 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(Boolean(remembered));
   const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const [error, setError] = useState("");
+  // Second-factor state: set when the password step returns an MFA challenge.
+  // No session exists while this is set — the ticket alone grants nothing.
+  const [mfaTicket, setMfaTicket] = useState<string | null>(null);
+  const [mfaUsername, setMfaUsername] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaBusy, setMfaBusy] = useState(false);
+  // Sub-views of the sign-in screen: "forgot" requests a reset, "reset"
+  // consumes ?resetToken= from a reset link. No router change needed —
+  // unauthenticated users always land on this page through AuthGate.
+  const [view, setView] = useState<"login" | "forgot" | "reset">(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("resetToken") ? "reset" : "login";
+    } catch {
+      return "login";
+    }
+  });
+  const [initialResetToken] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("resetToken") ?? "";
+    } catch {
+      return "";
+    }
+  });
   // Why are we on the sign-in screen? Read once at mount: "idle" means the
   // 10-minute inactivity logout brought us here, "expired" a dead session.
   const [noticeReason] = useState<"none" | "idle" | "expired" | "password">(() => {
@@ -76,37 +119,93 @@ export default function LoginPage() {
     }
   }, [noticeReason]);
 
+  // Shared tail of both sign-in paths: verify the freshly issued session
+  // through the same proxy before mounting the dashboard, then land by role.
+  // This closes the gap where a bad/stale token could launch every
+  // dashboard query at once and turn one auth failure into many 401s.
+  const finishSignIn = async (previousSessionsEnded: boolean) => {
+    const verifiedUser = await currentUserRequest();
+    const previous = getLastUsername();
+    if (previous !== verifiedUser.username) sweepWorkspaceCaches();
+    setLastUsername(verifiedUser.username);
+    try {
+      if (rememberMe) localStorage.setItem(REMEMBER_KEY, verifiedUser.username);
+      else localStorage.removeItem(REMEMBER_KEY);
+    } catch {
+      // remember-me is best-effort
+    }
+    adoptSession(verifiedUser);
+    if (previousSessionsEnded) {
+      notify.info(t("auth.login.sessions_replaced"));
+    }
+    navigate(landingPathForRole(verifiedUser.role), { replace: true });
+  };
+
   const authenticate = async (user: string, pass: string) => {
+    if (loginSubmitInFlight) return;
+    loginSubmitInFlight = true;
     setBusy(true);
     setError("");
     setFieldErrors({});
     try {
       const signedIn = await loginRequest(user, pass);
-      // Do not mount the dashboard until the exact token just issued by the
-      // backend has passed an authenticated request through the same proxy.
-      // This closes the gap where a bad/stale token could launch every
-      // dashboard query at once and turn one auth failure into many 401s.
-      const verifiedUser = await currentUserRequest();
-      const previous = getLastUsername();
-      if (previous !== verifiedUser.username) sweepWorkspaceCaches();
-      setLastUsername(verifiedUser.username);
-      try {
-        if (rememberMe) localStorage.setItem(REMEMBER_KEY, verifiedUser.username);
-        else localStorage.removeItem(REMEMBER_KEY);
-      } catch {
-        // remember-me is best-effort
+      if (signedIn.mfaRequired) {
+        // Password accepted, second factor pending. Hold here for the code —
+        // finishSignIn runs only after the ticket verifies.
+        setMfaUsername(user);
+        setMfaTicket(signedIn.mfaTicket);
+        setMfaCode("");
+        setPassword("");
+        setBusy(false);
+        loginSubmitInFlight = false;
+        return;
       }
-      adoptSession(verifiedUser);
-      if (signedIn.previousSessionsEnded) {
-        notify.info(t("auth.login.sessions_replaced"));
-      }
-      navigate(landingPathForRole(verifiedUser.role), { replace: true });
+      await finishSignIn(signedIn.previousSessionsEnded);
+      loginSubmitInFlight = false;
     } catch (cause) {
       setError(loginErrorMessage(cause, t("auth.login.failed")));
+      loginSubmitInFlight = false;
       setBusy(false);
       setPassword("");
     }
   };
+
+  const verifyMfa = async (e: FormEvent) => {
+    e.preventDefault();
+    if (mfaBusy || !mfaTicket || mfaCode.trim().length !== 6) return;
+    setMfaBusy(true);
+    setError("");
+    try {
+      const verified = await mfaVerifyRequest(mfaTicket, mfaCode.trim());
+      await finishSignIn(verified.previousSessionsEnded);
+    } catch (cause) {
+      const message = mfaErrorMessage(cause);
+      if (/sign in again from the start/i.test(message)) {
+        // The ticket died — back to the password step, not a dead-end.
+        setMfaTicket(null);
+        setMfaCode("");
+      } else {
+        setMfaCode("");
+      }
+      setError(message);
+      setMfaBusy(false);
+    }
+  };
+
+  const backToPassword = () => {
+    setMfaTicket(null);
+    setMfaCode("");
+    setMfaUsername("");
+    setError("");
+  };
+
+  if (view !== "login") {
+    return view === "forgot" ? (
+      <ForgotPasswordPage onBack={() => setView("login")} />
+    ) : (
+      <ResetPasswordPage initialToken={initialResetToken} onDone={() => setView("login")} />
+    );
+  }
 
   const handleSignIn = (e: FormEvent) => {
     e.preventDefault();
@@ -183,6 +282,79 @@ export default function LoginPage() {
               </div>
             )}
 
+            {mfaTicket ? (
+              <form onSubmit={verifyMfa} className="mt-6 space-y-4" noValidate>
+                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-emerald-800">
+                  <ShieldCheck size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                  Password accepted{mfaUsername ? ` for ${mfaUsername}` : ""}. Enter the
+                  6-digit code from your authenticator app to finish signing in.
+                </div>
+                <div>
+                  <label htmlFor="login-mfa-code" className="mb-1 block text-xs font-semibold text-slate-600">
+                    Two-factor code
+                  </label>
+                  <input
+                    id="login-mfa-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={mfaCode}
+                    onChange={(e) => {
+                      setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                      if (error) setError("");
+                    }}
+                    maxLength={6}
+                    className="w-full rounded-lg border border-slate-200 bg-white py-2.5 text-center text-lg font-bold tracking-[0.35em] text-slate-800 shadow-sm outline-none transition placeholder:text-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
+                    placeholder="••••••"
+                    aria-invalid={Boolean(error)}
+                  />
+                </div>
+
+                {error && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-rose-700"
+                  >
+                    <AlertCircle size={14} className="mt-0.5 shrink-0 text-rose-500" aria-hidden="true" />
+                    <span className="flex-1">{error}</span>
+                    <button
+                      type="button"
+                      onClick={() => setError("")}
+                      aria-label={t("common.close")}
+                      className="shrink-0 rounded p-0.5 text-rose-400 transition-colors hover:bg-rose-100 hover:text-rose-700"
+                    >
+                      <X size={14} aria-hidden="true" />
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={mfaBusy || mfaCode.trim().length !== 6}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {mfaBusy ? (
+                    <>
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                      </svg>
+                      Verifying…
+                    </>
+                  ) : (
+                    <>
+                      Verify and sign in
+                      <ArrowRight size={15} />
+                    </>
+                  )}
+                </button>
+                <div className="text-center text-xs">
+                  <button type="button" onClick={backToPassword} className="font-medium text-brand-600 transition-colors hover:text-brand-700">
+                    Back to username and password
+                  </button>
+                </div>
+              </form>
+            ) : (
             <form onSubmit={handleSignIn} className="mt-6 space-y-4" noValidate>
               <div>
                 <label htmlFor="login-username" className="mb-1 block text-xs font-semibold text-slate-600">
@@ -280,9 +452,9 @@ export default function LoginPage() {
                   />
                   {t("auth.login.remember")}
                 </label>
-                <span className="font-medium text-slate-400" title={t("auth.login.forgot_hint")}>
+                <button type="button" onClick={() => setView("forgot")} className="font-medium text-brand-600 transition-colors hover:text-brand-700">
                   {t("auth.login.forgot")}
-                </span>
+                </button>
               </div>
 
               <button
@@ -306,6 +478,7 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
+            )}
           </div>
 
           <p className="mt-5 text-center text-xs text-slate-400">

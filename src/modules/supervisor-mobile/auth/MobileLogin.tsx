@@ -5,12 +5,14 @@ import { useMobileAuth } from "./mobileAuthContext";
 import { asMobileApiError } from "../services/mobileApiClient";
 
 export default function MobileLogin() {
-  const { login } = useMobileAuth();
+  const { login, completeMfaLogin } = useMobileAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mfaTicket, setMfaTicket] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -18,9 +20,23 @@ export default function MobileLogin() {
     setBusy(true);
     setError(null);
     try {
-      await login(username, password);
+      if (mfaTicket) {
+        await completeMfaLogin(mfaTicket, mfaCode.trim());
+      } else {
+        await login(username, password);
+      }
     } catch (caught) {
-      setError(asMobileApiError(caught).message);
+      const apiError = asMobileApiError(caught);
+      if (!mfaTicket && apiError.code === "MFA_REQUIRED") {
+        const ticket = (apiError.details as { ticket?: string } | undefined)?.ticket;
+        if (typeof ticket === "string" && ticket.length > 0) {
+          setMfaTicket(ticket);
+          setMfaCode("");
+          setBusy(false);
+          return;
+        }
+      }
+      setError(apiError.message);
     } finally {
       setBusy(false);
     }
@@ -46,50 +62,76 @@ export default function MobileLogin() {
         </div>
 
         <form onSubmit={submit} className="space-y-4 p-6">
-          <div>
-            <label htmlFor="mobile-username" className="mb-1.5 block text-xs font-bold text-slate-600">
-              Supervisor username
-            </label>
-            <div className="relative">
-              <UserRound size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                id="mobile-username"
-                autoComplete="username"
-                autoCapitalize="none"
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                className={inputClass}
-                placeholder="Enter username"
-                required
-              />
+          {mfaTicket ? (
+            <div>
+              <label htmlFor="mobile-mfa-code" className="mb-1.5 block text-xs font-bold text-slate-600">
+                Two-factor code
+              </label>
+              <div className="relative">
+                <ShieldCheck size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="mobile-mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className={inputClass}
+                  placeholder="Enter 6-digit code"
+                  required
+                />
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                Your account requires two-factor verification. Enter the 6-digit code from your authenticator app.
+              </p>
             </div>
-          </div>
-          <div>
-            <label htmlFor="mobile-password" className="mb-1.5 block text-xs font-bold text-slate-600">
-              Password
-            </label>
-            <div className="relative">
-              <LockKeyhole size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                id="mobile-password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className={inputClass}
-                placeholder="Enter password"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((shown) => !shown)}
-                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-              </button>
-            </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <label htmlFor="mobile-username" className="mb-1.5 block text-xs font-bold text-slate-600">
+                  Supervisor username
+                </label>
+                <div className="relative">
+                  <UserRound size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="mobile-username"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    value={username}
+                    onChange={(event) => setUsername(event.target.value)}
+                    className={inputClass}
+                    placeholder="Enter username"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="mobile-password" className="mb-1.5 block text-xs font-bold text-slate-600">
+                  Password
+                </label>
+                <div className="relative">
+                  <LockKeyhole size={17} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="mobile-password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className={inputClass}
+                    placeholder="Enter password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((shown) => !shown)}
+                    className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           {error && (
             <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-semibold leading-relaxed text-rose-700">
@@ -99,11 +141,11 @@ export default function MobileLogin() {
 
           <button
             type="submit"
-            disabled={busy || !username.trim() || !password}
+            disabled={busy || (mfaTicket ? mfaCode.trim().length !== 6 : !username.trim() || !password)}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 text-sm font-extrabold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? <LoaderCircle size={17} className="animate-spin" /> : <ShieldCheck size={17} />}
-            {busy ? "Authenticating…" : "Secure sign in"}
+            {busy ? "Authenticating…" : mfaTicket ? "Verify code" : "Secure sign in"}
           </button>
           <p className="text-center text-[11px] leading-relaxed text-slate-400">
             Credentials are verified by the office backend and are never stored as plaintext on this device.

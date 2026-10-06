@@ -41,11 +41,13 @@
     "test:e2e:emi": "playwright test --config tests/emi/playwright.config.ts",
     "test:i18n": "tsx --test tests/i18n/context.test.ts",
     "test:auth": "tsx --test tests/auth/permissions.test.ts",
+    "test:session": "tsx --test src/api/errorTaxonomy.test.ts src/modules/auth/idleActivity.test.ts src/modules/auth/resetValidation.test.ts src/modules/auth/singleFlight.test.ts src/modules/auth/mfaLogin.test.ts",
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:sample-quarter": "tsx --test src/sample/quarterSample.test.ts",
     "test:collection-balances": "node --test scripts/verify-collection-balances.mjs",
     "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts src/modules/accounts/utils/paymentRegister.test.ts src/modules/accounts/utils/tripNavigation.test.ts src/modules/accounts/utils/analysisWeeks.test.ts src/modules/accounts/utils/approvedExpenses.test.ts src/modules/accounts/services/farmPaymentApiService.test.ts src/modules/accounts/services/analysisService.test.ts src/modules/accounts/utils/farmPaymentSync.test.ts src/modules/dashboard/services/paymentRegisterSummary.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:session": "playwright test --config tests/session-e2e/playwright.config.ts",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
     "verify:quarter-data": "node scripts/verify-quarter-sample-data.mjs",
     "verify:account-analysis": "node scripts/verify-account-analysis-sync.mjs",
@@ -69,7 +71,6 @@
     "@types/react-date-range": "^1.4.10",
     "axios": "^1.19.0",
     "date-fns": "^4.4.0",
-    "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
@@ -86,7 +87,7 @@
     "recharts": "^3.9.2",
     "tailwindcss": "^4.3.1",
     "uuid": "^14.0.1",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -98,11 +99,12 @@
     "@types/uuid": "^10.0.0",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.5.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "exceljs": "^4.4.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.6.0",
     "playwright": "^1.62.1",
@@ -112,5 +114,11 @@
     "vite": "^8.1.0",
     "wait-on": "^7.2.0"
   },
-  "main": "electron/main.cjs"
+  "main": "electron/main.cjs",
+  "overrides": {
+    "@electron/get": "5.1.0",
+    "exceljs": {
+      "uuid": "11.1.1"
+    }
+  }
 }

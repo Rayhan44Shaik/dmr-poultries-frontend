@@ -59,7 +59,8 @@ test('one reveal per route and shape — a re-render cannot yank the list back',
 });
 
 test('the list is a bounded scroll box in the rail, the panel and the popup', () => {
-  const source = fs.readFileSync(path.join(here, 'Sidebar.tsx'), 'utf8');
+  // Normalise CRLF so the slice end-marker `"\n        }` matches on any OS.
+  const source = fs.readFileSync(path.join(here, 'Sidebar.tsx'), 'utf8').replace(/\r\n/g, '\n');
   const navTag = source.slice(source.indexOf('<nav'), source.indexOf('>', source.indexOf('<nav')) + 1);
   assert.match(navTag, /data-nav-scope/, 'one implementation, two shapes, addressable for the reveal');
   assert.match(navTag, /onClick=\{markUserNavigation\}/, 'a click on a row must suppress the reveal');

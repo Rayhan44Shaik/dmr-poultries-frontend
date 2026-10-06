@@ -6,6 +6,7 @@ export type MobileAuthContextValue = {
   supervisor: MobileSupervisorProfile | null;
   expiresAt: string | null;
   login: (username: string, password: string) => Promise<void>;
+  completeMfaLogin: (ticket: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 

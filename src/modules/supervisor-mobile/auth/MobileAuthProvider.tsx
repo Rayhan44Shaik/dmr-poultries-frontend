@@ -8,9 +8,11 @@ import {
 import { MobileAuthContext } from "./mobileAuthContext";
 import {
   asMobileApiError,
+  MobileApiError,
   mobileLogin,
   mobileLogout,
   mobileMe,
+  mobileMfaVerify,
   setMobileAccessToken,
 } from "../services/mobileApiClient";
 
@@ -63,13 +65,46 @@ export default function MobileAuthProvider({ children }: { children: ReactNode }
     };
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const session = await mobileLogin(username, password);
-    await saveMobileSession(session);
-    setMobileAccessToken(session.token);
-    setSupervisor(session.supervisor);
-    setExpiresAt(session.expiresAt);
-  }, []);
+  const adoptMobileSession = useCallback(
+    async (session: { token: string; expiresAt: string; supervisor: MobileSupervisorProfile }) => {
+      await saveMobileSession(session);
+      setMobileAccessToken(session.token);
+      setSupervisor(session.supervisor);
+      setExpiresAt(session.expiresAt);
+    },
+    []
+  );
+
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const session = await mobileLogin(username, password);
+      if ((session as unknown as { mfaRequired?: boolean }).mfaRequired) {
+        throw new MobileApiError(
+          "Two-factor verification is required for this account.",
+          "MFA_REQUIRED",
+          401,
+          false,
+          { ticket: (session as unknown as { mfaTicket?: string }).mfaTicket }
+        );
+      }
+      await adoptMobileSession(
+        session as unknown as {
+          token: string;
+          expiresAt: string;
+          supervisor: MobileSupervisorProfile;
+        }
+      );
+    },
+    [adoptMobileSession]
+  );
+
+  const completeMfaLogin = useCallback(
+    async (ticket: string, code: string) => {
+      const session = await mobileMfaVerify(ticket, code);
+      await adoptMobileSession(session);
+    },
+    [adoptMobileSession]
+  );
 
   const logout = useCallback(async () => {
     try {
@@ -86,8 +121,8 @@ export default function MobileAuthProvider({ children }: { children: ReactNode }
   }, []);
 
   const value = useMemo(
-    () => ({ loading, supervisor, expiresAt, login, logout }),
-    [expiresAt, loading, login, logout, supervisor]
+    () => ({ loading, supervisor, expiresAt, login, completeMfaLogin, logout }),
+    [expiresAt, loading, login, completeMfaLogin, logout, supervisor]
   );
 
   return <MobileAuthContext.Provider value={value}>{children}</MobileAuthContext.Provider>;

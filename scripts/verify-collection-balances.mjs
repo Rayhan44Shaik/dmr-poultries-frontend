@@ -40,11 +40,18 @@ const money = (actual, expected, message) => assert.equal(round(actual), round(e
 
 let child;
 let logs = "";
+let authToken = "";
 
 async function req(path, options = {}) {
   const response = await fetch(`${api}${path}`, {
     ...options,
-    headers: { "content-type": "application/json", ...(options.headers ?? {}) },
+    headers: {
+      "content-type": "application/json",
+      // The sample API requires a session on every non-auth route — sign in
+      // once in the boot hook and ride the owner token for every case.
+      ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
+      ...(options.headers ?? {}),
+    },
     body: options.body == null ? undefined : JSON.stringify(options.body),
   });
   const text = await response.text();
@@ -84,7 +91,10 @@ let WEEK_END;
 before(async () => {
   child = spawn(process.execPath, ["scripts/quarter-sample-data.mjs"], {
     cwd: process.cwd(),
-    env: { ...process.env, MOCK_BACKEND_PORT: String(port) },
+    // PORT is pinned too: an ambient PORT in the developer shell must not
+    // override the harness's MOCK_BACKEND_PORT (the sample binds whatever
+    // PORT it sees first).
+    env: { ...process.env, PORT: String(port), MOCK_BACKEND_PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   const capture = (chunk) => {
@@ -105,6 +115,18 @@ before(async () => {
     if (Date.now() > deadline) throw new Error(`Sample API did not start.\n${logs}`);
     await wait(100);
   }
+
+  // The sample API requires a session on every non-auth route (owner role
+  // carries the "*" permission), so sign in once before the first probe.
+  const login = await fetch(`${api}/auth/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "owner", password: "dmr@owner1414" }),
+  });
+  const loginText = await login.text();
+  assert.ok(login.ok, `sample login failed: ${login.status} ${loginText}`);
+  authToken = String(JSON.parse(loginText).token ?? "");
+  assert.ok(authToken, "sample login returned no token");
 
   const manifest = await get("/quarter-summary");
   TODAY = manifest.quarter.today;
