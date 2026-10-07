@@ -407,12 +407,17 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
   // Every level falls back through its i18n key first: a section-level match
   // (no page) must still read its translated label, never the raw English one.
-  const title = route.page?.labelKey
-    ? t(route.page.labelKey)
-    : (route.page?.label ??
-      (route.section?.labelKey ? t(route.section.labelKey) : route.section?.label) ??
-      "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
+  // Settings is a single page whose tabs (Profile / Access) live inside the
+  // page itself, so its header reads one plain "Settings" title — no child
+  // crumb, no per-tab nav label ("System Settings"). Scoped to this section
+  // alone: every other route keeps its breadcrumb untouched.
+  const isSettingsSection = route.section?.id === "settings";
+  const title = isSettingsSection
+    ? sectionLabel ?? ""
+    : route.page?.labelKey
+      ? t(route.page.labelKey)
+      : (route.page?.label ?? sectionLabel ?? "");
 
   // The collapsible group the current row sits in, if any ("orders" → "Orders").
   const group = route.page?.group ? NAV_CHILD_GROUPS[route.page.group] : undefined;
@@ -448,7 +453,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
       {/* Neat Single-Line Breadcrumb & Page Title */}
       <div className="min-w-0 flex-1 flex items-center">
-        {sectionLabel && route.page && (
+        {sectionLabel && route.page && !isSettingsSection && (
           <>
             <Link
               to={route.section?.children[0]?.path ?? "/dashboard"}

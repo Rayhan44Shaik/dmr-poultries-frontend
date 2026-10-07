@@ -543,14 +543,15 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.settings",
     icon: Settings,
     children: [
-      // Hidden from frontend navigation — underlying modules/routes remain intact.
+      // The settings page only has Profile / Access tabs — its nav row opens
+      // Profile, so the URL never points at the retired `appearance` tab.
       {
-        label: "System Settings",
-        labelKey: "nav.systemSettings",
-        path: "/settings?tab=appearance",
+        label: "Profile",
+        labelKey: "settings.profile",
+        path: "/settings?tab=profile",
         icon: Settings,
         tone: "slate",
-        keywords: "settings appearance theme language",
+        keywords: "settings profile account preferences password language",
       },
       // { label: "Users & Roles", path: "/settings?tab=users", icon: UserCog, keywords: "users roles management" },
       // { label: "Permissions", path: "/settings?tab=permissions", icon: KeyRound, keywords: "permissions roles access" },

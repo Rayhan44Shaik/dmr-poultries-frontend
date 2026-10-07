@@ -765,6 +765,18 @@ export default {
   'settings.password_changed': 'పాస్‌వర్డ్ విజయవంతంగా మార్చబడింది.',
   'settings.password_mismatch': 'కొత్త పాస్‌వర్డ్‌లు సరిపోలడం లేదు.',
   'settings.password_incorrect': 'ప్రస్తుత పాస్‌వర్డ్ తప్పుగా ఉంది.',
+  'settings.personal_information': 'వ్యక్తిగత సమాచారం',
+  'settings.security': 'భద్రత',
+  'settings.preferences': 'ప్రాధాన్యతలు',
+  'settings.last_changed': 'చివరిసారిగా మార్చబడింది',
+  'settings.not_changed': 'ఇంకా మార్చబడలేదు',
+  'settings.full_name': 'పూర్తి పేరు',
+  'settings.employee_number': 'ఉద్యోగి నంబర్',
+  'settings.mobile_number': 'మొబైల్ నంబర్',
+  'settings.role': 'హోదా',
+  'settings.username': 'వినియోగదారు పేరు',
+  'settings.department': 'విభాగం',
+  'settings.profile_failed': 'మీ ప్రొఫైల్ లోడ్ కాలేదు.',
 
   // Empty states
   'empty.no_records': 'రికార్డులు ఏవీ కనుగొనబడలేదు.',

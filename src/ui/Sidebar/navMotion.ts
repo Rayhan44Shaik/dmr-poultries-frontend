@@ -112,7 +112,7 @@ const MOTION_BY_PATH: Record<string, NavMotion> = {
   "/reports?tab=shopLedger": { motion: PAGE },
 
   // ── Settings ────────────────────────────────────────────────────────────
-  "/settings?tab=appearance": { motion: GEAR },
+  "/settings?tab=profile": { motion: GEAR },
 };
 
 /** Fallback for entries without a bespoke motion: a gentle, shared lift. */

@@ -770,6 +770,18 @@ export default {
   'settings.password_changed': 'Password changed successfully.',
   'settings.password_mismatch': 'New passwords do not match.',
   'settings.password_incorrect': 'Current password is incorrect.',
+  'settings.personal_information': 'Personal Information',
+  'settings.security': 'Security',
+  'settings.preferences': 'Preferences',
+  'settings.last_changed': 'Last changed',
+  'settings.not_changed': 'Not changed yet',
+  'settings.full_name': 'Full Name',
+  'settings.employee_number': 'Employee Number',
+  'settings.mobile_number': 'Mobile Number',
+  'settings.role': 'Role',
+  'settings.username': 'Username',
+  'settings.department': 'Department',
+  'settings.profile_failed': 'Unable to load your profile.',
 
   // Empty states
   'empty.no_records': 'No records found.',
