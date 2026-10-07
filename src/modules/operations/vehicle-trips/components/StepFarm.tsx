@@ -168,14 +168,20 @@ export default function StepFarm({
       preferLat: trip.farmGpsLat,
       preferLon: trip.farmGpsLon,
     }).then((gps) => {
-      updateTrip({
-        farmGpsLat: gps.latitude,
-        farmGpsLon: gps.longitude,
-        farmGpsAccuracy: gps.accuracy,
-        farmGpsTime: gps.capturedAt,
-      });
-      clearFieldError("gps");
-      // Never toast "Unable to fetch/retrieve location" — GPS always lands.
+      if (gps) {
+        updateTrip({
+          farmGpsLat: gps.latitude,
+          farmGpsLon: gps.longitude,
+          farmGpsAccuracy: gps.accuracy,
+          farmGpsTime: gps.capturedAt,
+        });
+        clearFieldError("gps");
+      } else {
+        // No real fix and no previously captured point: never invent
+        // coordinates — keep the validation error and tell the operator
+        // exactly what to do (allow location access, then retry).
+        notify(t("ops.trip.gps_unavailable"), "error");
+      }
       setIsFetchingLocation(false);
     });
   };

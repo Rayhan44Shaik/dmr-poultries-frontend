@@ -158,15 +158,8 @@ function TripRecentTable({
   const tableRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
 
-  // ✅ Get current user name (or fallback to "Admin")
-  const getCurrentUser = () => {
-    try {
-      const user = localStorage.getItem("user");
-      return user ? JSON.parse(user).name : "Admin";
-    } catch {
-      return "Admin";
-    }
-  };
+  // ✅ Approver identity is stamped server-side from the authenticated
+  // session (backend serverActor middleware) — the client never sends it.
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -386,7 +379,7 @@ function TripRecentTable({
       return;
     }
     if (newStatus === "Completed") {
-      if (onStatusChange) onStatusChange(trip, "Completed", getCurrentUser());
+      if (onStatusChange) onStatusChange(trip, "Completed");
       return;
     }
     if (newStatus === "Pending") {

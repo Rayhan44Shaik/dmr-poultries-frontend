@@ -894,6 +894,7 @@ export default {
   'ops.trip.step4_submitted': 'Step 4 saved. You can continue with expenses.',
   'ops.trip.step5_submitted': 'Trip completed successfully.',
   'ops.trip.submission_failed': 'Submission failed. Please try again.',
+  'ops.trip.gps_unavailable': 'Location unavailable. Allow location access for this site, then tap the location button again.',
   'ops.trip.submit_current_entry': 'Submit Current Entry',
   'ops.trip.ready_next_entry': 'Ready for next entry',
   'ops.trip.submit_diesel_first': 'Submit the diesel sheet first.',

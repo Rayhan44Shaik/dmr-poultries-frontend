@@ -439,16 +439,22 @@ export default function DieselExpensesTable({
 
     void captureGpsQuiet({ timeoutMs: 8000 }).then((gps) => {
       if (gpsRequestRef.current[index] !== requestId) return;
-      const gpsPatch = {
-        [`dieselGpsLat${index}`]: gps.latitude,
-        [`dieselGpsLon${index}`]: gps.longitude,
-        [`dieselGpsAccuracy${index}`]: gps.accuracy,
-        [`dieselGpsCapturedAt${index}`]: gps.capturedAt,
-      };
-      if (captureIntoDraft) {
-        setDraftData((prev) => ({ ...prev, ...gpsPatch }));
+      if (gps) {
+        const gpsPatch = {
+          [`dieselGpsLat${index}`]: gps.latitude,
+          [`dieselGpsLon${index}`]: gps.longitude,
+          [`dieselGpsAccuracy${index}`]: gps.accuracy,
+          [`dieselGpsCapturedAt${index}`]: gps.capturedAt,
+        };
+        if (captureIntoDraft) {
+          setDraftData((prev) => ({ ...prev, ...gpsPatch }));
+        } else {
+          applyBatchUpdates(gpsPatch);
+        }
       } else {
-        applyBatchUpdates(gpsPatch);
+        // Diesel GPS is optional: leave the fields empty rather than storing
+        // fabricated coordinates, and tell the operator what to do.
+        notifyUser(t("ops.trip.gps_unavailable"), "warning");
       }
       setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
     });

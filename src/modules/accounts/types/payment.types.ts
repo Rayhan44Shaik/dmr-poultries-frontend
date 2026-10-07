@@ -39,7 +39,11 @@ export interface PaymentAudit {
 
 /**
  * The subset of a payment a form may write. Everything else (id, payment number,
- * audit stamps, attachments) is owned by the server — or, in the sample preview,
- * by the register's own in-memory rows.
+ * audit stamps, attachments) is owned by the server — including `createdBy`,
+ * which is stamped from the authenticated session and can never be forged by
+ * the client.
  */
-export type PaymentWritePayload = Omit<Payment, 'id' | 'paymentNo' | 'createdAt' | 'updatedAt' | 'attachments'>;
+export type PaymentWritePayload = Omit<
+  Payment,
+  'id' | 'paymentNo' | 'createdAt' | 'updatedAt' | 'attachments' | 'createdBy'
+>;

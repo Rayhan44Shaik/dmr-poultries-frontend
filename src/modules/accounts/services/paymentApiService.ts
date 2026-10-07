@@ -47,7 +47,9 @@ export async function listPayments(filters: PaymentFilters = {}): Promise<Paymen
   return data.map(toPayment);
 }
 
-export async function createPayment(body: Omit<Payment, "id" | "paymentNo" | "createdAt" | "updatedAt" | "attachments">): Promise<Payment> {
+export async function createPayment(
+  body: Omit<Payment, "id" | "paymentNo" | "createdAt" | "updatedAt" | "attachments" | "createdBy">,
+): Promise<Payment> {
   const { data } = await apiPost<ApiPayment>(PATH, body);
   return toPayment(data);
 }

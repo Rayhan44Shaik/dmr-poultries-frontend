@@ -79,7 +79,7 @@ function EditForm({ isOpen, payment, onClose, onSave, persist }: PaymentEditModa
     if (savingRef.current || !isEditable || !validate()) return;
     savingRef.current = true;
     setSaving(true);
-    const paymentData = { ...form, amount: Number(form.amount), createdBy: 'admin' };
+    const paymentData = { ...form, amount: Number(form.amount) };
     try {
       const saved: Payment = persist
         ? await persist(paymentData, payment ?? null)

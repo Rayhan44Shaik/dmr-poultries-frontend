@@ -881,6 +881,7 @@ export default {
   'ops.trip.step4_submitted': 'దశ 4 సేవ్ అయింది. ఖర్చులతో కొనసాగించవచ్చు.',
   'ops.trip.step5_submitted': 'ట్రిప్ పూర్తయింది.',
   'ops.trip.submission_failed': 'సమర్పణ విఫలం. మళ్లీ ప్రయత్నించండి.',
+  'ops.trip.gps_unavailable': 'స్థానం అందుబాటులో లేదు. ఈ సైట్‌కు లొకేషన్ అనుమతి ఇచ్చి, మళ్లీ లొకేషన్ బటన్ నొక్కండి.',
   'ops.trip.submit_current_entry': 'ఈ ఎంట్రీ సమర్పించండి',
   'ops.trip.ready_next_entry': 'తర్వాతి ఎంట్రీకి సిద్ధం',
   'ops.trip.submit_diesel_first': 'ముందు డీజిల్ షీట్ సమర్పించండి.',

@@ -152,7 +152,7 @@ function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps)
       category: form.paymentType,
       remarks: form.remarks,
       status: 'Approved' as const, // Directly Approved / Paid instead of Draft
-      createdBy: 'admin',
+      // recorded-by identity is stamped server-side from the signed-in session.
     };
 
     try {
