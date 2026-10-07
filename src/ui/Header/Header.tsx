@@ -677,6 +677,15 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
                 <Settings size={15} /> {t("header.settings")}
               </Link>
             )}
+            {(user?.role === "OWNER" || user?.role === "FULL_ACCESS") && (
+              <Link
+                to="/settings?tab=access"
+                onClick={close}
+                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+              >
+                <UserRound size={15} /> Access Management
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => {

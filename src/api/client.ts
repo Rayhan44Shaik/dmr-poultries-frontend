@@ -6,7 +6,6 @@ import axios, {
 import { logger } from "../logger/logger";
 import { API_CONFIG } from "./config";
 import { toApiError } from "./errors";
-import { getStoredToken, storeToken } from "../modules/auth/tokenStore";
 import { isSigningOut } from "../modules/auth/signOutGate";
 
 declare module "axios" {
@@ -45,10 +44,6 @@ apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     config.metadata = { startTime: Date.now() };
 
-    // Bearer [REDACTED] issued by POST /auth/login (see modules/auth/authApi.ts).
-    const token = getStoredToken();
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-
     // Duplicate-transaction protection: every mutation carries a unique
     // Idempotency-Key so a browser retry, double-click, or timeout replay
     // can never create a second business record for one user action.
@@ -73,10 +68,6 @@ apiClient.interceptors.request.use(
 /** Response interceptor — normalize success logging and error shape */
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
-    const recoveredToken = response.headers["x-dmr-session-token"];
-    if (typeof recoveredToken === "string" && recoveredToken) {
-      storeToken(recoveredToken);
-    }
     const started = response.config.metadata?.startTime;
     const ms = started ? Date.now() - started : undefined;
 

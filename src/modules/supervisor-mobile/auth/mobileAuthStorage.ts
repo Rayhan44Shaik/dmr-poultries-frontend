@@ -1,54 +1,16 @@
-import localforage from "localforage";
-
 export type MobileSupervisorProfile = {
-  accountId: string;
-  employeeId: number;
-  employeeName: string;
-  username: string;
-  role: string;
-  department: string;
+  accountId: string; employeeId: number; employeeName: string;
+  username: string; role: string; department: string;
 };
+export type StoredMobileSession = { token: string; expiresAt: string; supervisor: MobileSupervisorProfile };
 
-export type StoredMobileSession = {
-  token: string;
-  expiresAt: string;
-  supervisor: MobileSupervisorProfile;
-};
-
-const authStore = localforage.createInstance({
-  name: "dmr-poultries",
-  storeName: "supervisor_mobile_auth",
-  description: "Opaque, backend-issued Supervisor Mobile session",
-});
-
-const SESSION_KEY = "active-session";
-
-function validSession(value: unknown): value is StoredMobileSession {
-  if (!value || typeof value !== "object") return false;
-  const session = value as Partial<StoredMobileSession>;
-  return Boolean(
-    session.token &&
-      session.expiresAt &&
-      session.supervisor?.accountId &&
-      session.supervisor?.employeeId &&
-      session.supervisor?.employeeName
-  );
-}
-
+// Mobile bearer credentials are document-memory only. A refresh requires a
+// new backend login; no authorization state is written to Web Storage or
+// IndexedDB.
+let session: StoredMobileSession | null = null;
 export async function loadMobileSession(): Promise<StoredMobileSession | null> {
-  const value = await authStore.getItem<unknown>(SESSION_KEY);
-  if (!validSession(value)) return null;
-  if (new Date(value.expiresAt).getTime() <= Date.now()) {
-    await authStore.removeItem(SESSION_KEY);
-    return null;
-  }
-  return value;
+  if (session && new Date(session.expiresAt).getTime() > Date.now()) return session;
+  session = null; return null;
 }
-
-export async function saveMobileSession(session: StoredMobileSession): Promise<void> {
-  await authStore.setItem(SESSION_KEY, session);
-}
-
-export async function clearMobileSession(): Promise<void> {
-  await authStore.removeItem(SESSION_KEY);
-}
+export async function saveMobileSession(value: StoredMobileSession): Promise<void> { session = value; }
+export async function clearMobileSession(): Promise<void> { session = null; }

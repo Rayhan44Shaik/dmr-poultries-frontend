@@ -1,5 +1,5 @@
 // tests/auth/permissions.test.ts
-// Role-access matrix for the two desktop sign-in roles.
+// Authoritative frontend location matrix for the six production roles.
 // Run: tsx --test tests/auth/permissions.test.ts
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -33,17 +33,6 @@ describe("SUPERVISOR — entry-only workspace", () => {
   test("may open exactly the allowed pages", () => {
     const allowed = [
       ["/operations", "?tab=trip-entry"],
-      ["/operations", "?tab=trip-list"],
-      ["/operations", "?tab=collection"],
-      ["/operations", "?tab=pending-collections"],
-      ["/operations", "?tab=fuel-expenses"],
-      ["/fleet", "?tab=entry"],
-      ["/fleet", "?tab=history"],
-      ["/fleet", "?tab=permits"],
-      ["/fleet", "?tab=emi"],
-      ["/fleet", "?tab=fastag"],
-      ["/staff", "?tab=leaves"],
-      ["/staff", "?tab=duty-planner"],
       ["/operations", ""], // tabless hub resolves to trip-entry inside the page
     ] as const;
     for (const [path, search] of allowed) {
@@ -57,6 +46,10 @@ describe("SUPERVISOR — entry-only workspace", () => {
       ["/masters", "?tab=shops"],
       ["/masters/shops", ""],
       ["/operations", "?tab=rate-entry"],
+      ["/operations", "?tab=trip-list"],
+      ["/operations", "?tab=collection"],
+      ["/fleet", "?tab=entry"],
+      ["/staff", "?tab=leaves"],
       ["/operations", "?tab=shop-sales"],
       ["/operations", "?tab=mortality"],
       ["/operations/orders/collection", ""],
@@ -89,10 +82,9 @@ describe("SUPERVISOR — entry-only workspace", () => {
 
   test("nav paths mirror location access", () => {
     assert.equal(canAccessNavPath("SUPERVISOR", "/operations?tab=trip-entry"), true);
-    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=permits"), true);
-    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=emi"), true);
-    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=fastag"), true);
-    assert.equal(canAccessNavPath("SUPERVISOR", "/staff?tab=duty-planner"), true);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=permits"), false);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=emi"), false);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/staff?tab=duty-planner"), false);
     assert.equal(canAccessNavPath("SUPERVISOR", "/staff?tab=salary-sheet"), false);
     assert.equal(canAccessNavPath("SUPERVISOR", "/accounts?tab=summary"), false);
   });
@@ -100,4 +92,11 @@ describe("SUPERVISOR — entry-only workspace", () => {
   test("landing stays on trip entry with the wider scope", () => {
     assert.equal(landingPathForRole("SUPERVISOR"), "/operations?tab=trip-entry");
   });
+});
+
+describe("OFFICE / COLLECTION / AUDIT / FULL_ACCESS",()=>{
+  test("Office sees only its operational entry modules",()=>{assert.equal(canAccessLocation("OFFICE","/fleet","?tab=emi"),true);assert.equal(canAccessLocation("OFFICE","/operations","?tab=collection"),false);assert.equal(canAccessLocation("OFFICE","/dashboard"),false)});
+  test("Collection sees trips, orders and collections only",()=>{assert.equal(canAccessLocation("COLLECTION","/operations","?tab=trip-list"),true);assert.equal(canAccessLocation("COLLECTION","/operations/orders/collection"),true);assert.equal(canAccessLocation("COLLECTION","/fleet","?tab=entry"),false)});
+  test("Audit sees business pages and Profile, but not Access Management",()=>{assert.equal(canAccessLocation("AUDIT","/reports"),true);assert.equal(canAccessLocation("AUDIT","/settings","?tab=profile"),true);assert.equal(canAccessLocation("AUDIT","/settings","?tab=access"),false)});
+  test("Full Access sees business settings",()=>assert.equal(canAccessLocation("FULL_ACCESS","/settings"),true));
 });

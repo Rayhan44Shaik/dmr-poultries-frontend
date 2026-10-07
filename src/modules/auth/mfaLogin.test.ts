@@ -45,7 +45,7 @@ test('MFA challenge stores no token and returns the ticket', async () => {
   }
 });
 
-test('MFA verify persists the token and adopts the session', async () => {
+test('MFA verify adopts the HttpOnly-cookie session without persisting a token', async () => {
   storeToken(null);
   const seen: Array<{ url: string; body: unknown }> = [];
   const restore = stubPost(async (url, body) => {
@@ -63,7 +63,7 @@ test('MFA verify persists the token and adopts the session', async () => {
     assert.equal(result.user.username, 'owner1');
     assert.equal(result.user.displayName, 'owner1', 'falls back to username');
     assert.equal(result.user.employeeId, 3);
-    assert.equal(getStoredToken(), 'sess-token-xyz');
+    assert.equal(getStoredToken(), null);
     assert.deepEqual(seen, [{ url: '/auth/mfa/verify', body: { ticket: 'ticket-abc-123', code: '123456' } }]);
   } finally {
     restore();
@@ -71,13 +71,13 @@ test('MFA verify persists the token and adopts the session', async () => {
   }
 });
 
-test('non-MFA login still stores the token immediately (regression)', async () => {
+test('non-MFA login uses the HttpOnly cookie and current six-role model', async () => {
   storeToken(null);
   const restore = stubPost(async (url) => {
     assert.equal(url, '/auth/login');
     return {
       data: {
-        user: { id: 9, username: 'clerk', role: 'SENIOR_ACCOUNT' },
+        user: { id: 9, username: 'clerk', role: 'OFFICE' },
         token: 'plain-token',
         previousSessionsEnded: true,
       },
@@ -88,9 +88,9 @@ test('non-MFA login still stores the token immediately (regression)', async () =
     assert.ok(!result.mfaRequired);
     if (!result.mfaRequired) {
       assert.equal(result.previousSessionsEnded, true);
-      assert.equal(result.user.role, 'SENIOR_ACCOUNT');
+      assert.equal(result.user.role, 'OFFICE');
     }
-    assert.equal(getStoredToken(), 'plain-token');
+    assert.equal(getStoredToken(), null);
   } finally {
     restore();
     storeToken(null);

@@ -12,12 +12,14 @@ import { useAuth } from "../providers/authContext";
 import LoginPage from "../modules/auth/LoginPage";
 import IdleSessionGuard from "../modules/auth/IdleSessionGuard";
 import BrandSplash from "./BrandSplash";
+import ChangePasswordDialog from "../modules/auth/ChangePasswordDialog";
 
 export default function AuthGate({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) return <BrandSplash />;
   if (!isAuthenticated) return <LoginPage />;
+  if (user?.mustChangePassword) return <><BrandSplash label="Change your temporary password to continue" /><ChangePasswordDialog open onClose={() => undefined} /></>;
   return (
     <>
       <IdleSessionGuard />

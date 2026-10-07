@@ -18,6 +18,7 @@ const DEMO_USER: AuthenticatedUser = {
   displayName: 'Demo Owner',
   role: 'OWNER',
   employeeId: null,
+  mustChangePassword: false,
 };
 
 /** Only a confirmed AUTH_* classification means the session is definitively
@@ -51,16 +52,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   // INSTANT restore: token + cached user → the app boots straight into the
   // session with no network and no splash. The /auth/me revalidation below
   // quietly corrects the record (role changes, revoked sessions).
-  const [user, setUser] = useState<AuthenticatedUser | null>(() => {
-    if (demoMode) return DEMO_USER;
-    return getStoredToken() ? getCachedUser() : null;
-  });
+  const [user, setUser] = useState<AuthenticatedUser | null>(() => demoMode ? DEMO_USER : null);
   // A restored token must be verified before mounting the dashboard. Mounting
   // first lets every dashboard hook fire with an expired/revoked token and
   // creates a large burst of 401s before /auth/me can redirect to sign-in.
   const [loading, setLoading] = useState(() => {
     if (demoMode) return false;
-    return !!getStoredToken();
+    return !demoMode;
   });
 
   /** Soft land on the sign-in screen — no full document reload (that caused
@@ -92,13 +90,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (demoMode) return undefined;
     const expired = () => {
       if (isSigningOut()) return;
-      const token = getStoredToken();
-      if (!token) {
-        // Session already ended deliberately — stay on the sign-in screen.
-        setLoading(false);
-        setUser(null);
-        return;
-      }
       currentUserShared()
         .then((value) => {
           // Server confirms the session is ALIVE — the 401 was transient.
@@ -148,11 +139,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     if (demoMode) return undefined;
-    // No token → nothing to revalidate (sign-in screen / fresh document).
-    if (!getStoredToken()) {
-      setLoading(false);
-      return undefined;
-    }
     let active = true;
     currentUserShared()
       .then((value) => {

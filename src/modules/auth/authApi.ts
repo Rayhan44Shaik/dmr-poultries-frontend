@@ -1,12 +1,13 @@
 import { apiClient } from "../../api/client";
 
-export type AppRole = "OWNER" | "SENIOR_ACCOUNT" | "SUPERVISOR";
+export type AppRole = "OWNER" | "FULL_ACCESS" | "AUDIT" | "OFFICE" | "COLLECTION" | "SUPERVISOR";
 export type AuthenticatedUser = {
   id: number;
   username: string;
   displayName: string;
   role: AppRole;
   employeeId: number | null;
+  mustChangePassword: boolean;
 };
 
 export { AUTH_TOKEN_KEY, getStoredToken, storeToken } from "./tokenStore";
@@ -18,8 +19,11 @@ import { storeToken } from "./tokenStore";
  */
 export function normalizeRole(value: unknown): AppRole {
   const raw = String(value ?? "").toUpperCase();
+  if (raw === "FULL_ACCESS") return "FULL_ACCESS";
+  if (raw === "AUDIT") return "AUDIT";
+  if (raw === "OFFICE") return "OFFICE";
+  if (raw === "COLLECTION") return "COLLECTION";
   if (raw.includes("SUPERVISOR")) return "SUPERVISOR";
-  if (raw.includes("ACCOUNT")) return "SENIOR_ACCOUNT";
   return "OWNER";
 }
 
@@ -31,6 +35,7 @@ type RawUser = {
   name?: unknown;
   role?: unknown;
   employeeId?: unknown;
+  mustChangePassword?: unknown;
 };
 
 function normalizeUser(value: RawUser | null | undefined): AuthenticatedUser {
@@ -40,6 +45,7 @@ function normalizeUser(value: RawUser | null | undefined): AuthenticatedUser {
     displayName: String(value?.displayName ?? value?.name ?? value?.username ?? "User"),
     role: normalizeRole(value?.role),
     employeeId: value?.employeeId == null ? null : Number(value.employeeId),
+    mustChangePassword: Boolean(value?.mustChangePassword),
   };
 }
 
@@ -94,7 +100,6 @@ export async function loginRequest(username: string, password: string): Promise<
     // Real backend returns both HttpOnly `dmr_session` cookie and `token` in the
     // JSON body. The SPA persists Bearer [REDACTED] /api calls through the Vite proxy
     // (and Electron / cross-origin previews) keep working after reload.
-    storeToken(response.data?.token ?? null);
     return {
       user: normalizeUser(response.data?.user),
       expiresAt: response.data?.expiresAt,
@@ -110,7 +115,6 @@ export async function mfaVerifyRequest(ticket: string, code: string) {
     expiresAt?: string;
     previousSessionsEnded?: boolean;
   }>("/auth/mfa/verify", { ticket, code });
-  storeToken(response.data?.token ?? null);
   return {
     user: normalizeUser(response.data?.user),
     expiresAt: response.data?.expiresAt,
@@ -148,6 +152,9 @@ export async function currentUserRequest(): Promise<AuthenticatedUser> {
   const response = await apiClient.get<{ user: RawUser }>("/auth/me", { timeout: 8000 });
   return normalizeUser(response.data?.user);
 }
+
+export type UserProfile = { id:number; username:string; fullName:string; role:AppRole; employeeNumber:string|null; mobileNumber:string; department:string; employeeStatus:string|null; lastPasswordResetAt:string|null };
+export async function profileRequest():Promise<UserProfile>{const response=await apiClient.get<{profile:UserProfile}>("/auth/profile");return response.data.profile}
 
 // Single-flight /auth/me: a burst of 401s (or several mounted guards) must
 // produce ONE validation request, not N parallel probes. Concurrent callers

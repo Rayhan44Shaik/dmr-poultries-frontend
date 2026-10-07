@@ -1,78 +1,9 @@
-// src/modules/settings/pages/SettingsPage.tsx
-// Settings hub: routes to available settings pages.
-
-import React, { useMemo } from "react";
-import { useLocation } from "react-router-dom";
-
+import { useMemo } from "react";
+import { useLocation,useNavigate } from "react-router-dom";
 import Profile from "./Profile_copy";
-import Language from "./Language";
-import Appearance from "./Appearance";
-import About from "./About";
+import AccessManagement from "./AccessManagement";
+import { useAuth } from "../../../providers/authContext";
 
-const settingsTabs: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
-  profile: Profile,
-  language: Language,
-  appearance: Appearance,
-  about: About,
-};
-
-const SETTINGS_LABELS: Record<string, string> = {
-  profile: "Profile",
-  language: "Language",
-  appearance: "Appearance",
-  about: "About",
-};
-
-const SettingsPage = () => {
-  const location = useLocation();
-
-  const activeTab = useMemo(() => {
-    const searchParams = new URLSearchParams(location.search);
-    return searchParams.get("tab") || "profile";
-  }, [location.search]);
-
-  const ActiveComponent = useMemo(() => {
-    return settingsTabs[activeTab] ?? Profile;
-  }, [activeTab]);
-
-  const tabs = [
-    { key: "profile", label: SETTINGS_LABELS.profile },
-    { key: "language", label: SETTINGS_LABELS.language },
-    { key: "appearance", label: SETTINGS_LABELS.appearance },
-    { key: "about", label: SETTINGS_LABELS.about },
-  ];
-
-  return (
-    <div className="w-full px-4 pb-12 pt-8 sm:px-6 sm:pt-10 lg:px-8">
-      <div className="mx-auto w-full max-w-[1480px]">
-        {/* Tabs */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => {
-                const params = new URLSearchParams(location.search);
-                params.set("tab", tab.key);
-                window.history.pushState({}, "", `${location.pathname}?${params.toString()}`);
-                window.dispatchEvent(new Event("popstate"));
-              }}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === tab.key
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 sm:p-8">
-          <ActiveComponent embedded />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default React.memo(SettingsPage);
+export default function SettingsPage(){const location=useLocation(),navigate=useNavigate(),{user}=useAuth();const mayViewAccess=user?.role==="OWNER"||user?.role==="FULL_ACCESS";const requested=useMemo(()=>new URLSearchParams(location.search).get("tab"),[location.search]);const active=requested==="access"&&mayViewAccess?"access":"profile";const tabs=[{key:"profile",label:"Profile"},...(mayViewAccess?[{key:"access",label:"Access Management"}]:[])];
+ return <div className="w-full px-4 pb-10 pt-6 sm:px-6 lg:px-8"><div className="mx-auto max-w-[1480px]"><div className="mb-5"><h1 className="text-xl font-bold text-slate-900 dark:text-white">Settings</h1><p className="mt-1 text-sm text-slate-500">Manage your profile and account preferences.</p></div><div role="tablist" className="mb-5 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900">{tabs.map(tab=><button key={tab.key} role="tab" aria-selected={active===tab.key} onClick={()=>navigate(`/settings?tab=${tab.key}`)} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${active===tab.key?"bg-emerald-600 text-white shadow-sm":"text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"}`}>{tab.label}</button>)}</div>{active==="access"?<AccessManagement/>:<Profile/>}</div></div>;
+}

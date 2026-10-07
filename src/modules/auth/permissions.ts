@@ -70,27 +70,41 @@ const OWNER_ACCESS: RoleAccess = {
  * pages — and no approve/delete anywhere.
  */
 const SUPERVISOR_ACCESS: RoleAccess = {
-  sections: ["operations", "fleet", "staff"],
+  sections: ["operations", "settings"],
   tabs: {
-    operations: [
-      "trip-entry",
-      "trip-list",
-      "collection",
-      "pending-collections",
-      "fuel-expenses",
-    ],
-    fleet: ["entry", "history", "permits", "emi", "fastag"],
-    staff: ["leaves", "duty-planner"],
+    operations: ["trip-entry"],
+    settings: ["profile"],
   },
   capabilities: [],
 };
 
+const OFFICE_ACCESS: RoleAccess = {
+  sections: ["operations", "fleet", "staff", "settings"],
+  tabs: {
+    operations: ["trip-entry", "trip-list", "fuel-expenses"],
+    fleet: ["entry", "history", "permits", "emi"],
+    staff: ["leaves", "duty-planner"],
+    settings: ["profile"],
+  }, capabilities: [],
+};
+
+const COLLECTION_ACCESS: RoleAccess = {
+  sections: ["operations", "settings"],
+  tabs: { operations: ["trip-list", "orders", "collection", "pending-collections"], settings:["profile"] },
+  capabilities: [],
+};
+
+const AUDIT_ACCESS: RoleAccess = {
+  sections: ["dashboard", "masters", "operations", "fleet", "staff", "accounts", "reports", "settings"],
+  tabs: {settings:["profile"]}, capabilities: [],
+};
+
 const ROLE_ACCESS: Readonly<Record<AppRole, RoleAccess>> = {
   OWNER: OWNER_ACCESS,
-  // Kept for the shared AppRole union — senior accountants are not part of
-  // the two sign-in roles yet; they get the conservative supervisor set
-  // rather than accidentally inheriting owner rights.
-  SENIOR_ACCOUNT: SUPERVISOR_ACCESS,
+  FULL_ACCESS: OWNER_ACCESS,
+  AUDIT: AUDIT_ACCESS,
+  OFFICE: OFFICE_ACCESS,
+  COLLECTION: COLLECTION_ACCESS,
   SUPERVISOR: SUPERVISOR_ACCESS,
 };
 
