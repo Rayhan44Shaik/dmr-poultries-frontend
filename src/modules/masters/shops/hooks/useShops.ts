@@ -12,6 +12,7 @@ import {
   mapShop,
   type ShopInput,
   createShopsBulk,
+  updateShopOpeningBalancesBulk,
 } from "../services/shopService";
 const config = { path: "/masters/shops", load: loadShops, map: mapShop };
 export function useShops(options?: MasterQuery) {
@@ -31,6 +32,11 @@ export function useShops(options?: MasterQuery) {
   );
   const addShopsBulk = useCallback(
     (inputs: ShopInput[]) => mutate(() => createShopsBulk(inputs)),
+    [mutate],
+  );
+  const updateOpeningBalancesBulk = useCallback(
+    (inputs: Array<{ shopNumber: string; shopName: string; openingBalance: number }>) =>
+      mutate(() => updateShopOpeningBalancesBulk(inputs)),
     [mutate],
   );
 
@@ -54,6 +60,7 @@ export function useShops(options?: MasterQuery) {
     editShop,
     removeShop,
     addShopsBulk,
+    updateOpeningBalancesBulk,
     refreshShops: reload,
   };
 }

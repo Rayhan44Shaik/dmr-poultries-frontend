@@ -152,6 +152,8 @@ export interface Trip {
   farmStepSubmittedAt?: string | null;
   farmAddress?: string;
   avgBirdWeight?: number;
+  /** Step 2 Farm Loading remarks; persisted independently from Step 5 remarks. */
+  farmRemarks?: string | null;
   farmGpsLat?: number | null;
   farmGpsLon?: number | null;
   farmGpsAccuracy?: number | null;

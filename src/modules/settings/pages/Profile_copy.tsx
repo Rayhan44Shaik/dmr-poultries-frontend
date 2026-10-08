@@ -17,6 +17,7 @@ import { loadEmployees } from "../../masters/employees/services/employeeService"
 import type { Employee } from "../../masters/employees/types/employee";
 import { useI18n } from "../../../i18n";
 import { useUserPreferences } from "../hooks/useUserPreferences";
+import MasterDropdown from "../../masters/components/MasterDropdown";
 
 /** Password tile wants the exact moment, not just the day. */
 const formatDateTime = (value: string | null) =>
@@ -237,27 +238,32 @@ export default function Profile() {
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
               <Languages size={14} />
             </span>
-            <select
+            <MasterDropdown
+              hideLabel
+              label={t("settings.language")}
               value={language}
-              onChange={(e) => setLanguage(e.target.value as "en" | "te")}
-              aria-label={t("settings.language")}
-              className="w-full max-w-[150px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="en">{t("settings.english")}</option>
-              <option value="te">{t("settings.telugu")}</option>
-            </select>
+              onChange={(value) => setLanguage(value as "en" | "te")}
+              options={[
+                { value: "en", label: t("settings.english") },
+                { value: "te", label: t("settings.telugu") },
+              ]}
+              className="w-[150px]"
+              triggerClassName="h-8 px-2.5 text-xs"
+            />
             {/* Alphabet size — sits right beside the language choice. */}
-            <select
+            <MasterDropdown
+              hideLabel
+              label={t("settings.alphabet_size")}
               value={alphabetSize}
-              onChange={(e) => setAlphabetSize(e.target.value as "small" | "medium" | "large")}
-              aria-label={t("settings.alphabet_size")}
-              title={t("settings.alphabet_size")}
-              className="w-full max-w-[120px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-            >
-              <option value="small">{t("settings.alphabet_small")}</option>
-              <option value="medium">{t("settings.alphabet_medium")}</option>
-              <option value="large">{t("settings.alphabet_large")}</option>
-            </select>
+              onChange={(value) => setAlphabetSize(value as "small" | "medium" | "large")}
+              options={[
+                { value: "small", label: t("settings.alphabet_small") },
+                { value: "medium", label: t("settings.alphabet_medium") },
+                { value: "large", label: t("settings.alphabet_large") },
+              ]}
+              className="w-[130px]"
+              triggerClassName="h-8 px-2.5 text-xs"
+            />
           </div>
           <div className="flex items-center gap-2">
             <span

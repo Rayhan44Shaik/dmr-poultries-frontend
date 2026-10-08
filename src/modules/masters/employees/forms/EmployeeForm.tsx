@@ -33,6 +33,10 @@ type EmployeeFormProps = {
 
 // Departments sorted alphabetically
 const DEPARTMENTS = [
+  "Owner",
+  "Accounts",
+  "Office",
+  "Audit",
   "Accountant",
   "Collection",
   "Driver",
@@ -43,7 +47,7 @@ const DEPARTMENTS = [
   "Other",
   "Sales",
   "Supervisor",
-].sort();
+];
 
 // Helper: format salary with commas
 const formatSalary = (value: number | ""): string => {
@@ -74,6 +78,7 @@ function EmployeeForm({
 
   const [employeeName, setEmployeeName] = useState(employee?.employeeName ?? "");
   const [department, setDepartment] = useState(employee?.department ?? "");
+  const [secondaryDepartment, setSecondaryDepartment] = useState(employee?.secondaryDepartment ?? "");
   const [role, setRole] = useState(employee?.role ?? "");
   const [phoneNumber, setPhoneNumber] = useState(employee?.phoneNumber ?? "");
   const [email, setEmail] = useState(employee?.email ?? "");
@@ -134,7 +139,7 @@ function EmployeeForm({
     }
 
     if (
-      (department === "Driver" || department === "Collection") &&
+      ([department, secondaryDepartment].includes("Driver") || [department, secondaryDepartment].includes("Collection")) &&
       !licenseNumber?.trim()
     ) {
       showNotification(
@@ -160,6 +165,7 @@ function EmployeeForm({
     onSave({
       employeeName,
       department,
+      secondaryDepartment: secondaryDepartment || null,
       role,
       phoneNumber,
       email,
@@ -290,6 +296,17 @@ function EmployeeForm({
             disabled={isSaving}
           />
 
+          <MasterDropdown
+            label="Secondary Department"
+            labelStyle="field"
+            value={secondaryDepartment}
+            onChange={setSecondaryDepartment}
+            options={DEPARTMENTS.filter((item) => item !== department)}
+            placeholder="Optional dual duty"
+            allowClear
+            disabled={isSaving}
+          />
+
           <div className="relative">
             {fieldLabel("Role", "(Optional)")}
             <div className="relative">
@@ -363,7 +380,7 @@ function EmployeeForm({
           <div className="relative">
             {fieldLabel(
               "License Number",
-              department === "Driver" || department === "Collection"
+              [department, secondaryDepartment].includes("Driver") || [department, secondaryDepartment].includes("Collection")
                 ? "(Required)"
                 : "(Optional)",
             )}
@@ -375,7 +392,7 @@ function EmployeeForm({
                 onChange={(e) => setLicenseNumber(e.target.value)}
                 placeholder="License number"
                 className={inputClass(
-                  (department === "Driver" || department === "Collection") &&
+                  ([department, secondaryDepartment].includes("Driver") || [department, secondaryDepartment].includes("Collection")) &&
                     !licenseNumber,
                 )}
                 disabled={isSaving}

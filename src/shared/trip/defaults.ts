@@ -74,6 +74,7 @@ export function createEmptyTrip(overrides: Partial<Trip> = {}): Trip {
     status: "Draft",
     fuel: 0,
     expense: 0,
+    farmRemarks: "",
     remarks: "",
     rateCompleted: false,
     createdAt: now,

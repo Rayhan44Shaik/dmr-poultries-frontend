@@ -579,13 +579,13 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           hasUnsavedChanges={JSON.stringify({
             sourceFarmId: trip.sourceFarmId, sourceFarm: trip.sourceFarm, farmAddress: trip.farmAddress,
             destMeter: trip.destMeter, pickupTolls: trip.pickupTolls, avgBirdWeight: trip.avgBirdWeight,
-            remarks: trip.remarks, farmGpsLat: trip.farmGpsLat, farmGpsLon: trip.farmGpsLon,
+            farmRemarks: trip.farmRemarks, farmGpsLat: trip.farmGpsLat, farmGpsLon: trip.farmGpsLon,
             farmGpsAccuracy: trip.farmGpsAccuracy, farmGpsTime: trip.farmGpsTime,
             birdTypeId: trip.birdTypeId, birdType: trip.birdType,
           }) !== JSON.stringify({
             sourceFarmId: savedTrip.sourceFarmId, sourceFarm: savedTrip.sourceFarm, farmAddress: savedTrip.farmAddress,
             destMeter: savedTrip.destMeter, pickupTolls: savedTrip.pickupTolls, avgBirdWeight: savedTrip.avgBirdWeight,
-            remarks: savedTrip.remarks, farmGpsLat: savedTrip.farmGpsLat, farmGpsLon: savedTrip.farmGpsLon,
+            farmRemarks: savedTrip.farmRemarks, farmGpsLat: savedTrip.farmGpsLat, farmGpsLon: savedTrip.farmGpsLon,
             farmGpsAccuracy: savedTrip.farmGpsAccuracy, farmGpsTime: savedTrip.farmGpsTime,
             birdTypeId: savedTrip.birdTypeId, birdType: savedTrip.birdType,
           })}

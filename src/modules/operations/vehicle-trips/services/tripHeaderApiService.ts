@@ -207,6 +207,7 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     advanceAmount: numOrNull(raw.advanceAmount ?? raw.advance_amount),
     startStepSubmitted: Boolean(raw.startStepSubmitted ?? raw.start_step_submitted ?? defaults.startStepSubmitted),
     remarks: str(raw.remarks, defaults.remarks),
+    farmRemarks: str(raw.farmRemarks ?? raw.farm_remarks, defaults.farmRemarks ?? ""),
     farmStepSubmitted: Boolean(raw.farmStepSubmitted ?? raw.farm_step_submitted ?? defaults.farmStepSubmitted),
     pickupStepSubmitted: Boolean(raw.pickupStepSubmitted ?? raw.pickup_step_submitted ?? defaults.pickupStepSubmitted),
     deliveryStepSubmitted: Boolean(raw.deliveryStepSubmitted ?? raw.delivery_step_submitted ?? defaults.deliveryStepSubmitted),
@@ -333,7 +334,7 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
     advanceAmount: optionalQuantity(trip.advanceAmount),
     helpers: trip.helpers ?? [],
     loaders: trip.loaders ?? [],
-    remarks: trip.remarks ?? "",
+    remarks: String(trip.remarks ?? "").toLocaleUpperCase("en-IN"),
     startStepSubmitted: trip.startStepSubmitted ?? false,
   };
 }
@@ -355,7 +356,7 @@ export function toStep2Payload(trip: Partial<Trip>): Record<string, unknown> {
     destMeter: destMeter === 0 ? null : destMeter,
     pickupTolls: normalizeTolls(trip.pickupTolls),
     avgBirdWeight: avgBirdWeight === 0 ? null : avgBirdWeight,
-    remarks: trip.remarks ?? "",
+    farmRemarks: String(trip.farmRemarks ?? "").toLocaleUpperCase("en-IN"),
     farmStepSubmitted: trip.farmStepSubmitted ?? false,
   };
   // Farm bird type — backend canonical body keys are farmBirdTypeId /
@@ -427,7 +428,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
     "others5Amt",
   ] as const;
   const payload: Record<string, unknown> = {
-    remarks: trip.remarks ?? "",
+    remarks: String(trip.remarks ?? "").toLocaleUpperCase("en-IN"),
   };
   for (const key of EXPENSE_KEYS) {
     const x = n(trip[key]);
@@ -532,7 +533,7 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
         clientKey: d.clientKey || undefined,
         shopId,
         shopName: d.shopName || "",
-        subShopName: d.subShopName?.trim() || "",
+        subShopName: d.subShopName?.trim().toLocaleUpperCase("en-IN") || "",
         birdTypeId,
         birdType: d.birdType || "",
         birds,
@@ -541,7 +542,7 @@ export function toStep4Payload(trip: Partial<Trip> & { deliveries?: Trip["delive
         mortKg,
         rate,
         amount,
-        remarks: d.remarks ?? "",
+        remarks: String(d.remarks ?? "").toLocaleUpperCase("en-IN"),
         deliveryMode: d.deliveryMode === "weight" ? "weight" : "box",
         selectedBoxIds,
         perBoxData: sanitizePerBoxData(d.perBoxData),

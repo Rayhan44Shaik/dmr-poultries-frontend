@@ -1,6 +1,6 @@
 import "../../styles/masters.css";
 import MasterDropdown from "../../components/MasterDropdown";
-import { MapPin, Store } from "lucide-react";
+import { FileSpreadsheet, MapPin, Store } from "lucide-react";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\pages\ShopsPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -18,6 +18,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildShopBulkImportConfig } from "../bulkImportConfig";
+import { buildOpeningBalanceImportConfig } from "../openingBalanceImportConfig";
 import { useI18n } from "../../../../i18n";
 import { countActiveFilters } from "../../../../ui";
 import {
@@ -34,6 +35,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const { t } = useI18n();
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
+  const [showOpeningBalanceImport, setShowOpeningBalanceImport] = useState(false);
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -51,6 +53,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     reload,
     addShop,
     addShopsBulk,
+    updateOpeningBalancesBulk,
     editShop,
     total,
     page: serverPage,
@@ -68,6 +71,10 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const shopBulkImportConfig = useMemo(
     () => buildShopBulkImportConfig({ addShopsBulk, reload }),
     [addShopsBulk, reload],
+  );
+  const openingBalanceImportConfig = useMemo(
+    () => buildOpeningBalanceImportConfig({ update: updateOpeningBalancesBulk, reload }),
+    [updateOpeningBalancesBulk, reload],
   );
 
   // Reset to page 1 whenever search keyword changes
@@ -451,6 +458,16 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         onPageChange={setCurrentPage}
         onPageSizeChange={handlePageSizeChange}
       >
+        <div className="flex justify-end border-b border-slate-100 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setShowOpeningBalanceImport(true)}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-sm"
+          >
+            <FileSpreadsheet size={15} />
+            Import Opening Balances
+          </button>
+        </div>
         <ShopTable
           shops={paginatedShops}
           onEdit={handleEditShop}
@@ -488,6 +505,18 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
               imported: result.imported,
               total: result.total,
             }),
+            result.failed === 0 ? "success" : "error",
+          );
+        }}
+      />
+      <BulkImportDialog
+        open={showOpeningBalanceImport}
+        onClose={() => setShowOpeningBalanceImport(false)}
+        config={openingBalanceImportConfig}
+        existing={shops}
+        onImported={(result) => {
+          showNotification(
+            `Imported ${result.imported} of ${result.total} shop opening balances.`,
             result.failed === 0 ? "success" : "error",
           );
         }}

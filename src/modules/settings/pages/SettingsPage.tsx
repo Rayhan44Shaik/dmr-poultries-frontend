@@ -9,7 +9,7 @@ import Profile from "./Profile_copy";
  */
 export default function SettingsPage() {
   const { user } = useAuth();
-  const canViewAccess = user?.role === "OWNER" || user?.role === "FULL_ACCESS";
+  const canViewAccess = user?.role === "OWNER" || user?.role === "FULL_ACCESS" || user?.role === "AUDIT";
 
   return (
     <main className="min-h-screen w-full bg-slate-50/50 px-3 pb-10 pt-4 text-slate-800 sm:px-6 lg:px-8 dark:bg-slate-950/40 dark:text-slate-100">

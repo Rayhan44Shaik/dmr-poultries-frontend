@@ -11,7 +11,7 @@ test("toStep2Payload sends only Step 2 fields, normalizes negative tolls, omits 
     destMeter: 50001,
     pickupTolls: -3,
     avgBirdWeight: 2.2,
-    remarks: "note",
+    farmRemarks: "farm note",
     farmStepSubmitted: false,
     reachedTime: "1999-01-01T00:00:00.000Z",
     farmCompletedTrips: 12,
@@ -21,6 +21,8 @@ test("toStep2Payload sends only Step 2 fields, normalizes negative tolls, omits 
   assert.equal(payload.sourceFarmId, 4);
   assert.equal(payload.pickupTolls, 0);
   assert.equal(payload.destMeter, 50001);
+  assert.equal(payload.farmRemarks, "FARM NOTE");
+  assert.equal("remarks" in payload, false);
   assert.equal("reachedTime" in payload, false);
   assert.equal("farmCompletedTrips" in payload, false);
   assert.equal("farmRate" in payload, false);

@@ -3,6 +3,7 @@ export type Employee = {
   employeeNo: number;
   employeeName: string;
   department: string;
+  secondaryDepartment?: string | null;
   role: string;
   phoneNumber: string;
   email: string;

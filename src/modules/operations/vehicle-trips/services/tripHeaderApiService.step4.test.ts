@@ -34,7 +34,8 @@ test("toStep4Payload sends only delivery rows — no KPI or submit flag; keeps p
   const row = (payload.deliveries as any[])[0];
   assert.equal(row.clientKey, "ck-a");
   assert.equal(row.shopId, 3);
-  assert.equal(row.subShopName, "Counter B");
+  assert.equal(row.subShopName, "COUNTER B");
+  assert.equal(row.remarks, "OK");
   assert.equal(row.birds, 40);
   assert.equal(row.amount, 0);
   assert.equal(Number.isNaN(row.amount), false);

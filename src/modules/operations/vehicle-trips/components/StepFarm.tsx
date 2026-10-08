@@ -126,7 +126,7 @@ export default function StepFarm({
   };
 
   const farmAddress = trip.farmAddress || "";
-  const remarks = trip.remarks || "";
+  const remarks = trip.farmRemarks || "";
   const avgBirdWeight = trip.avgBirdWeight || 0;
   const hasGps =
     trip.farmGpsLat != null &&
@@ -405,10 +405,10 @@ export default function StepFarm({
             value={avgWeightLabel}
           />
         </div>
-        {trip.remarks ? (
+        {trip.farmRemarks ? (
           <p className="text-xs text-slate-600">
             <span className="font-semibold text-slate-400 uppercase text-[10px]">{t("common.remarks")} </span>
-            {trip.remarks}
+            {trip.farmRemarks}
           </p>
         ) : null}
 
@@ -710,7 +710,7 @@ export default function StepFarm({
             <input
               type="text"
               value={remarks}
-              onChange={(e) => updateTrip({ remarks: e.target.value })}
+              onChange={(e) => updateTrip({ farmRemarks: e.target.value.toLocaleUpperCase("en-IN") })}
               className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder={t("ops.trip.optional")}
             />

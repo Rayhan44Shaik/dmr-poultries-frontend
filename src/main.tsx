@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { ChunkLoadError, diagnoseConnection, guardedReload, isChunkLoadError } from "./routes/lazyWithRetry";
+import { installProjectInputPolicy } from "./shared/forms/inputPolicy";
 
 // -----------------------------------------------------------------------------
 // SELF-HEALING LAZY LOADS (global layer)
@@ -40,14 +41,10 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-// Number fields retain keyboard entry but never mutate while the page is
-// being scrolled. Capture handles every current and future numeric input.
-document.addEventListener("wheel", (event) => {
-  const target = event.target;
-  if (target instanceof HTMLInputElement && target.type === "number" && document.activeElement === target) {
-    event.preventDefault();
-  }
-}, { capture: true, passive: false });
+// One form policy for every module: ordinary operator-entered text is stored
+// in capitals, while numeric values cannot be nudged by wheel/arrow controls.
+// Passwords, email addresses, URLs and explicitly opted-out fields preserve case.
+installProjectInputPolicy();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

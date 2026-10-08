@@ -140,6 +140,17 @@ export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
   return data.created.map(mapShop);
 }
 
+export async function updateShopOpeningBalancesBulk(
+  inputs: Array<{ shopNumber: string; shopName: string; openingBalance: number }>,
+): Promise<Shop[]> {
+  clearLegacyShopStorage();
+  const { data } = await apiPost<{ updated: Record<string, unknown>[] }>(
+    `${SHOPS_PATH}/opening-balances/bulk`,
+    inputs,
+  );
+  return data.updated.map(mapShop);
+}
+
 /** PUT /api/masters/shops/:id */
 export async function updateShop(
   id: number,

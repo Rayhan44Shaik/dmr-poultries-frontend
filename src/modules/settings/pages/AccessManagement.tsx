@@ -147,7 +147,7 @@ type DialogState =
 
 /** The directory lists only granted logins by default — NOT_GRANTED employees
  *  are handled through the header Grant Access flow instead of the table. */
-const DEFAULT_ACCESS_FILTER = "ACTIVE,PAUSED,REVOKED";
+const DEFAULT_ACCESS_FILTER = "ACTIVE,PAUSED";
 const ROLES = ["FULL_ACCESS", "AUDIT", "OFFICE", "COLLECTION", "SUPERVISOR"];
 const ACCESS_STATUSES = ["ACTIVE", "PAUSED", "REVOKED"];
 
@@ -262,8 +262,9 @@ const statusBadge = (value: string) => {
   return `inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold whitespace-nowrap ${tone}`;
 };
 
-const rowActions = (row: AccessRow, editable: boolean) => {
+const rowActions = (row: AccessRow, editable: boolean, actorRole?: string) => {
   if (!editable || !row.user_id) return false;
+  if (row.role === "OWNER" || (actorRole !== "OWNER" && row.role === "FULL_ACCESS")) return false;
   return !["REVOKED", "NOT_GRANTED"].includes(row.access_status);
 };
 
@@ -278,7 +279,8 @@ const rowActions = (row: AccessRow, editable: boolean) => {
 export default function AccessManagement() {
   const { t } = useI18n();
   const { user } = useAuth();
-  const editable = user?.role === "OWNER";
+  const editable = user?.role === "OWNER" || user?.role === "FULL_ACCESS";
+  const assignableRoles = user?.role === "OWNER" ? ROLES : ROLES.filter((roleName) => roleName !== "FULL_ACCESS");
   const { showNotification } = useSafeNotification();
 
   const [rows, setRows] = useState<AccessRow[]>([]);
@@ -301,6 +303,7 @@ export default function AccessManagement() {
   /** Owner re-authentication popup: { row } while asking for login password. */
   const [revealAsk, setRevealAsk] = useState<{ row: AccessRow } | null>(null);
   const [actorPassword, setActorPassword] = useState("");
+  const [revealInputReady, setRevealInputReady] = useState(false);
   const [revealBusy, setRevealBusy] = useState(false);
   const [eligible, setEligible] = useState<HistoryRow[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
@@ -419,6 +422,7 @@ export default function AccessManagement() {
     setDialog(null);
     setRevealAsk(null);
     setActorPassword("");
+    setRevealInputReady(false);
   };
 
   /** Revealed passwords hide themselves after 10 seconds — the owner had
@@ -535,7 +539,7 @@ export default function AccessManagement() {
               <div className="flex flex-wrap items-center gap-1.5">
                 {expiredRows.map((row) => (
                   <button
-                    key={row.employee_id}
+                    key={`expired-${row.employee_id ?? row.user_id}`}
                     type="button"
                     onClick={() => setDialog({ kind: "reset", row })}
                     className="group inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-bold text-rose-600 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md hover:shadow-rose-500/15 active:translate-y-0 active:scale-95"
@@ -630,7 +634,7 @@ export default function AccessManagement() {
                 </tr>
               ) : (
                 rows.map((row) => (
-                  <tr key={row.employee_id} className="border-t border-slate-100 dark:border-slate-800">
+                  <tr key={`access-${row.employee_id ?? row.user_id}`} className="border-t border-slate-100 dark:border-slate-800">
                     <td className="px-3 py-2.5">
                       <span className="block font-semibold text-slate-800 dark:text-slate-100">{row.employee_name}</span>
                       <span className="mt-0.5 block text-[11px] font-medium uppercase text-slate-500">
@@ -639,7 +643,7 @@ export default function AccessManagement() {
                     </td>
                     <td className="px-3 align-middle">
                       <div className="flex justify-center whitespace-nowrap">
-                        {editable && row.user_id ? (
+                        {rowActions(row, editable, user?.role) ? (
                           <MasterDropdown
                             hideLabel
                             label={`Role for ${row.employee_name}`}
@@ -653,7 +657,7 @@ export default function AccessManagement() {
                                 showNotification(t("settings.access_update_failed"), "error");
                               }
                             }}
-                            options={ROLES.map((option) => ({ value: option, label: option.replace(/_/g, " ") }))}
+                            options={assignableRoles.map((option) => ({ value: option, label: option.replace(/_/g, " ") }))}
                             className="w-[112px]"
                             triggerClassName="h-8 px-2 text-[11px]"
                           />
@@ -682,7 +686,7 @@ export default function AccessManagement() {
                         {revealed === row.employee_id && revealedSecret && (
                           <CopyPasswordButton value={revealedSecret} label={t("settings.access_copy_password")} />
                         )}
-                        {editable && row.user_id && (
+                        {rowActions(row, editable, user?.role) && (
                           <button
                             type="button"
                             onClick={() => {
@@ -699,7 +703,7 @@ export default function AccessManagement() {
                             }`}
                           >
                             {revealed === row.employee_id ? <EyeOff size={14} /> : <Eye size={14} />}
-                            <ActionTooltip label={revealed === row.employee_id ? t("settings.access_pw_hide") : t("settings.access_pw_reveal")} side="bottom" />
+                            <ActionTooltip label={revealed === row.employee_id ? t("settings.access_pw_hide") : t("settings.access_pw_reveal")} side="top" className="whitespace-nowrap" />
                           </button>
                         )}
                       </div>
@@ -712,45 +716,45 @@ export default function AccessManagement() {
                     </td>
                     <td className="px-3 text-center align-middle text-slate-600">{fmt(row.last_login_at)}</td>
                     <td className="px-3 align-middle">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {editable && row.user_id && rowActions(row, editable) && (
+                      <div className="relative z-0 flex items-center justify-center gap-1.5 [&>button]:z-0 [&>button:hover]:z-20 [&>button:focus-visible]:z-20">
+                        {rowActions(row, editable, user?.role) && (
                           <button
                             type="button"
                             onClick={() => setDialog({ kind: "reset", row })}
                             className="group relative inline-flex items-center gap-1 rounded-lg bg-violet-50/80 p-1.5 text-violet-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-violet-100 hover:shadow-sm hover:shadow-violet-500/20 active:translate-y-0 active:scale-95"
                           >
                             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><KeyRound size={14} /></span>
-                            <ActionTooltip label={t("settings.access_change")} side="bottom" />
+                            <ActionTooltip label={t("settings.access_change")} side="top" className="whitespace-nowrap" />
                           </button>
                         )}
-                        {editable && row.user_id && row.access_status === "ACTIVE" && (
+                        {rowActions(row, editable, user?.role) && row.access_status === "ACTIVE" && (
                           <button
                             type="button"
                             onClick={() => setDialog({ kind: "pause", row })}
                             className="group relative inline-flex items-center gap-1 rounded-lg bg-amber-50/80 p-1.5 text-amber-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-amber-100 hover:shadow-sm hover:shadow-amber-500/20 active:translate-y-0 active:scale-95"
                           >
                             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><PauseCircle size={14} /></span>
-                            <ActionTooltip label={t("settings.access_pause")} side="bottom" />
+                            <ActionTooltip label={t("settings.access_pause")} side="top" className="whitespace-nowrap" />
                           </button>
                         )}
-                        {editable && row.user_id && row.access_status === "PAUSED" && (
+                        {rowActions(row, editable, user?.role) && row.access_status === "PAUSED" && (
                           <button
                             type="button"
                             onClick={() => setDialog({ kind: "resume", row })}
                             className="group relative inline-flex items-center gap-1 rounded-lg bg-emerald-50/80 p-1.5 text-emerald-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-sm hover:shadow-emerald-500/20 active:translate-y-0 active:scale-95"
                           >
                             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><PlayCircle size={14} /></span>
-                            <ActionTooltip label={t("settings.access_resume")} side="bottom" />
+                            <ActionTooltip label={t("settings.access_resume")} side="top" className="whitespace-nowrap" />
                           </button>
                         )}
-                        {rowActions(row, editable) && (
+                        {rowActions(row, editable, user?.role) && (
                           <button
                             type="button"
                             onClick={() => setDialog({ kind: "revoke", row })}
                             className="group relative inline-flex items-center gap-1 rounded-lg bg-rose-50/80 p-1.5 text-rose-600 transition-all duration-200 hover:-translate-y-0.5 hover:bg-rose-100 hover:shadow-sm hover:shadow-rose-500/20 active:translate-y-0 active:scale-95"
                           >
                             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} strokeWidth={2.5} /></span>
-                            <ActionTooltip label={t("settings.access_revoke")} side="bottom" />
+                            <ActionTooltip label={t("settings.access_revoke")} side="top" className="whitespace-nowrap" />
                           </button>
                         )}
                         {row.user_id && (
@@ -761,7 +765,7 @@ export default function AccessManagement() {
                               className="group relative inline-flex rounded-lg bg-sky-50/80 p-1.5 text-sky-500 transition-all duration-200 hover:-translate-y-0.5 hover:bg-sky-100 hover:shadow-sm hover:shadow-sky-500/20 active:translate-y-0 active:scale-95"
                             >
                               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><History size={14} /></span>
-                              <ActionTooltip label={t("settings.access_login_history")} side="bottom" />
+                              <ActionTooltip label={t("settings.access_login_history")} side="top" className="whitespace-nowrap" />
                             </button>
                             <button
                               type="button"
@@ -769,7 +773,7 @@ export default function AccessManagement() {
                               className="group relative inline-flex rounded-lg bg-indigo-50/80 p-1.5 text-indigo-500 transition-all duration-200 hover:-translate-y-0.5 hover:bg-indigo-100 hover:shadow-sm hover:shadow-indigo-500/20 active:translate-y-0 active:scale-95"
                             >
                               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><ShieldCheck size={14} /></span>
-                              <ActionTooltip label={t("settings.access_security_history")} side="bottom" />
+                              <ActionTooltip label={t("settings.access_security_history")} side="top" className="whitespace-nowrap" />
                             </button>
                           </>
                         )}
@@ -869,7 +873,7 @@ export default function AccessManagement() {
                 label={t("settings.access_col_role")}
                 value={selectedRole}
                 onChange={setSelectedRole}
-                options={ROLES.map((option) => ({ value: option, label: option.replace(/_/g, " ") }))}
+                options={assignableRoles.map((option) => ({ value: option, label: option.replace(/_/g, " ") }))}
                 searchable
                 className="w-full"
               />
@@ -923,10 +927,17 @@ export default function AccessManagement() {
               </label>
               <input
                 id="owner-actor-password"
+                name="dmr-owner-password-verification"
                 type="password"
-                autoComplete="current-password"
+                autoComplete="new-password"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                data-form-type="other"
+                readOnly={!revealInputReady}
                 value={actorPassword}
                 onChange={(event) => setActorPassword(event.target.value)}
+                onFocus={() => setRevealInputReady(true)}
+                onPointerDown={() => setRevealInputReady(true)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && actorPassword && !revealBusy) void revealPassword();
                 }}
