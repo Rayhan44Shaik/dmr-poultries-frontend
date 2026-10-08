@@ -100,9 +100,86 @@
     color: var(--color-slate-100);
   }
 
+  /* -----------------------------------------------------------------------
+     GLOBAL DARK SURFACES
+     Most module pages were authored light-only (bg-white / text-slate-900
+     with no dark: variants), which left main content white when the app
+     theme was switched to dark. Rather than touching every module file,
+     map the common neutral utilities to their dark equivalents. Declared in
+     the BASE layer with :where() (specificity 0,1,0) so any explicit
+     `dark:` utility — which lives in the later UTILITIES layer — always
+     wins. No component logic changes; purely presentational.
+     ----------------------------------------------------------------------- */
+  .dark :where(.bg-white) {
+    background-color: var(--color-slate-900);
+  }
+  .dark :where(.bg-slate-50) {
+    background-color: var(--color-slate-900);
+  }
+  .dark :where(.bg-slate-50\/80) {
+    background-color: color-mix(in oklab, var(--color-slate-900) 80%, transparent);
+  }
+  .dark :where(.bg-slate-100) {
+    background-color: var(--color-slate-800);
+  }
+  .dark :where(.bg-slate-100\/80) {
+    background-color: color-mix(in oklab, var(--color-slate-800) 80%, transparent);
+  }
+  .dark :where(.text-slate-900) {
+    color: var(--color-slate-50);
+  }
+  .dark :where(.text-slate-800) {
+    color: var(--color-slate-100);
+  }
+  .dark :where(.text-slate-700) {
+    color: var(--color-slate-200);
+  }
+  .dark :where(.text-slate-600) {
+    color: var(--color-slate-300);
+  }
+  .dark :where(.text-slate-500) {
+    color: var(--color-slate-400);
+  }
+  .dark :where(.border-slate-100) {
+    border-color: var(--color-slate-800);
+  }
+  .dark :where(.border-slate-200) {
+    border-color: var(--color-slate-700);
+  }
+  .dark :where(.border-slate-200\/90) {
+    border-color: color-mix(in oklab, var(--color-slate-700) 90%, transparent);
+  }
+  .dark :where(.border-slate-200\/80) {
+    border-color: color-mix(in oklab, var(--color-slate-700) 80%, transparent);
+  }
+  .dark :where(.divide-slate-100 > * + *) {
+    border-color: var(--color-slate-800);
+  }
+  .dark :where(.ring-slate-200) {
+    --tw-ring-color: var(--color-slate-700);
+  }
+  .dark :where(.shadow-slate-900\/10) {
+    --tw-shadow-color: color-mix(in oklab, black 40%, transparent);
+  }
+
   ::selection {
     background: var(--color-emerald-200);
     color: var(--color-emerald-950);
+  }
+
+  /* ---------------------------------------------------------------------
+     ALPHABET SIZE — per-user root font scale (Settings → Preferences).
+     Scales every rem-based size/padding app-wide; px-exact accents keep
+     their shape. Applied via <html data-alphabet> by useUserPreferences.
+     --------------------------------------------------------------------- */
+  html[data-alphabet="small"] {
+    font-size: 87.5%;
+  }
+  html[data-alphabet="medium"] {
+    font-size: 100%;
+  }
+  html[data-alphabet="large"] {
+    font-size: 112.5%;
   }
 
   /* ---------------------------------------------------------------------

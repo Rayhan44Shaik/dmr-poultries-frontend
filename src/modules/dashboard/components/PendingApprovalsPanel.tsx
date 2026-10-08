@@ -23,6 +23,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useI18n } from "../../../i18n";
+import { useAuth } from "../../../providers/authContext";
 import { usePendingApprovals } from "../../approvals/hooks/usePendingApprovals";
 import { PENDING_LEAVES_PATH } from "../../staff/utils/leaveDeepLink";
 
@@ -106,6 +107,10 @@ export default function PendingApprovalsPanel({
   actions?: ReactNode;
 }) {
   const { t } = useI18n();
+  const { user } = useAuth();
+  // The panel summarises owner business (payments, rates, collections).
+  // OWNER/FULL_ACCESS only — other roles never render it and never fetch it.
+  const approver = user?.role === "OWNER" || user?.role === "FULL_ACCESS";
   const q = usePendingApprovals();
   const loading = !q.loaded;
   const allClear = q.loaded && q.total === 0 && q.documents.count === 0;
@@ -123,6 +128,12 @@ export default function PendingApprovalsPanel({
     return () =>
       handles.forEach((h) => window.cancelIdleCallback?.(h as number));
   }, []);
+
+  // Not an approver → render nothing at all. The queues would stay empty
+  // anyway (the snapshot never loads without approve rights), but this keeps
+  // AUDIT and entry roles from seeing even an all-clear owner strip. Placed
+  // AFTER every hook so the hook order never varies between renders.
+  if (!approver) return null;
 
   const stats: Stat[] = [
     {

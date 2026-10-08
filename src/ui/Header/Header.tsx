@@ -219,9 +219,13 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       .finally(() => { notificationRead.current = false; });
   }, [pendingCollections.loaded]);
 
-  /* ----- Live trip / permit alerts (API only — no localStorage) ----- */
+  /* ----- Live trip / permit alerts (API only — no localStorage) -----
+     OWNER/FULL_ACCESS only: notifications as a whole are an owner surface.
+     Entry/read roles never fetch these queues, so nothing owner-scoped ever
+     leaves the server for them. */
   const [opsAlerts, setOpsAlerts] = useState<NotificationItem[]>([]);
   useEffect(() => {
+    if (!canApproveAnything) return undefined;
     let cancelled = false;
     const nowLabel = formatRelativeTime(new Date());
     void (async () => {
@@ -279,7 +283,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key, language, t]);
+  }, [location.key, language, t, canApproveAnything]);
 
   /* ----- Data-driven notifications (collections snapshot + live ops alerts) -----
      Role-scoped: the bell only ever shows items that belong to the signed-in

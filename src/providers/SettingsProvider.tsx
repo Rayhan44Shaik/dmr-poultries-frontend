@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-
 interface Settings {
   currency: string;
   dateFormat: string;
   language: string;
   theme: 'light' | 'dark';
+  accessManagementEnabled: boolean;
+  profileEnabled: boolean;
 }
 
 interface SettingsContextType {
@@ -18,6 +19,8 @@ const defaultSettings: Settings = {
   dateFormat: 'DD/MM/YYYY',
   language: 'en',
   theme: 'light',
+  accessManagementEnabled: false,
+  profileEnabled: true,
 };
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -52,6 +55,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useSettings = () => {
   const context = useContext(SettingsContext);
   if (!context) throw new Error('useSettings must be used within SettingsProvider');

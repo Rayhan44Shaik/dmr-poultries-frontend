@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   AtSign,
-  BadgeCheck,
   Briefcase,
-  Hash,
+  Building2,
   KeyRound,
   Languages,
   Moon,
-  ShieldCheck,
   Smartphone,
   Sun,
   UserRound,
@@ -18,11 +16,12 @@ import ChangePasswordDialog from "../../auth/ChangePasswordDialog";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
 import type { Employee } from "../../masters/employees/types/employee";
 import { useI18n } from "../../../i18n";
-import { useTheme } from "../../../providers/ThemeProvider";
+import { useUserPreferences } from "../hooks/useUserPreferences";
 
-const formatDate = (value: string | null) =>
+/** Password tile wants the exact moment, not just the day. */
+const formatDateTime = (value: string | null) =>
   value
-    ? new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value))
+    ? new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: true }).format(new Date(value))
     : null;
 
 const roleLabel = (role: string) =>
@@ -45,27 +44,79 @@ function SectionHeading({ icon: Icon, title, delay }: { icon: LucideIcon; title:
   );
 }
 
-/** One labelled value with the tinted glyph used across the trip/activity cards. */
-function InfoTile({ icon: Icon, label, value, delay }: { icon: LucideIcon; label: string; value: string; delay: number }) {
+/**
+ * The password tile. It is rendered immediately after the Username tile in the
+ * grid so the change control and the last-changed date sit beside the user's
+ * login name, where the operator looks for them — not in a separate section
+ * further down the page.
+ */
+function PasswordTile({
+  lastChanged,
+  delay,
+  onOpen,
+}: {
+  lastChanged: string | null;
+  delay: number;
+  onOpen: () => void;
+}) {
+  const { t } = useI18n();
   return (
     <div
-      className="group animate-fade-in flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40"
+      className="group animate-fade-in flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110 dark:bg-emerald-500/10 dark:text-emerald-400">
-        <Icon size={18} />
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110 dark:bg-emerald-500/10 dark:text-emerald-400">
+        <KeyRound size={14} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+          {t("settings.password")}
+        </p>
+        <p className="truncate text-[13px] font-semibold leading-tight text-slate-800 dark:text-slate-100">
+          {lastChanged ?? t("settings.not_changed")}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 active:translate-y-0 active:scale-95"
+      >
+        <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><KeyRound size={12} /></span>
+        {t("settings.change_password")}
+      </button>
+    </div>
+  );
+}
+
+/** One labelled value with the tinted glyph used across the trip/activity cards.
+ *  `sub` renders a small secondary line (e.g. the employee no under the name). */
+function InfoTile({ icon: Icon, label, value, sub, delay }: { icon: LucideIcon; label: string; value: string; sub?: string; delay: number }) {
+  return (
+    <div
+      className="group animate-fade-in flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:hover:border-emerald-500/40"
+      style={{ animationDelay: `${delay}ms` }}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-emerald-50 text-emerald-600 transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110 dark:bg-emerald-500/10 dark:text-emerald-400">
+        <Icon size={14} />
       </span>
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
-        <p className="mt-0.5 truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{value || "—"}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="truncate text-[13px] font-semibold leading-tight text-slate-800 dark:text-slate-100">{value || "—"}</p>
+        {sub ? (
+          <p className="mt-0.5 truncate text-[10.5px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{sub}</p>
+        ) : null}
       </div>
     </div>
   );
 }
 
 export default function Profile() {
-  const { t, language, setLanguage } = useI18n();
-  const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
+  // Language + theme are persisted per user server-side; the hook keeps the
+  // providers (and therefore the whole app) in step with the stored choice.
+  // Preferences persist server-side on every change; `syncState` is kept only
+  // so a failed save can surface an inline error chip.
+  const { language, theme, alphabetSize, setLanguage, setTheme, setAlphabetSize, syncState } = useUserPreferences();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [master, setMaster] = useState<Employee | null>(null);
   const [failed, setFailed] = useState(false);
@@ -87,8 +138,13 @@ export default function Profile() {
           .then((list) => {
             if (!live) return;
             const no = (p.employeeNumber ?? "").trim();
+            const noNum = Number(no);
             const match =
-              (no ? list.find((e) => String(e.employeeNo) === no) : undefined) ??
+              (no
+                ? list.find(
+                    (e) => String(e.employeeNo) === no || (Number.isFinite(noNum) && e.employeeNo === noNum)
+                  )
+                : undefined) ??
               list.find((e) => e.employeeName.trim().toLowerCase() === p.fullName.trim().toLowerCase()) ??
               null;
             setMaster(match);
@@ -121,70 +177,30 @@ export default function Profile() {
     );
   }
 
+  /* The /auth/profile payload is already master-joined server-side
+     (authService.profile joins the employees row). When the Employees master
+     is also loaded locally it is the fresher copy of the same record, so it
+     wins; the profile values stand in when masters access is unavailable. */
   const fullName = master?.employeeName?.trim() || profile.fullName;
-  const employeeNo = profile.employeeNumber || (master ? String(master.employeeNo) : "");
+  const employeeNo = master ? String(master.employeeNo) : (profile.employeeNumber ?? "");
   const mobile = master?.phoneNumber?.trim() || profile.mobileNumber;
   const department = master?.department?.trim() || profile.department;
   const roleText = roleLabel(profile.role);
-  const lastChanged = formatDate(profile.lastPasswordResetAt);
-  const initials =
-    fullName
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((x) => x[0])
-      .join("")
-      .toUpperCase() || "";
-
-  const tiles: Array<{ icon: LucideIcon; label: string; value: string }> = [
-    { icon: UserRound, label: t("settings.full_name"), value: fullName },
-    { icon: Hash, label: t("settings.employee_number"), value: employeeNo ? String(employeeNo) : "" },
+  const lastChanged = formatDateTime(profile.lastPasswordResetAt);
+  const tiles: Array<{ icon: LucideIcon; label: string; value: string; sub?: string }> = [
+    /* Name carries the employee number on its second line — one identity
+       tile instead of two. */
+    { icon: UserRound, label: t("settings.full_name"), value: fullName, sub: employeeNo ? `${t("settings.employee_number")}: ${employeeNo}` : "" },
+    /* Where the number tile used to sit: the department, straight from the
+       Employees master. */
+    { icon: Building2, label: t("settings.department"), value: department },
     { icon: Smartphone, label: t("settings.mobile_number"), value: mobile },
-    { icon: Briefcase, label: t("settings.role"), value: roleText + (department ? ` · ${department}` : "") },
+    { icon: Briefcase, label: t("settings.role"), value: roleText },
     { icon: AtSign, label: t("settings.username"), value: profile.username },
   ];
 
   return (
     <div className="space-y-6">
-      {/* ── Identity: the logo card ─────────────────────────────────────── */}
-      <section
-        className="animate-fade-in relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900 sm:p-6"
-        aria-label="Identity"
-      >
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-emerald-500/10 blur-2xl"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-brand-500/10 blur-2xl"
-        />
-        <div className="relative flex flex-wrap items-center gap-4">
-          <span className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 text-lg font-bold text-white shadow-lg shadow-emerald-500/25 ring-4 ring-white transition-transform duration-300 hover:scale-105 dark:ring-slate-900">
-            {initials || <UserRound size={26} />}
-            <span className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-white ring-2 ring-white dark:bg-slate-900 dark:ring-slate-900">
-              <BadgeCheck size={13} className="text-emerald-500" />
-            </span>
-          </span>
-          <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold tracking-tight text-slate-900 dark:text-white">{fullName}</h2>
-            <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                <ShieldCheck size={12} />
-                {roleText}
-              </span>
-              {department && <span>{department}</span>}
-              {profile.username && (
-                <span className="inline-flex items-center gap-1">
-                  <AtSign size={12} />
-                  {profile.username}
-                </span>
-              )}
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ── Personal information ────────────────────────────────────────── */}
       <section aria-labelledby="personal-info">
         <div id="personal-info">
@@ -192,42 +208,15 @@ export default function Profile() {
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {tiles.map((tile, index) => (
-            <InfoTile key={tile.label} icon={tile.icon} label={tile.label} value={tile.value} delay={80 + index * 45} />
+            <InfoTile key={tile.label} icon={tile.icon} label={tile.label} value={tile.value} sub={tile.sub} delay={80 + index * 45} />
           ))}
-        </div>
-      </section>
-
-      {/* ── Security ───────────────────────────────────────────────────── */}
-      <section aria-labelledby="security">
-        <div id="security">
-          <SectionHeading icon={ShieldCheck} title={t("settings.security")} delay={260} />
-        </div>
-        <div
-          className="animate-fade-in flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
-          style={{ animationDelay: "300ms" }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
-              <KeyRound size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("settings.password")}</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                {t("settings.last_changed")}: {lastChanged ?? t("settings.not_changed")}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setPasswordOpen(true)}
-            className="group inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 active:translate-y-0 active:scale-95"
-          >
-            <KeyRound
-              size={15}
-              className="transition-transform duration-300 group-hover:-rotate-12 group-active:rotate-0"
-            />
-            {t("auth.password.title")}
-          </button>
+          {/* Password sits directly beside the username tile: its last-changed
+              date and the control to change it live together here. */}
+          <PasswordTile
+            delay={80 + tiles.length * 45}
+            lastChanged={lastChanged}
+            onOpen={() => setPasswordOpen(true)}
+          />
         </div>
       </section>
 
@@ -236,49 +225,74 @@ export default function Profile() {
         <div id="preferences">
           <SectionHeading icon={Languages} title={t("settings.preferences")} delay={340} />
         </div>
+        {/* Compact, always-aligned preference row — Language select and the
+            Light/Dark toggle share one strip. Saving is silent: every change is
+            persisted to the backend immediately (errors surface only when a
+            save actually fails), so no "last saved" chip is shown. */}
         <div
-          className="animate-fade-in grid gap-5 rounded-xl border border-slate-200 bg-white p-5 sm:grid-cols-2 dark:border-slate-700 dark:bg-slate-900"
+          className="animate-fade-in flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900"
           style={{ animationDelay: "380ms" }}
         >
-          <label className="block">
-            <span className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              <Languages size={15} />
-              {t("settings.language")}
+          <div className="flex min-w-[180px] flex-1 items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-50 text-sky-600 dark:bg-sky-500/10 dark:text-sky-400">
+              <Languages size={14} />
             </span>
             <select
               value={language}
               onChange={(e) => setLanguage(e.target.value as "en" | "te")}
-              className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 transition focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              aria-label={t("settings.language")}
+              className="w-full max-w-[150px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             >
               <option value="en">{t("settings.english")}</option>
               <option value="te">{t("settings.telugu")}</option>
             </select>
-          </label>
-
-          <div>
-            <p className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              {theme === "dark" ? <Moon size={15} /> : <Sun size={15} />}
-              {t("settings.appearance")}
-            </p>
-            <div className="mt-2 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1 dark:border-slate-700 dark:bg-slate-800/60">
+            {/* Alphabet size — sits right beside the language choice. */}
+            <select
+              value={alphabetSize}
+              onChange={(e) => setAlphabetSize(e.target.value as "small" | "medium" | "large")}
+              aria-label={t("settings.alphabet_size")}
+              title={t("settings.alphabet_size")}
+              className="w-full max-w-[120px] rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            >
+              <option value="small">{t("settings.alphabet_small")}</option>
+              <option value="medium">{t("settings.alphabet_medium")}</option>
+              <option value="large">{t("settings.alphabet_large")}</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${
+                theme === "dark"
+                  ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400"
+                  : "bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
+              }`}
+            >
+              {theme === "dark" ? <Moon size={14} /> : <Sun size={14} />}
+            </span>
+            <div className="flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800/60">
               {(["light", "dark"] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   onClick={() => setTheme(mode)}
                   aria-pressed={theme === mode}
-                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold capitalize transition-all duration-200 ${
+                  className={`inline-flex items-center gap-1 rounded-sm px-2.5 py-1 text-[11px] font-bold capitalize transition-all duration-200 ${
                     theme === mode
                       ? "bg-emerald-600 text-white shadow-sm"
-                      : "text-slate-600 hover:bg-white hover:shadow-sm dark:text-slate-300 dark:hover:bg-slate-700"
+                      : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                   }`}
                 >
-                  {mode === "light" ? <Sun size={13} /> : <Moon size={13} />}
+                  {mode === "light" ? <Sun size={11} /> : <Moon size={11} />}
                   {mode}
                 </button>
               ))}
             </div>
           </div>
+          {syncState === "error" && (
+            <span className="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+              {t("settings.preferences_state_error")}
+            </span>
+          )}
         </div>
       </section>
 

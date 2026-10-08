@@ -1,6 +1,6 @@
 // src/modules/auth/ChangePasswordDialog.tsx
 import { useMemo, useState, type FormEvent } from "react";
-import { CheckCircle2, Eye, EyeOff, KeyRound } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, KeyRound, X } from "lucide-react";
 import { changePasswordRequest } from "./authApi";
 import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
@@ -127,27 +127,29 @@ export default function ChangePasswordDialog({ open, onClose }: Props) {
           {t("auth.password.title")}
         </span>
       }
-      overlayClassName="!z-[120]"
+      overlayClassName="!z-[120] backdrop-blur-none"
       footer={
         done ? null : (
-          <>
+          <div className="flex w-full items-center justify-end gap-2">
             <button
               type="button"
               onClick={close}
               disabled={busy}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="group inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md active:translate-y-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50 disabled:cursor-not-allowed disabled:opacity-60"
             >
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} strokeWidth={2.4} /></span>
               {t("common.cancel")}
             </button>
             <button
               type="submit"
               form="change-password-form"
               disabled={!canSubmit}
-              className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative inline-flex min-h-9 items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-500/25 transition-all duration-200 before:absolute before:inset-0 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:transition-transform before:duration-500 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-emerald-500/35 hover:before:translate-x-full active:translate-y-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
             >
-              {busy ? t("auth.password.saving") : t("auth.password.save")}
+              <span className="relative z-10 inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><KeyRound size={14} strokeWidth={2.4} /></span>
+              <span className="relative z-10">{busy ? t("auth.password.saving") : t("auth.password.save")}</span>
             </button>
-          </>
+          </div>
         )
       }
     >

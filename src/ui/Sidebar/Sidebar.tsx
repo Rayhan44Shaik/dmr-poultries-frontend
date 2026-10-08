@@ -445,7 +445,13 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed left-3 top-[4.5rem] z-50 flex max-h-[calc(100dvh-6rem)] w-[18.75rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
+            /* Definite height, NOT max-height: percentage-height children
+               (nav `h-full`) only resolve inside a definite-height parent, and
+               with max-h the nav computed its full content height and was
+               clipped by overflow-hidden — the list could not scroll at all
+               on small screens. h- caps it; the nav below then owns the
+               scrolling. */
+            className="fixed left-3 top-[4.5rem] z-50 flex h-[calc(100dvh-6rem)] w-[18.75rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
           >
             {/* Compact brand row */}
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">
