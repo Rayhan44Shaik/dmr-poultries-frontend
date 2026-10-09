@@ -4,6 +4,9 @@ import type { FontScale } from "./fontScale";
 export interface FontScaleContextValue {
   scale: FontScale;
   setScale: (scale: FontScale) => void;
+  /** Applies + locally persists a scale WITHOUT echoing it back to the
+   *  preferences API — used when adopting the server's stored value. */
+  adoptScale: (scale: FontScale) => void;
   increase: () => void;
   decrease: () => void;
   canIncrease: boolean;

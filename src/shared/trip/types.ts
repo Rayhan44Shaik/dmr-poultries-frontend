@@ -252,5 +252,8 @@ export interface Trip {
   dcPhotoKey2?: string;
   dcPhotoMime2?: string;
   dcPhotoData2?: string;
+  /** All Step 3 DC photos for the active load. Legacy two-photo fields remain
+   * populated for older clients, while this collection has no UI limit. */
+  pickupPhotos?: Array<{ key: string; mime: string; data: string }>;
   approvedBy?: string;
 }

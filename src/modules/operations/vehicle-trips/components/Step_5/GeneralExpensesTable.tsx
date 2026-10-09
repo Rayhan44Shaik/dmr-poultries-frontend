@@ -32,7 +32,7 @@ export default function GeneralExpensesTable({
   averageKmLtr: _averageKmLtr,
   openingMeter,
   destMeter,
-  trip: _trip,
+  trip,
   readOnly = false,
   onMeterNotice,
 }: GeneralExpensesTableProps) {
@@ -127,6 +127,10 @@ export default function GeneralExpensesTable({
     computedDistance > 0 && totalDieselLiters > 0
       ? (computedDistance / totalDieselLiters).toFixed(2)
       : null;
+  const dieselOtherAmount = Array.isArray(trip?.dieselEntries)
+    ? trip.dieselEntries.reduce((sum: number, entry: any) =>
+        entry?.bunkSource === "OTHER" ? sum + Number(entry?.amount || 0) : sum, 0)
+    : 0;
   /** Coloured icon chip for expense category labels. */
   const CatIcon = ({
     icon: Icon,
@@ -197,8 +201,11 @@ export default function GeneralExpensesTable({
               field?: string;
               rightBg?: string;
               nameField?: string;
+              derived?: boolean;
             }> = [
               { key: "others1Amt", label: t("ops.trip.exp_rto"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
+              { key: "dieselOthers", label: "Diesel Others", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
+              { key: "supervisorPc", label: "Supervisor (PC)", value: trip?.advanceAmount || 0, tone: "bg-blue-50/70 text-blue-600", Icon: Users, derived: true, rightBg: "bg-blue-50/30" },
               { key: "others2Amt", label: sheetData.others2Name || t("common.other"), value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", nameField: "others2Name", rightBg: "bg-slate-50/50" },
               { key: "others3Amt", label: sheetData.others3Name || t("common.other"), value: sheetData.others3Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others3Amt", nameField: "others3Name", rightBg: "bg-slate-50/50" },
               { key: "others4Amt", label: sheetData.others4Name || t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", nameField: "others4Name", rightBg: "bg-slate-50/50" },
@@ -271,7 +278,7 @@ export default function GeneralExpensesTable({
                   </td>
                   <td colSpan={2} className={`w-[22%] ${readOnly ? "font-semibold text-slate-900 px-3 tabular-nums" : "p-0"}`}>
                     {right ? (
-                      readOnly ? (
+                      readOnly || right.derived ? (
                         formatInrAmt(right.value)
                       ) : (
                         <input

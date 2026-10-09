@@ -36,9 +36,9 @@ export function ActionTooltip({ label, placement = "top", side, className }: Act
         "shadow-[0_8px_32px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.12)] ring-1 ring-white/5",
         "whitespace-normal break-words text-pretty",
         // animation - like trip list refresh hen dance smoothness
-        "opacity-0 scale-[0.92] translate-y-1 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
-        "group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0",
-        "group-focus-visible:opacity-100 group-focus-visible:scale-100 group-focus-visible:translate-y-0",
+        "invisible opacity-0 scale-[0.92] transition-[opacity,transform,visibility] duration-150 ease-out",
+        "group-hover:visible group-hover:opacity-100 group-hover:scale-100",
+        "group-focus-visible:visible group-focus-visible:opacity-100 group-focus-visible:scale-100",
         // origin for scale
         isTop ? "origin-bottom" : "origin-top",
         placementClass[resolvedPlacement],

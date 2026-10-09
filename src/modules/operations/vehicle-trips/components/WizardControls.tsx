@@ -417,6 +417,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
               event.preventDefault();
               onChange(Array.from(new Set([...selectedValues, ...additions])));
               setQuery("");
+              setOpen(false);
             }}
           />
 

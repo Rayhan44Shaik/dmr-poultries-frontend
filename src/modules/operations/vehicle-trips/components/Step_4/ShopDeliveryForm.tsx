@@ -13,11 +13,13 @@ import {
   PackageCheck,
   Tag,
   CheckCircle2,
+  Save,
 } from "lucide-react";
 import { SearchDropdown, MultiSearchDropdown, type DropdownOption } from "../WizardControls";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { useI18n } from "../../../../../i18n";
 import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 
 /** Soft, eye-friendly tile palette cycled across the selected-box grid so each
  *  box number is easy to tell apart without harsh/bright colours. */
@@ -315,10 +317,10 @@ export default function ShopDeliveryForm({
           type="button"
           tabIndex={-1}
           onClick={onClose}
-          className="h-8 w-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors shrink-0"
+          className="group h-9 w-9 rounded-full border border-slate-200 bg-white hover:border-red-100 hover:bg-red-50 flex items-center justify-center text-slate-400 hover:text-red-500 transition-all active:scale-95 shrink-0"
           aria-label={t("common.close")}
         >
-          <X size={16} />
+          <X size={16} className={uiActionIconMotionClass.close} />
         </button>
         </div>
       </div>
@@ -401,17 +403,17 @@ export default function ShopDeliveryForm({
           </div>
           {selectedBoxIds.length > 0 ? (
             <div
-              className={`grid gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 ${
-                selectedBoxIds.length > 30
-                  ? "grid-cols-[repeat(auto-fill,minmax(40px,1fr))]"
-                  : "grid-cols-[repeat(auto-fill,minmax(64px,1fr))]"
+              className={`grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50/60 p-2 ${
+                selectedBoxIds.length > 12
+                  ? "grid-cols-[repeat(auto-fill,minmax(42px,1fr))]"
+                  : "grid-cols-[repeat(auto-fill,minmax(52px,1fr))]"
               }`}
             >
               {selectedBoxIds.map((id, idx) => (
                 <span
                   key={id}
                   className={`flex items-center justify-center gap-1 rounded-lg border px-1 font-bold shadow-xs ${
-                    selectedBoxIds.length > 30 ? "h-7 text-[11px]" : "h-10 text-sm"
+                    selectedBoxIds.length > 12 ? "h-8 text-xs" : "h-9 text-xs"
                   } ${BOX_TILE_PALETTE[idx % BOX_TILE_PALETTE.length]}`}
                 >
                   <span className="tabular-nums">{String(id).padStart(2, "0")}</span>
@@ -435,6 +437,20 @@ export default function ShopDeliveryForm({
             </div>
           )}
         </div>
+
+        {/* Keep the balance warning below the box list so it never changes the
+            height of one KPI tile or pushes the other KPI columns out of line. */}
+        {mode === "weight" && validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
+          <div className="flex min-h-9 items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs font-semibold leading-5 text-amber-700" role="alert">
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>{t("ops.trip.validate.birds_mismatch", {
+              pickup: farmBirds,
+              delivered: Number(formData.birds) || 0,
+              mortality: Number(formData.mortality) || 0,
+              total: (Number(formData.birds) || 0) + (Number(formData.mortality) || 0),
+            })}</span>
+          </div>
+        )}
 
         {/* Mode-specific breakdown */}
         {mode === "box" ? (
@@ -547,17 +563,6 @@ export default function ShopDeliveryForm({
                       <AlertCircle size={10} /> {t("ops.trip.max")}: {farmBirds}
                     </p>
                   )}
-                  {validationErrors.birdsMismatch && !validationErrors.birdsExceedFarm && (
-                    <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1 font-medium">
-                      <AlertCircle size={10} />{" "}
-                      {t("ops.trip.validate.birds_mismatch", {
-                        pickup: farmBirds,
-                        delivered: Number(formData.birds) || 0,
-                        mortality: Number(formData.mortality) || 0,
-                        total: (Number(formData.birds) || 0) + (Number(formData.mortality) || 0),
-                      })}
-                    </p>
-                  )}
                 </MetricTile>
                 <MetricTile
                   icon={Scale}
@@ -617,7 +622,6 @@ export default function ShopDeliveryForm({
                     min="0"
                     className={neutralInputClass()}
                   />
-                  <p className="mt-1 text-[10px] text-slate-400 font-medium">{t("ops.trip.optional")}</p>
                 </MetricTile>
               </div>
             </div>
@@ -698,7 +702,7 @@ export default function ShopDeliveryForm({
                 : "bg-slate-200 text-slate-400 cursor-not-allowed"
             }`}
           >
-            <CheckCircle2 size={15} />
+            <Save size={15} className="transition-transform duration-200 group-hover:-translate-y-0.5" />
             {isEditing ? t("ops.trip.update_delivery") : t("ops.trip.save_delivery")}
           </button>
         </div>

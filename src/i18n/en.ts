@@ -815,7 +815,7 @@ export default {
   'settings.access_pw_reveal': 'View password (owner only)',
   'settings.access_pw_hide': 'Hide password',
   'settings.access_reveal_title': 'View employee password',
-  'settings.access_reveal_note': "Enter your own login password to view {name}'s password. A fresh working password will be issued and their current sessions will be signed out.",
+  'settings.access_reveal_note': "Enter your own login password to view {name}'s password. Viewing is read-only: it shows the temporary password issued at grant or reset and changes nothing. If {name} already set a private password, use Reset Password to issue a new one.",
   'settings.access_reveal_prompt': 'Enter your login password',
   'settings.access_reveal_confirm': 'View password',
   'settings.access_reveal_failed': 'Password verification failed. The password was not revealed.',

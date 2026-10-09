@@ -73,5 +73,7 @@ test('the list is a bounded scroll box in the rail, the panel and the popup', ()
   assert.doesNotMatch(navClass, /max-h-\[calc/, 'no hardcoded chrome-height arithmetic');
   assert.doesNotMatch(navClass, /lg:max-h-none/, 'an unbounded nav on desktop is what made it unscrollable');
   // The popup dialog must be bounded too, or h-full has nothing to fill.
-  assert.match(source, /flex max-h-\[calc\(100dvh-6rem\)\] .*flex-col/, 'popup is a bounded flex column');
+  // The bound may be an exact height (current) or a max-height cap — what
+  // matters is the 100dvh-6rem bound itself.
+  assert.match(source, /flex (?:max-)?h-\[calc\(100dvh-6rem\)\] .*flex-col/, 'popup is a bounded flex column');
 });

@@ -163,7 +163,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [demoMode, user, landOnSignIn]);
+  // Boot validation runs once per provider mount. Depending on `user` here
+  // would issue another /auth/me every time login/adoption changes identity.
+  }, [demoMode, landOnSignIn]);
 
   const isAuthenticated = !!user;
 

@@ -11,6 +11,7 @@ import {
   handleApiError,
 } from "../../../../api";
 import type { Vehicle } from "../types/vehicle";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 const VEHICLES_PATH = "/masters/vehicles";
 export const VEHICLES_CHANGED_EVENT = "dmr:vehicles-changed";
@@ -81,7 +82,7 @@ export function mapVehicle(raw: Record<string, unknown>): Vehicle {
   const mapped: Vehicle & { emiDay?: number; totalEMIs?: number } = {
     id: Number(raw.id),
     vehicleNo: Number(raw.vehicleNo ?? raw.vehicle_no ?? 0),
-    vehicleNumber: String(raw.vehicleNumber ?? raw.vehicle_number ?? ""),
+    vehicleNumber: formatVehicleNumber(String(raw.vehicleNumber ?? raw.vehicle_number ?? "")),
     vehicleType: String(raw.vehicleType ?? raw.vehicle_type ?? ""),
     noOfBoxes: Number(raw.noOfBoxes ?? raw.no_of_boxes ?? 0),
     birdCapacity: Number(raw.birdCapacity ?? raw.bird_capacity ?? 0),

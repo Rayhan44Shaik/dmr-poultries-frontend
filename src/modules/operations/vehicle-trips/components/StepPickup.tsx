@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Scale, Bird, Box, Gauge, Clock, Pencil, Package, Lock,
-  Plus, Trash2, FileText, Camera, Download
+  Plus, Trash2, FileText, Camera, Download, Upload, CheckCircle2, X
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles, loadVehicles } from "../../../masters/vehicles/services/vehicleService";
@@ -22,6 +22,7 @@ import { formatTripViewStamp } from "../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "./TripTimestampDisplay";
 import { withMinSaveDuration } from "../utils/withMinSaveDuration";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
+import { parsePickupImport, validatePickupImport } from "../utils/pickupImport";
 
 interface Props {
   trip: Trip;
@@ -71,7 +72,10 @@ function formatAvg(birds: number, weight: number, stored?: number | null) {
   return avg == null ? "—" : String(avg);
 }
 
-function photosFromTrip(trip: Pick<Trip, "id" | "dcPhotoKey" | "dcPhotoKey2" | "dcPhotoMime" | "dcPhotoMime2" | "dcPhotoData" | "dcPhotoData2">): PickupPhoto[] {
+function photosFromTrip(trip: Pick<Trip, "id" | "dcPhotoKey" | "dcPhotoKey2" | "dcPhotoMime" | "dcPhotoMime2" | "dcPhotoData" | "dcPhotoData2" | "pickupPhotos">): PickupPhoto[] {
+  if (Array.isArray(trip.pickupPhotos) && trip.pickupPhotos.length) {
+    return trip.pickupPhotos.filter((photo) => photo?.data?.startsWith("data:image/"));
+  }
   const out: PickupPhoto[] = [];
   if (trip.dcPhotoData && trip.dcPhotoData.startsWith("data:image/")) {
     out.push({
@@ -87,7 +91,7 @@ function photosFromTrip(trip: Pick<Trip, "id" | "dcPhotoKey" | "dcPhotoKey2" | "
       data: trip.dcPhotoData2,
     });
   }
-  return out.slice(0, 2);
+  return out;
 }
 
 export default function StepPickup({
@@ -245,6 +249,7 @@ export default function StepPickup({
     dcPhotoMime2: trip.dcPhotoMime2,
     dcPhotoData: trip.dcPhotoData,
     dcPhotoData2: trip.dcPhotoData2,
+    pickupPhotos: trip.pickupPhotos,
   }), [
     trip.id,
     trip.dcPhotoKey,
@@ -253,10 +258,51 @@ export default function StepPickup({
     trip.dcPhotoMime2,
     trip.dcPhotoData,
     trip.dcPhotoData2,
+    trip.pickupPhotos,
   ]);
   const persistedBoxDetails = trip.boxDetails;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importRows, setImportRows] = useState<BoxDetail[]>([]);
+  const [importError, setImportError] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [selectedImportIndex, setSelectedImportIndex] = useState(0);
+  const [editingImportIndex, setEditingImportIndex] = useState<number | null>(null);
+  const importRowRefs = useRef<Map<number, HTMLTableRowElement>>(new Map());
+  const importGridRef = useRef<HTMLDivElement>(null);
+  const importEditOriginalRef = useRef<BoxDetail | null>(null);
+  useEffect(() => {
+    if (!importOpen) return;
+    const appScroll = document.getElementById("app-scroll");
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousAppOverflow = appScroll?.style.overflow ?? "";
+    const previousAppOverscroll = appScroll?.style.overscrollBehavior ?? "";
+    const lockedScrollTop = appScroll?.scrollTop ?? 0;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    if (appScroll) {
+      appScroll.style.overflow = "hidden";
+      appScroll.style.overscrollBehavior = "none";
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setImportOpen(false);
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      if (appScroll) {
+        appScroll.style.overflow = previousAppOverflow;
+        appScroll.style.overscrollBehavior = previousAppOverscroll;
+        appScroll.scrollTop = lockedScrollTop;
+      }
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [importOpen]);
   // Which DC-photo slot (0 or 1) the picker was opened for.
   const slotIndexRef = useRef(0);
   const [, setSavedPhotoKeys] = useState(() => photosFromTrip(trip).map((photo) => photo.key));
@@ -321,6 +367,8 @@ export default function StepPickup({
               dcPhotoData2: photos[1].data,
             }
           : {}),
+        pickupPhotos: photos,
+        syncPickupPhotos: true,
       } as Partial<Trip>;
       const fingerprint = JSON.stringify({
         legIndex: Number(trip.activeLegIndex ?? 1),
@@ -550,6 +598,81 @@ export default function StepPickup({
     return Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail;
   });
 
+  const handleImportFile = async (file?: File) => {
+    if (!file) return;
+    setImportBusy(true);
+    setImportError("");
+    try {
+      const parsed = await parsePickupImport(file);
+      const errors = validatePickupImport(parsed, maxBoxes);
+      if (errors.length) {
+        setImportRows(parsed);
+        setImportError(errors.join(" "));
+        return;
+      }
+      setImportRows(parsed);
+      setSelectedImportIndex(0);
+      setEditingImportIndex(null);
+      requestAnimationFrame(() => importGridRef.current?.focus());
+    } catch (error) {
+      setImportRows([]);
+      setImportError(error instanceof Error ? error.message : "Unable to read this file.");
+    } finally {
+      setImportBusy(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
+  const applyImportedRows = () => {
+    const errors = validatePickupImport(importRows, maxBoxes);
+    if (errors.length) return setImportError(errors.join(" "));
+    setRows(importRows.map((row) => ({ ...row, uid: generateUid() })));
+    setRemovedBoxNos([]);
+    setImportOpen(false);
+    setToast({ message: `Imported ${importRows.length} box entries.`, type: "success" });
+  };
+
+  const updateImportedRow = (index: number, field: "boxNo" | "birds" | "weight", value: string) => {
+    const number = Number(value);
+    setImportRows((current) => current.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, [field]: Number.isFinite(number) ? number : 0 };
+      next.avgWeight = next.birds > 0 && next.weight > 0
+        ? Number((next.weight / next.birds).toFixed(2))
+        : null;
+      return next;
+    }));
+    setImportError("");
+  };
+
+  const selectImportedRow = (index: number) => {
+    const next = Math.max(0, Math.min(importRows.length - 1, index));
+    setSelectedImportIndex(next);
+    importRowRefs.current.get(next)?.scrollIntoView({ block: "nearest" });
+  };
+
+  const beginImportEdit = (index: number) => {
+    importEditOriginalRef.current = { ...importRows[index] };
+    setSelectedImportIndex(index);
+    setEditingImportIndex(index);
+  };
+
+  const cancelImportEdit = () => {
+    if (editingImportIndex !== null && importEditOriginalRef.current) {
+      const original = importEditOriginalRef.current;
+      setImportRows((current) => current.map((row, index) => index === editingImportIndex ? original : row));
+    }
+    importEditOriginalRef.current = null;
+    setEditingImportIndex(null);
+  };
+
+  const finishImportEdit = () => {
+    const errors = validatePickupImport(importRows, maxBoxes);
+    setImportError(errors.join(" "));
+    importEditOriginalRef.current = null;
+    setEditingImportIndex(null);
+  };
+
   const isLastRowComplete = useMemo(() => {
     if (rows.length === 0) return true;
     const lastRow = rows[rows.length - 1];
@@ -564,6 +687,7 @@ export default function StepPickup({
     dcPhotoKey2: photos[1]?.key,
     dcPhotoMime2: photos[1]?.mime,
     dcPhotoData2: photos[1]?.data,
+    pickupPhotos: photos,
     syncPickupPhotos: true,
   });
 
@@ -575,6 +699,19 @@ export default function StepPickup({
       ? formatTripViewStamp(trip.pickupStepSubmittedAt, language)
       : formatTripViewStamp(trip.pickupLoadTime, language) || ""
     : "";
+  const timeOnly = (value: unknown) => {
+    if (!value) return "";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit", hour12: true,
+    }).toLowerCase();
+  };
+  const pickupTimeRange = trip.pickupStepSubmitted
+    ? [timeOnly(trip.farmStepSubmittedAt), timeOnly(trip.pickupStepSubmittedAt || trip.pickupLoadTime)]
+        .filter(Boolean)
+        .filter((value, index, all) => all.indexOf(value) === index)
+        .join(" – ")
+    : "";
 
   const uploadBusyRef = useRef(false);
 
@@ -585,59 +722,46 @@ export default function StepPickup({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || uploadBusyRef.current) return;
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || uploadBusyRef.current) return;
     uploadBusyRef.current = true;
 
     try {
-      if (!file.type.startsWith("image/")) {
+      if (files.some((file) => !file.type.startsWith("image/"))) {
         setToast({ message: t("ops.trip.valid_image"), type: "error" });
         return;
       }
-    if (file.size > 5 * 1024 * 1024) {
+    if (files.some((file) => file.size > 20 * 1024 * 1024)) {
       setToast({ message: t("ops.trip.image_size_5mb"), type: "error" });
       return;
     }
-    if (photos.length >= 2) {
-      setToast({ message: t("ops.trip.max_2_photos"), type: "error" });
-      return;
-    }
-
-    // Auto-compress before storing: every photo lands under ~100 KB while
-      // staying clear (quality-first JPEG stepping, dimension floor 640px).
-      // The 5 MB gate above only rejects undecodable monsters — compression
-      // handles everything in between.
-      const result = await compressImageFile(file, { maxBytes: 100 * 1024, maxDimension: 1600 });
-      const data = result.dataUrl;
-      if (!data.startsWith("data:image/")) {
-        setToast({ message: t("ops.trip.valid_image"), type: "error" });
+      const results = await Promise.all(files.map((file) =>
+        compressImageFile(file, { maxBytes: 50 * 1024, maxDimension: 2000, minDimension: 640 })
+      ));
+      if (results.some((result) => result.storedBytes > 50 * 1024)) {
+        setToast({ message: "An image could not be reduced below 50 KB without becoming unreadable.", type: "error" });
         return;
       }
-      const next: PickupPhoto = {
-        key: `${trip.tripNo || `trip-${trip.id}`}-load-${Number(trip.activeLegIndex ?? 1)}-photo-${photos.length + 1}-${Date.now()}`,
+      const stamp = Date.now();
+      const additions: PickupPhoto[] = results.map((result, index) => ({
+        key: `${trip.tripNo || `trip-${trip.id}`}-load-${Number(trip.activeLegIndex ?? 1)}-photo-${photos.length + index + 1}-${stamp}-${index}`,
         mime: result.mime,
-        data,
-      };
-      // Place the photo in the slot the user tapped; keep max 2.
-      const target = Math.min(slotIndexRef.current, photos.length);
-      const nextPhotos = [...photos];
-      nextPhotos.splice(target, 0, next);
-      const capped = nextPhotos.slice(0, 2);
-      setPhotos(capped);
+        data: result.dataUrl,
+      }));
+      const nextPhotos = [...photos, ...additions];
+      setPhotos(nextPhotos);
       updateTrip({
-        dcPhotoKey: capped[0]?.key,
-        dcPhotoMime: capped[0]?.mime,
-        dcPhotoData: capped[0]?.data,
-        dcPhotoKey2: capped[1]?.key,
-        dcPhotoMime2: capped[1]?.mime,
-        dcPhotoData2: capped[1]?.data,
+        dcPhotoKey: nextPhotos[0]?.key,
+        dcPhotoMime: nextPhotos[0]?.mime,
+        dcPhotoData: nextPhotos[0]?.data,
+        dcPhotoKey2: nextPhotos[1]?.key,
+        dcPhotoMime2: nextPhotos[1]?.mime,
+        dcPhotoData2: nextPhotos[1]?.data,
+        pickupPhotos: nextPhotos,
       });
-      if (result.compressed) {
+      if (results.some((result) => result.compressed)) {
         setToast({
-          message: t("ops.trip.photo_auto_compressed", {
-            from: Math.round(result.originalBytes / 1024),
-            to: Math.round(result.storedBytes / 1024),
-          }),
+          message: `${files.length} image${files.length === 1 ? "" : "s"} ready (each 50 KB or below).`,
           type: "success",
         });
       }
@@ -662,7 +786,16 @@ export default function StepPickup({
       dcPhotoKey2: nextPhotos[1]?.key,
       dcPhotoMime2: nextPhotos[1]?.mime,
       dcPhotoData2: nextPhotos[1]?.data,
+      pickupPhotos: nextPhotos,
     });
+  };
+
+  const openImage = (photo: PickupPhoto) => {
+    const popup = window.open("", "_blank");
+    if (!popup) return;
+    popup.opener = null;
+    popup.document.write(`<!doctype html><title>Pickup image</title><style>html,body{margin:0;min-height:100%;background:#0f172a;display:grid;place-items:center}img{max-width:100vw;max-height:100vh;object-fit:contain}</style><img alt="Pickup DC" src="${photo.data}">`);
+    popup.document.close();
   };
 
   // ─── Download Image ──────────────────────────────────────────────────
@@ -796,7 +929,7 @@ export default function StepPickup({
     if (!beginAction("pdf")) return;
     try {
       await generatePickupReportPDF(trip, {
-        pickupTime: officialPickupTime || undefined,
+        pickupTime: pickupTimeRange || officialPickupTime || undefined,
         maxBoxes: maxBoxes || undefined,
       });
     } catch (error) {
@@ -898,17 +1031,16 @@ export default function StepPickup({
             </div>
             <div className="flex flex-wrap items-center justify-start gap-2">
               {photos.map((photo, index) => (
-                <a
+                <button
+                  type="button"
                   key={photo.key}
-                  href={photo.data}
-                  target="_blank"
-                  rel="noreferrer"
+                  onClick={() => openImage(photo)}
                   className="group w-28 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                   aria-label={`View Load ${Number(trip.activeLegIndex ?? 1)} pickup photo ${index + 1}`}
                 >
                   <img src={photo.data} alt={`Load ${Number(trip.activeLegIndex ?? 1)} pickup ${index + 1}`} className="h-16 w-28 object-contain transition-transform duration-200 group-hover:scale-[1.02]" />
                   <span className="block truncate border-t border-slate-200 bg-white px-1.5 py-1 text-[9px] font-semibold text-slate-500">Photo {index + 1} · View</span>
-                </a>
+                </button>
               ))}
             </div>
           </div>
@@ -1119,7 +1251,7 @@ export default function StepPickup({
           )}
         </div>
 
-        {/* Image Upload Section — two DC photo slots */}
+        {/* A single upload box manages an unlimited collection of DC photos. */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <label className="text-[15px] font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
             <span className="h-6 w-6 rounded-md bg-sky-50/80 text-sky-500 flex items-center justify-center shrink-0">
@@ -1127,15 +1259,15 @@ export default function StepPickup({
             </span>
             {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
             <span className="text-[13px] font-normal text-slate-400">
-              {t("ops.trip.photos_of_2", { count: photos.length })}
+              {photos.length} uploaded · each 50 KB or below
             </span>
           </label>
           <div className="mt-2 flex items-center gap-3 flex-wrap">
-            {[0, 1].map((slot) => {
-              const p = photos[slot];
-              return p ? (
+            {photos.map((p, slot) => (
                 <div key={p.key} className="relative">
-                  <img src={p.data} alt={`Pickup ${slot + 1}`} className="h-24 w-24 object-cover rounded-xl border border-slate-200 shadow-xs" />
+                  <button type="button" onClick={() => openImage(p)} className="block">
+                    <img src={p.data} alt={`Pickup ${slot + 1}`} className="h-24 w-24 object-contain rounded-xl border border-slate-200 bg-white shadow-xs" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => void removeImage(p.key)}
@@ -1147,22 +1279,20 @@ export default function StepPickup({
                     {slot + 1}
                   </span>
                 </div>
-              ) : (
+            ))}
                 <button
-                  key={`add-slot-${slot}`}
                   type="button"
-                  onClick={() => openFilePicker(slot)}
+                  onClick={() => openFilePicker(photos.length)}
                   className="h-24 w-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50/60 text-slate-400 hover:text-sky-500 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
                 >
                   <Camera size={18} />
                   <span className="text-[11px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
                 </button>
-              );
-            })}
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*"
+              multiple
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -1180,6 +1310,13 @@ export default function StepPickup({
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
             <div className="inline-flex items-end gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => { setImportOpen(true); setImportRows([]); setImportError(""); }}
+              className="inline-flex h-[42px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+            >
+              <Upload size={14} /> Import Excel / PDF
+            </button>
             <SearchableSelect
               label=""
               ariaLabel={`Loaded boxes, ${rows.length} available`}
@@ -1406,6 +1543,73 @@ export default function StepPickup({
       </div>
 
       {/* Confirmation Modal */}
+      {importOpen && (
+        <div className="fixed inset-0 z-[90] grid touch-none place-items-center overflow-hidden bg-slate-950/25 p-4 backdrop-blur-[0.5px]">
+          <div role="dialog" aria-modal="true" className="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl touch-pan-y flex-col overflow-hidden overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
+              <div><h3 className="font-bold text-slate-800">Import pickup boxes</h3><p className="text-xs text-slate-500">1. Choose file · 2. Validate totals and capacity · 3. Import entries</p></div>
+              <button type="button" onClick={() => setImportOpen(false)} className="group grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500"><X size={16} className={uiActionIconMotionClass.close} /></button>
+            </div>
+            <div className="min-h-0 flex-1 touch-pan-y space-y-4 overflow-y-auto overscroll-contain p-5">
+              <input ref={importInputRef} type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={(event) => void handleImportFile(event.target.files?.[0])} />
+              <button type="button" disabled={importBusy} onClick={() => importInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-600 hover:border-emerald-400 hover:bg-emerald-50/40"><Upload size={18} />{importBusy ? "Reading and validating…" : "Choose Excel or PDF"}</button>
+              {importError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{importError}</div>}
+              {importRows.length > 0 && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Boxes</span><strong>{importRows.length} / {maxBoxes || "—"}</strong></div>
+                    <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Total birds</span><strong>{importRows.reduce((sum, row) => sum + row.birds, 0)}</strong></div>
+                    <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Total weight</span><strong>{importRows.reduce((sum, row) => sum + row.weight, 0).toFixed(2)} kg</strong></div>
+                  </div>
+                  <p className="text-xs text-slate-500">Select a row, then use ↑/↓ to move. Press Enter or choose Edit to change it.</p>
+                  <div
+                    ref={importGridRef}
+                    tabIndex={0}
+                    role="grid"
+                    aria-label="Imported pickup box entries"
+                    aria-activedescendant={`pickup-import-row-${selectedImportIndex}`}
+                    onKeyDown={(event) => {
+                      if (editingImportIndex !== null) return;
+                      if (event.key === "ArrowDown") { event.preventDefault(); selectImportedRow(selectedImportIndex + 1); }
+                      if (event.key === "ArrowUp") { event.preventDefault(); selectImportedRow(selectedImportIndex - 1); }
+                      if (event.key === "Enter") { event.preventDefault(); beginImportEdit(selectedImportIndex); }
+                    }}
+                    className="relative h-72 touch-pan-y overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white outline-none focus:outline-none"
+                  >
+                    <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+                      <thead><tr>{["Box #", "Birds", "Weight", "Avg WT", "Action"].map((label) => <th key={label} className="sticky top-0 z-20 h-11 border-b border-slate-200 bg-slate-100 px-2 text-center font-bold text-slate-700 shadow-[0_1px_0_rgba(203,213,225,1)]">{label}</th>)}</tr></thead>
+                      <tbody>{importRows.map((row, index) => {
+                        const selected = selectedImportIndex === index;
+                        const editing = editingImportIndex === index;
+                        const inputClass = "h-8 w-full rounded-lg border border-emerald-200 bg-white px-2 text-center font-semibold outline-none focus:ring-2 focus:ring-emerald-300";
+                        return (
+                          <tr
+                            id={`pickup-import-row-${index}`}
+                            key={`${row.boxNo}-${index}`}
+                            ref={(element) => { if (element) importRowRefs.current.set(index, element); else importRowRefs.current.delete(index); }}
+                            onClick={() => setSelectedImportIndex(index)}
+                            onDoubleClick={() => beginImportEdit(index)}
+                            aria-selected={selected}
+                            className={`h-12 cursor-pointer transition-colors ${selected ? "bg-emerald-50 ring-1 ring-inset ring-emerald-300" : "bg-white hover:bg-slate-50"}`}
+                          >
+                            <td className="border-b border-slate-100 px-2 text-center">{editing ? <input autoFocus type="number" min="1" value={row.boxNo || ""} onChange={(event) => updateImportedRow(index, "boxNo", event.target.value)} className={inputClass} /> : row.boxNo}</td>
+                            <td className="border-b border-slate-100 px-2 text-center">{editing ? <input type="number" min="1" step="1" value={row.birds || ""} onChange={(event) => updateImportedRow(index, "birds", event.target.value)} className={inputClass} /> : row.birds}</td>
+                            <td className="border-b border-slate-100 px-2 text-center">{editing ? <input type="number" min="0.01" step="0.01" value={row.weight || ""} onChange={(event) => updateImportedRow(index, "weight", event.target.value)} className={inputClass} /> : row.weight.toFixed(2)}</td>
+                            <td className="border-b border-slate-100 px-2 text-center font-semibold text-slate-600">{row.avgWeight?.toFixed(2) ?? "—"}</td>
+                            <td className="border-b border-slate-100 px-2 text-center">{editing ? <div className="flex justify-center gap-1"><button type="button" onClick={(event) => { event.stopPropagation(); finishImportEdit(); }} className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-xs font-bold text-white"><CheckCircle2 size={13} />Save</button><button type="button" aria-label="Cancel row edit" onClick={(event) => { event.stopPropagation(); cancelImportEdit(); }} className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500"><X size={13} /></button></div> : <button type="button" onClick={(event) => { event.stopPropagation(); beginImportEdit(index); }} className="inline-flex h-8 items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-xs font-bold text-blue-600 hover:bg-blue-100"><Pencil size={13} />Edit</button>}</td>
+                          </tr>
+                        );
+                      })}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4"><button type="button" onClick={() => setImportOpen(false)} className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold"><X size={14} className="transition-transform group-hover:rotate-90" />Cancel</button><button type="button" disabled={!importRows.length || Boolean(importError) || editingImportIndex !== null} onClick={applyImportedRows} className="group inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><CheckCircle2 size={15} className="transition-transform group-hover:scale-110" />Import validated rows</button></div>
+          </div>
+        </div>
+      )}
+
       <TripStepConfirmDialog
         isOpen={confirmation.isOpen}
         title={confirmation.title}

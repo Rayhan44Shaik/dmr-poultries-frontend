@@ -1352,7 +1352,8 @@ export default function UnLoadingTable({
           style={{
             top: 64,
             left: modalLeftInset,
-            backgroundColor: "rgba(15, 23, 42, 0.01)",
+            backgroundColor: "rgba(15, 23, 42, 0.25)",
+            backdropFilter: "blur(0.5px)",
           }}
           role="presentation"
         >

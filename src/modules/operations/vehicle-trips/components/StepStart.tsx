@@ -40,6 +40,7 @@ import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
 import TripStepConfirmDialog from "./TripStepConfirmDialog";
 import { withMinSaveDuration } from "../utils/withMinSaveDuration";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 /** Match backend tripNumbering bounds (Asia/Kolkata business calendar). */
 const TRIP_DATE_MAX_PAST_DAYS = 730;
@@ -282,7 +283,7 @@ const VehicleField = React.memo(function VehicleField({
 }) {
   const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: String(option.id), label: localizeTripViewText(option.vehicleNumber, language), searchText: option.vehicleNumber || "" })),
+    () => options.map((option) => ({ value: String(option.id), label: formatVehicleNumber(localizeTripViewText(option.vehicleNumber, language)), searchText: option.vehicleNumber || "" })),
     [options, language]
   );
   const handleChange = useCallback(

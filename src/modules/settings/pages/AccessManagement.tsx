@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { apiClient } from "../../../api/client";
+import { handleApiError } from "../../../api/errors";
 import { useAuth } from "../../../providers/authContext";
 import { useI18n } from "../../../i18n";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
@@ -440,9 +441,8 @@ export default function AccessManagement() {
     if (hideTimer.current) clearTimeout(hideTimer.current);
   }, []);
 
-  /** Owner-only: verify the owner's login password server-side, then the
-   *  backend issues a fresh working password for the employee which is shown
-   *  in place of the mask. */
+  /** Verify the manager's login password server-side, then reveal only a
+   *  manager-issued temporary password. This operation is strictly read-only. */
   const revealPassword = async () => {
     const row = revealAsk?.row;
     if (!row?.user_id || !actorPassword) return;
@@ -457,8 +457,8 @@ export default function AccessManagement() {
       setActorPassword("");
       startRevealHideTimer();
       await load();
-    } catch {
-      showNotification(t("settings.access_reveal_failed"), "error");
+    } catch (cause) {
+      showNotification(handleApiError(cause) || t("settings.access_reveal_failed"), "error");
     } finally {
       setRevealBusy(false);
     }
@@ -669,9 +669,9 @@ export default function AccessManagement() {
                     <td className="px-3 text-center align-middle font-medium text-slate-600">{row.username ?? "—"}</td>
 
                     {/* Password column: mask + gated eye, centred. Revealing
-                        requires the owner to re-enter their own login password
-                        (backend-verified); the shown secret is a fresh working
-                        password issued at reveal time. */}
+                        requires the manager to re-enter their own login password
+                        (backend-verified); it is strictly read-only — it shows
+                        the stored temporary password and never rotates it. */}
                     <td className="px-3 align-middle">
                       <div className="flex items-center justify-center gap-2">
                         <span

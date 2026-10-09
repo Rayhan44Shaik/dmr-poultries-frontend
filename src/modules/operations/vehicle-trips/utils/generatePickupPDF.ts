@@ -162,7 +162,6 @@ export async function generatePickupReportPDF(
     ["Supervisor", fmt(trip.supervisorName)],
     ["Farm", fmt(trip.sourceFarm)],
     ["Pickup Time", fmt(options.pickupTime)],
-    ["Status", trip.pickupStepSubmitted ? "Submitted" : "Not submitted"],
   ]);
 
   // ─── BOX-WISE DETAILS ──────────────────────────────────────────────
@@ -211,9 +210,9 @@ export async function generatePickupReportPDF(
       columnStyles: {
         0: { cellWidth: 16, halign: "center" },
         1: { cellWidth: 30, halign: "center", fontStyle: "bold" },
-        2: { cellWidth: 40, halign: "right" },
-        3: { cellWidth: 48, halign: "right" },
-        4: { cellWidth: 48, halign: "right" },
+        2: { cellWidth: 40, halign: "center" },
+        3: { cellWidth: 48, halign: "center" },
+        4: { cellWidth: 48, halign: "center" },
       },
       margin: { left: margin, right: margin },
     });
@@ -248,7 +247,6 @@ export async function generatePickupReportPDF(
     ["Total DC Weight", `${Number(dcWeight).toFixed(2)} KG`],
     ["Average Weight", avgWeight != null ? `${avgWeight.toFixed(2)} kg / bird` : "—"],
     ["Pickup Time", fmt(options.pickupTime)],
-    ["Status", trip.pickupStepSubmitted ? "Submitted" : "Not submitted"],
   ]);
 
   // ─── FOOTER / PAGE CHROME ──────────────────────────────────────────

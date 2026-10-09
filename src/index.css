@@ -168,19 +168,12 @@
   }
 
   /* ---------------------------------------------------------------------
-     ALPHABET SIZE — per-user root font scale (Settings → Preferences).
-     Scales every rem-based size/padding app-wide; px-exact accents keep
-     their shape. Applied via <html data-alphabet> by useUserPreferences.
+     ROOT FONT SCALE — one source of truth: `--dmr-font-scale`, driven by
+     FontScaleProvider from both the header control and Settings →
+     Preferences. No other rule may size <html>: a second declaration here
+     (the old `html[data-alphabet=…]` rules) outranks the calc() above by
+     specificity and silently freezes the scale.
      --------------------------------------------------------------------- */
-  html[data-alphabet="small"] {
-    font-size: 87.5%;
-  }
-  html[data-alphabet="medium"] {
-    font-size: 100%;
-  }
-  html[data-alphabet="large"] {
-    font-size: 112.5%;
-  }
 
   /* ---------------------------------------------------------------------
      TYPOGRAPHY HIERARCHY

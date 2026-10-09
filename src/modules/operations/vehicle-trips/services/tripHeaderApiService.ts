@@ -295,6 +295,9 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     dcPhotoKey2: raw.dcPhotoKey2 != null ? str(raw.dcPhotoKey2) : defaults.dcPhotoKey2,
     dcPhotoMime2: raw.dcPhotoMime2 != null ? str(raw.dcPhotoMime2) : defaults.dcPhotoMime2,
     dcPhotoData2: raw.dcPhotoData2 != null ? str(raw.dcPhotoData2) : defaults.dcPhotoData2,
+    pickupPhotos: Array.isArray(raw.pickupPhotos)
+      ? raw.pickupPhotos.map((photo: any) => ({ key: str(photo.key), mime: str(photo.mime, "image/jpeg"), data: str(photo.data) }))
+      : defaults.pickupPhotos,
     vehicleBoxCapacity:
       numOrNull(raw.vehicleBoxCapacity ?? raw.vehicle_box_capacity) ?? defaults.vehicleBoxCapacity,
     destinationTolls: num(raw.destinationTolls ?? raw.destination_tolls, defaults.destinationTolls),
@@ -405,6 +408,7 @@ export function toStep3Payload(trip: Partial<Trip> & { removedBoxNos?: number[];
   if (trip.dcPhotoKey2) payload.dcPhotoKey2 = trip.dcPhotoKey2;
   if (trip.dcPhotoMime2) payload.dcPhotoMime2 = trip.dcPhotoMime2;
   if (trip.dcPhotoData2) payload.dcPhotoData2 = trip.dcPhotoData2;
+  if (Array.isArray(trip.pickupPhotos)) payload.pickupPhotos = trip.pickupPhotos;
   if (trip.syncPickupPhotos) payload.syncPickupPhotos = true;
   return payload;
 }

@@ -8,6 +8,7 @@ import {
   Moon,
   Smartphone,
   Sun,
+  Type,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -17,6 +18,8 @@ import { loadEmployees } from "../../masters/employees/services/employeeService"
 import type { Employee } from "../../masters/employees/types/employee";
 import { useI18n } from "../../../i18n";
 import { useUserPreferences } from "../hooks/useUserPreferences";
+import { FONT_SCALE_LEVELS, formatFontScale } from "../../../providers/fontScale";
+import { ActionTooltip } from "../../../ui/ActionTooltip";
 import MasterDropdown from "../../masters/components/MasterDropdown";
 
 /** Password tile wants the exact moment, not just the day. */
@@ -117,7 +120,7 @@ export default function Profile() {
   // providers (and therefore the whole app) in step with the stored choice.
   // Preferences persist server-side on every change; `syncState` is kept only
   // so a failed save can surface an inline error chip.
-  const { language, theme, alphabetSize, setLanguage, setTheme, setAlphabetSize, syncState } = useUserPreferences();
+  const { language, theme, fontScale, setLanguage, setTheme, setFontScale, syncState } = useUserPreferences();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [master, setMaster] = useState<Employee | null>(null);
   const [failed, setFailed] = useState(false);
@@ -226,10 +229,11 @@ export default function Profile() {
         <div id="preferences">
           <SectionHeading icon={Languages} title={t("settings.preferences")} delay={340} />
         </div>
-        {/* Compact, always-aligned preference row — Language select and the
-            Light/Dark toggle share one strip. Saving is silent: every change is
-            persisted to the backend immediately (errors surface only when a
-            save actually fails), so no "last saved" chip is shown. */}
+        {/* Compact, always-aligned preference row — Language select, the
+            horizontal font-size strip and the Light/Dark toggle share one
+            strip. Saving is silent: every change is persisted to the backend
+            immediately (errors surface only when a save actually fails), so no
+            "last saved" chip is shown. */}
         <div
           className="animate-fade-in flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 dark:border-slate-700 dark:bg-slate-900"
           style={{ animationDelay: "380ms" }}
@@ -250,20 +254,50 @@ export default function Profile() {
               className="w-[150px]"
               triggerClassName="h-8 px-2.5 text-xs"
             />
-            {/* Alphabet size — sits right beside the language choice. */}
-            <MasterDropdown
-              hideLabel
-              label={t("settings.alphabet_size")}
-              value={alphabetSize}
-              onChange={(value) => setAlphabetSize(value as "small" | "medium" | "large")}
-              options={[
-                { value: "small", label: t("settings.alphabet_small") },
-                { value: "medium", label: t("settings.alphabet_medium") },
-                { value: "large", label: t("settings.alphabet_large") },
-              ]}
-              className="w-[130px]"
-              triggerClassName="h-8 px-2.5 text-xs"
-            />
+            {/* Font size — horizontal percentage strip on the same scale as
+                the header control, with its own tinted logo. Every button
+                keeps a single-line tooltip below itself. */}
+            <div className="flex min-w-[180px] flex-1 items-center gap-2">
+              <span className="group relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+                <Type size={14} />
+                <ActionTooltip
+                  label={t("fontScale.current", { value: formatFontScale(fontScale) })}
+                  side="bottom"
+                  className="whitespace-nowrap"
+                />
+              </span>
+              <div
+                className="flex flex-wrap rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800/60"
+                role="group"
+                aria-label={t("fontScale.levels")}
+              >
+                {FONT_SCALE_LEVELS.map((level) => {
+                  const active = level === fontScale;
+                  const label = formatFontScale(level);
+                  return (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setFontScale(level)}
+                      aria-pressed={active}
+                      aria-label={t("fontScale.set", { value: label })}
+                      className={`group relative inline-flex items-center rounded-sm px-2 py-1 text-[11px] font-bold tabular-nums transition-all duration-200 ${
+                        active
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      }`}
+                    >
+                      {label}
+                      <ActionTooltip
+                        label={t("fontScale.set", { value: label })}
+                        side="bottom"
+                        className="whitespace-nowrap"
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <span

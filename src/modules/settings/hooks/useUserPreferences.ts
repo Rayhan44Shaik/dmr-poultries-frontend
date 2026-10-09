@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "../../../i18n";
 import { useTheme } from "../../../providers/ThemeProvider";
+import { useFontScale } from "../../../providers/fontScaleContext";
+import type { FontScale } from "../../../providers/fontScale";
 import {
   fetchPreferences,
   savePreferences,
-  type SettingsAlphabetSize,
   type SettingsLanguage,
   type SettingsTheme,
 } from "../services/settingsApi";
@@ -12,11 +13,11 @@ import {
 export type PreferenceSyncState = "loading" | "idle" | "saving" | "saved" | "error";
 
 /**
- * Server-backed language + theme preferences.
+ * Server-backed language + theme + font-size preferences.
  *
  * The providers stay the single source of truth for rendering (they own the
- * `<html class="dark">` and `<html lang>` side effects); this hook only
- * reconciles them with the user's stored preference:
+ * `<html class="dark">`, `<html lang>` and root font-scale side effects); this
+ * hook only reconciles them with the user's stored preference:
  *
  *   • a stored row is authoritative — the device adopts it on load;
  *   • NO stored row means "never chosen": the device's current choice is
@@ -24,18 +25,18 @@ export type PreferenceSyncState = "loading" | "idle" | "saving" | "saved" | "err
  *     reset to the default just because the feature shipped;
  *   • a failed save keeps the local choice and reports `error` — preferences
  *     must never block using the app.
+ *
+ * Font scale writes are persisted by FontScaleProvider itself (localStorage +
+ * this same preferences API), so the header popover and this page always save
+ * through one write path and can never drift apart. Reconciliation adopts the
+ * stored value through `adoptScale`, which never echoes a save back.
  */
 export function useUserPreferences() {
   const { language, setLanguage } = useI18n();
   const { theme, setTheme } = useTheme();
-  const [alphabetSize, setAlphabetSizeState] = useState<SettingsAlphabetSize>("medium");
+  const { scale: fontScale, setScale: applyFontScaleChange, adoptScale } = useFontScale();
   const [state, setState] = useState<PreferenceSyncState>("loading");
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
-
-  /** The root font-size scale follows the stored choice on every render. */
-  useEffect(() => {
-    document.documentElement.dataset.alphabet = alphabetSize;
-  }, [alphabetSize]);
 
   /**
    * Runs once, against the values this device already had at mount. The
@@ -44,14 +45,14 @@ export function useUserPreferences() {
    */
   useEffect(() => {
     let live = true;
-    const local = { language, theme };
+    const local = { language, theme, fontScale };
     fetchPreferences()
       .then((prefs) => {
         if (!live) return;
         setUpdatedAt(prefs.updatedAt);
         if (prefs.updatedAt === null) {
           setState("idle");
-          void savePreferences({ ...local, alphabetSize })
+          void savePreferences(local)
             .then((saved) => {
               if (live) setUpdatedAt(saved.updatedAt);
             })
@@ -60,7 +61,7 @@ export function useUserPreferences() {
         }
         if (prefs.language !== local.language) setLanguage(prefs.language);
         if (prefs.theme !== local.theme) setTheme(prefs.theme);
-        setAlphabetSizeState(prefs.alphabetSize);
+        if (prefs.fontScale !== local.fontScale) adoptScale(prefs.fontScale);
         setState("idle");
       })
       .catch(() => {
@@ -77,22 +78,29 @@ export function useUserPreferences() {
     async (patch: {
       language?: SettingsLanguage;
       theme?: SettingsTheme;
-      alphabetSize?: SettingsAlphabetSize;
+      fontScale?: FontScale;
     }) => {
       // Optimistic: the UI must switch immediately, then confirm with the API.
       if (patch.language) setLanguage(patch.language);
       if (patch.theme) setTheme(patch.theme);
-      if (patch.alphabetSize) setAlphabetSizeState(patch.alphabetSize);
+      // Font scale persists through FontScaleProvider (local + server), so the
+      // header popover and this page share one write path.
+      if (patch.fontScale) applyFontScaleChange(patch.fontScale);
+      const remote = {
+        ...(patch.language ? { language: patch.language } : {}),
+        ...(patch.theme ? { theme: patch.theme } : {}),
+      };
+      if (Object.keys(remote).length === 0) return;
       setState("saving");
       try {
-        const saved = await savePreferences(patch);
+        const saved = await savePreferences(remote);
         setUpdatedAt(saved.updatedAt);
         setState("saved");
       } catch {
         setState("error");
       }
     },
-    [setLanguage, setTheme],
+    [setLanguage, setTheme, applyFontScaleChange],
   );
 
   const setPreferenceLanguage = useCallback(
@@ -109,9 +117,9 @@ export function useUserPreferences() {
     [apply],
   );
 
-  const setPreferenceAlphabetSize = useCallback(
-    (value: SettingsAlphabetSize) => {
-      void apply({ alphabetSize: value });
+  const setPreferenceFontScale = useCallback(
+    (value: FontScale) => {
+      void apply({ fontScale: value });
     },
     [apply],
   );
@@ -119,11 +127,11 @@ export function useUserPreferences() {
   return {
     language,
     theme,
-    alphabetSize,
+    fontScale,
     updatedAt,
     syncState: state,
     setLanguage: setPreferenceLanguage,
     setTheme: setPreferenceTheme,
-    setAlphabetSize: setPreferenceAlphabetSize,
+    setFontScale: setPreferenceFontScale,
   };
 }

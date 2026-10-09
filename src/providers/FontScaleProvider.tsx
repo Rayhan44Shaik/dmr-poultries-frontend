@@ -10,6 +10,7 @@ import {
   readFontScalePreference,
   type FontScale,
 } from "./fontScale";
+import { savePreferences } from "../modules/settings/services/settingsApi";
 import { FontScaleContext, type FontScaleContextValue } from "./fontScaleContext";
 
 interface FontScaleProviderProps {
@@ -42,7 +43,7 @@ function initialFontScale(): FontScale {
 export function FontScaleProvider({ children }: FontScaleProviderProps) {
   const [scale, setScaleState] = useState<FontScale>(initialFontScale);
 
-  const setScale = useCallback((next: FontScale) => {
+  const applyScale = useCallback((next: FontScale, persistRemote: boolean) => {
     const safeScale = isFontScale(next) ? next : DEFAULT_FONT_SCALE;
     applyFontScale(typeof document === "undefined" ? undefined : document.documentElement, safeScale);
     setScaleState(safeScale);
@@ -53,7 +54,19 @@ export function FontScaleProvider({ children }: FontScaleProviderProps) {
     } catch {
       // Persistence is optional; the current session remains fully usable.
     }
+    if (persistRemote) {
+      // Saved server-side like theme/language so the choice follows the user
+      // across devices. A failed save keeps the local value and is retried on
+      // the next change — preferences must never block using the app.
+      void savePreferences({ fontScale: safeScale }).catch(() => undefined);
+    }
   }, []);
+
+  /** User-driven changes persist everywhere (localStorage + preferences API). */
+  const setScale = useCallback((next: FontScale) => applyScale(next, true), [applyScale]);
+
+  /** Reconciliation adopts the server's stored value without echoing a save. */
+  const adoptScale = useCallback((next: FontScale) => applyScale(next, false), [applyScale]);
 
   // Keep separate tabs in sync without writing back and creating an event loop.
   useEffect(() => {
@@ -83,8 +96,8 @@ export function FontScaleProvider({ children }: FontScaleProviderProps) {
   }, [scale, setScale]);
 
   const value = useMemo<FontScaleContextValue>(
-    () => ({ scale, setScale, increase, decrease, canIncrease, canDecrease }),
-    [scale, setScale, increase, decrease, canIncrease, canDecrease],
+    () => ({ scale, setScale, adoptScale, increase, decrease, canIncrease, canDecrease }),
+    [scale, setScale, adoptScale, increase, decrease, canIncrease, canDecrease],
   );
 
   // index.html applies the value before React. This layout-effect fallback runs

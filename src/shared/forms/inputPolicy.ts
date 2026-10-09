@@ -3,7 +3,14 @@ const CASE_SENSITIVE_TYPES = new Set(["password", "email", "url", "file"]);
 export function shouldUppercaseInput(target: EventTarget | null): target is HTMLInputElement | HTMLTextAreaElement {
   if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) return false;
   if (target.dataset.preserveCase === "true") return false;
-  if (target instanceof HTMLInputElement && CASE_SENSITIVE_TYPES.has(target.type)) return false;
+  if (target instanceof HTMLInputElement) {
+    if (CASE_SENSITIVE_TYPES.has(target.type)) return false;
+    // Password reveal controls temporarily switch their input to type="text".
+    // Keep detecting them as case-sensitive so showing a password can never
+    // uppercase it while the employee types.
+    const semanticName = `${target.name} ${target.id} ${target.autocomplete}`.toLowerCase();
+    if (semanticName.includes("password")) return false;
+  }
   return target instanceof HTMLTextAreaElement || target.type === "text" || target.type === "search";
 }
 
