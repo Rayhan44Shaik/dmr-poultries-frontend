@@ -403,8 +403,7 @@ export function FuelBillTable({
               </tr>
             ) : bills.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-16 text-center text-slate-400 text-sm font-medium">
-                  <Fuel size={24} className="mx-auto mb-2 text-slate-300" />
+                <td colSpan={11} className="py-12 text-center text-[13px] font-medium text-slate-400">
                   {t("ops.fuel.no_records")}
                 </td>
               </tr>

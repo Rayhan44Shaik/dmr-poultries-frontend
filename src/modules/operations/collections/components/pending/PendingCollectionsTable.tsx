@@ -239,7 +239,7 @@ function PendingCollectionsTable({
             <tbody className="divide-y divide-slate-100">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-400 text-sm font-medium">
+                  <td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">
                     {t("empty.no_shops")}
                   </td>
                 </tr>

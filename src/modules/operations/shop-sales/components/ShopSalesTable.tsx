@@ -344,7 +344,7 @@ function ShopSalesTable({
             {isLoading ? (
               <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
+              <tr><td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;

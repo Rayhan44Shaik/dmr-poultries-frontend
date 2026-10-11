@@ -123,6 +123,8 @@ export interface Trip {
   startTime: string;
   vehicleId: number;
   vehicleNo: string;
+  /** Snapshot of rental status when this trip selected its vehicle. */
+  isRentedVehicle?: boolean;
   driverId: number;
   driverName: string;
   supervisorId: number;

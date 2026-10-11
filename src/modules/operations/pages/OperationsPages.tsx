@@ -14,6 +14,9 @@ const TripEntryPage = React.lazy(
 const TripListPage = React.lazy(
   retryableImport(() => import("../vehicle-trips/pages/TripListPage")),
 );
+const TripExpensesPage = React.lazy(
+  retryableImport(() => import("../trip-expenses/pages/TripExpensesPage")),
+);
 const ShopSalesPage = React.lazy(
   retryableImport(() => import("../shop-sales/pages/ShopSalesPage")),
 );
@@ -47,6 +50,7 @@ const tabComponents: Record<
 > = {
   "trip-entry": TripEntryPage,
   "trip-list": TripListPage,
+  expenses: TripExpensesPage,
   "rate-entry": RatesEntryPage,
   "shop-sales": ShopSalesPage,
   collection: CollectionEntryPage,
@@ -154,6 +158,7 @@ function OperationsPages() {
     const pathname = location.pathname;
     if (pathname.includes("trip-entry")) return "trip-entry";
     if (pathname.includes("trip-list")) return "trip-list";
+    if (pathname.includes("expenses")) return "expenses";
     if (pathname.includes("rate-entry")) return "rate-entry";
     if (pathname.includes("shop-sales")) return "shop-sales";
     if (pathname.includes("collections/entry")) return "collection";
@@ -202,9 +207,9 @@ function OperationsPages() {
       >
         <Suspense
           fallback={
-            activeTab === "trip-list" ? (
+            activeTab === "trip-list" || activeTab === "expenses" ? (
               <FilterTableShell
-                title={t("ops.trip.trip_list")}
+                title={activeTab === "expenses" ? "Operation Expenses" : t("ops.trip.trip_list")}
                 loadingLabel={t("ops.trip.loading_trip_list")}
                 icon={<History className="h-5 w-5" />}
                 tone="blue"

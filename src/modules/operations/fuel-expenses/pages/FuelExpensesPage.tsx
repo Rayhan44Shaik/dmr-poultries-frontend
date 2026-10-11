@@ -28,11 +28,14 @@ import { PendingDeleteNotification } from "../../../../components/common/Pending
 import { useI18n } from "../../../../i18n";
 import { formatVehicleNumber } from "../../../../utils/format";
 import type { MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import { loadBirdTypes } from "../../../masters/bird-types/services/birdTypeService";
+import type { BirdType } from "../../../masters/bird-types/types/birdType";
 
 type FuelExpensesPageProps = { embedded?: boolean };
 
 const ALL_VEHICLES = "All Vehicles";
 const ALL_DRIVERS = "All Drivers";
+const ALL_BUNKS = "All Bunks";
 
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const { t, language } = useI18n();
@@ -62,6 +65,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const [toDate, setToDate] = useState("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [driver, setDriver] = useState(ALL_DRIVERS);
+  const [bunk, setBunk] = useState(ALL_BUNKS);
   const [sourceType, setSourceType] = useState("All");
   const [quickTab, setQuickTab] = useState<FuelQuickTab>("ALL");
   const [search, setSearch] = useState("");
@@ -79,9 +83,20 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const [showForm, setShowForm] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewingBill, setViewingBill] = useState<FuelExpense | null>(null);
+  const [fuelBunks, setFuelBunks] = useState<BirdType[]>([]);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadBirdTypes()
+      .then((rows) => {
+        if (active) setFuelBunks(rows.filter((row) => row.category === "Fuel Bunk" && row.status === "Active"));
+      })
+      .catch(() => { if (active) setFuelBunks([]); });
+    return () => { active = false; };
+  }, []);
 
   // ── Build Dropdown Options from Masters ──
   const vehicleOptions = useMemo<MasterDropdownOption[]>(() => {
@@ -108,6 +123,16 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     });
   }, [masterEmployees]);
 
+  const bunkOptions = useMemo<MasterDropdownOption[]>(() => {
+    const names = new Set<string>();
+    fuelBunks.forEach((item) => { if (item.birdType.trim()) names.add(item.birdType.trim()); });
+    deduplicatedExpenses.forEach((item) => { if (item.petrolBunk.trim()) names.add(item.petrolBunk.trim()); });
+    return [
+      ...[...names].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name, searchText: name })),
+      { value: "__OTHER__", label: "Other (Non-master)", searchText: "other custom non-master" },
+    ];
+  }, [deduplicatedExpenses, fuelBunks]);
+
   const driversList = useMemo(
     () => masterEmployees.filter((e) => (e.department || e.role || "").toLowerCase().includes("driver")),
     [masterEmployees]
@@ -133,10 +158,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       toDate,
       vehicleNo: vehicle === ALL_VEHICLES ? "" : vehicle,
       driverName: driver === ALL_DRIVERS ? "" : driver,
+      petrolBunk: bunk === ALL_BUNKS ? "" : bunk,
+      masterBunkNames: fuelBunks.map((item) => item.birdType),
       sourceType: sourceType === "All" ? "" : sourceType,
       search,
     });
-  }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, sourceType, search]);
+  }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, bunk, sourceType, search, fuelBunks]);
 
   // ── Live Tab Counts (All, Pending, Approved, Deleted) ──
   const tabCounts = useMemo(() => {
@@ -181,6 +208,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     toDate !== "" ||
     vehicle !== ALL_VEHICLES ||
     driver !== ALL_DRIVERS ||
+    bunk !== ALL_BUNKS ||
     sourceType !== "All" ||
     search.trim() !== "";
 
@@ -190,6 +218,15 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     const totalAmount = allFilteredBills.reduce((sum, b) => sum + (b.amount || 0), 0);
     const pendingCount = allFilteredBills.filter((b) => b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length;
     const approvedCount = allFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo).length;
+    const bunkMap = new Map<string, { name: string; bills: number; litres: number; amount: number }>();
+    allFilteredBills.forEach((bill) => {
+      const name = bill.petrolBunk?.trim() || "Other";
+      const current = bunkMap.get(name) ?? { name, bills: 0, litres: 0, amount: 0 };
+      current.bills += 1;
+      current.litres += Number(bill.litres || 0);
+      current.amount += Number(bill.amount || 0);
+      bunkMap.set(name, current);
+    });
 
     const billsWithMeter = allFilteredBills.filter((b) => b.meterReading > 0 && b.litres > 0);
     const avgMileage =
@@ -203,6 +240,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       pendingCount,
       approvedCount,
       avgMileage,
+      bunkDetails: [...bunkMap.values()].sort((a, b) => b.amount - a.amount),
     };
   }, [allFilteredBills]);
 
@@ -232,6 +270,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setToDate("");
     setVehicle(ALL_VEHICLES);
     setDriver(ALL_DRIVERS);
+    setBunk(ALL_BUNKS);
     setSourceType("All");
     setQuickTab("ALL");
     setSearch("");
@@ -438,6 +477,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         toDate={toDate}
         vehicle={vehicle}
         driver={driver}
+        bunk={bunk}
         sourceType={sourceType}
         sortBy={sortBy}
         sortDir={sortDir}
@@ -446,12 +486,14 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         setToDate={(v) => { setToDate(v); setCurrentPage(1); }}
         setVehicle={(v) => { setVehicle(v); setCurrentPage(1); }}
         setDriver={(v) => { setDriver(v); setCurrentPage(1); }}
+        setBunk={(v) => { setBunk(v); setCurrentPage(1); }}
         setSourceType={(v) => { setSourceType(v); setCurrentPage(1); }}
         setSort={handleExplicitSort}
         setSearch={(v) => { setSearch(v); setCurrentPage(1); }}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
         drivers={driverOptions}
+        bunks={bunkOptions}
         onAddFuelBill={() => setShowForm(!showForm)}
         isFormOpen={showForm}
         onExportPDF={() => void handleExportPDF()}
@@ -469,6 +511,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
             pendingCount={summaryTotals.pendingCount}
             approvedCount={summaryTotals.approvedCount}
             avgMileage={summaryTotals.avgMileage}
+            bunkDetails={summaryTotals.bunkDetails}
           />
         </div>
       )}
@@ -493,6 +536,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
             initialData={editingData}
             vehicles={masterVehicles}
             drivers={driversList}
+            fuelBunks={fuelBunks}
             onCancel={() => {
               setShowForm(false);
               setEditingId(null);

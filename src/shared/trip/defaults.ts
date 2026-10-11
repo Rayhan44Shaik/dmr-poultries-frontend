@@ -20,6 +20,7 @@ export function createEmptyTrip(overrides: Partial<Trip> = {}): Trip {
     startTime: "",
     vehicleId: 0,
     vehicleNo: "",
+    isRentedVehicle: false,
     driverId: 0,
     driverName: "",
     supervisorId: 0,

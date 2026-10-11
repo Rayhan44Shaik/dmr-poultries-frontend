@@ -61,6 +61,7 @@ function VehicleForm({
   const [noOfBoxes, setNoOfBoxes] = useState<number | "">(vehicle?.noOfBoxes ?? "");
   const [birdCapacity, setBirdCapacity] = useState<number | "">(vehicle?.birdCapacity ?? "");
   const [capacityKg, setCapacityKg] = useState<number | "">(vehicle?.capacityKg ?? "");
+  const [isRented, setIsRented] = useState(vehicle?.isRented ?? false);
   const [fastagBank, setFastagBank] = useState(vehicle?.fastagBank ?? "");
   const [purchaseDate, setPurchaseDate] = useState(vehicle?.purchaseDate ?? "");
   const [purchaseAmount, setPurchaseAmount] = useState<number | "">(vehicle?.purchaseAmount ?? "");
@@ -173,7 +174,7 @@ function VehicleForm({
     // Required fields
     if (
       !vehicleNumber ||
-      !vehicleType ||
+      (!isRented && !vehicleType) ||
       noOfBoxes === "" ||
       birdCapacity === "" ||
       capacityKg === ""
@@ -182,30 +183,31 @@ function VehicleForm({
       return;
     }
     // Engine and Chassis are now mandatory
-    if (!engineNumber.trim()) {
+    if (!isRented && !engineNumber.trim()) {
       showNotification("Engine Number is required.", "error");
       return;
     }
-    if (!chassisNumber.trim()) {
+    if (!isRented && !chassisNumber.trim()) {
       showNotification("Chassis Number is required.", "error");
       return;
     }
     onSave({
       vehicleNumber,
-      vehicleType,
-      trackingId,
+      vehicleType: isRented ? "" : vehicleType,
+      isRented,
+      trackingId: isRented ? "" : trackingId,
       noOfBoxes: Number(noOfBoxes),
       birdCapacity: Number(birdCapacity),
       capacityKg: Number(capacityKg),
-      fastagBank,
-      purchaseDate,
+      fastagBank: isRented ? "" : fastagBank,
+      purchaseDate: isRented ? "" : purchaseDate,
       purchaseAmount:
-        purchaseAmount === "" ? undefined : Number(purchaseAmount),
-      emiDay: emiDay === "" ? undefined : Number(emiDay),
-      totalEMIs: totalEMIs === "" ? undefined : Number(totalEMIs),
-      engineNumber,
-      chassisNumber,
-      rcDate,
+        isRented || purchaseAmount === "" ? undefined : Number(purchaseAmount),
+      emiDay: isRented || emiDay === "" ? undefined : Number(emiDay),
+      totalEMIs: isRented || totalEMIs === "" ? undefined : Number(totalEMIs),
+      engineNumber: isRented ? "" : engineNumber,
+      chassisNumber: isRented ? "" : chassisNumber,
+      rcDate: isRented ? "" : rcDate,
       status,
     });
   };
@@ -239,6 +241,24 @@ function VehicleForm({
       onCancel={onCancel}
       isSaving={isSaving}
       submitLabel={isEditing ? "Update Vehicle" : "Save Vehicle"}
+      headerActions={
+        <div className="mr-3 flex items-center gap-2 border-r border-slate-200 pr-3">
+          <span className="text-xs font-medium text-slate-600">Rental vehicle</span>
+          <button
+            type="button"
+            role="switch"
+            aria-label="Rental vehicle"
+            aria-checked={isRented}
+            onClick={() => setIsRented((value) => !value)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-amber-500/30 ${isRented ? "bg-amber-500" : "bg-slate-300"}`}
+          >
+            <span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isRented ? "translate-x-6" : "translate-x-1"}`} />
+          </button>
+          <span className={`text-xs font-semibold ${isRented ? "text-amber-700" : "text-slate-500"}`}>
+            {isRented ? "On" : "Off"}
+          </span>
+        </div>
+      }
     >
       {/* Section 1: Vehicle identity */}
       <section className="space-y-3">
@@ -258,7 +278,7 @@ function VehicleForm({
             </div>
           </div>
 
-          <div className="relative">
+          {!isRented && <div className="relative">
             {fieldLabel("Vehicle Type", true)}
             <div className="relative">
               <Package className={iconWrapperClass} size={16} />
@@ -270,9 +290,9 @@ function VehicleForm({
                 className={inputClass()}
               />
             </div>
-          </div>
+          </div>}
 
-          <div className="relative">
+          {!isRented && <div className="relative">
             {fieldLabel("Engine Number", true)}
             <div className="relative">
               <Gauge className={iconWrapperClass} size={16} />
@@ -284,9 +304,9 @@ function VehicleForm({
                 className={inputClass()}
               />
             </div>
-          </div>
+          </div>}
 
-          <div className="relative">
+          {!isRented && <div className="relative">
             {fieldLabel("Chassis Number", true)}
             <div className="relative">
               <Cpu className={iconWrapperClass} size={16} />
@@ -298,7 +318,7 @@ function VehicleForm({
                 className={inputClass()}
               />
             </div>
-          </div>
+          </div>}
         </div>
       </section>
 
@@ -363,7 +383,7 @@ function VehicleForm({
       </section>
 
       {/* Section 3: Purchase & finance */}
-      <section className="space-y-3">
+      {!isRented && <section className="space-y-3">
         {sectionHeading("Purchase & Finance")}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="relative">
@@ -464,10 +484,10 @@ function VehicleForm({
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Section 4: Tracking (kept last) */}
-      <section className="space-y-3">
+      {!isRented && <section className="space-y-3">
         {sectionHeading("Tracking")}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="relative">
@@ -484,7 +504,7 @@ function VehicleForm({
             </div>
           </div>
         </div>
-      </section>
+      </section>}
     </MasterForm>
   );
 }

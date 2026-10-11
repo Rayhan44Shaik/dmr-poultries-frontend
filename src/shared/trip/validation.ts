@@ -32,7 +32,7 @@ export function validateStartStep(trip: Trip): TripValidationResult {
   if (required("loaders") && !trip.loaders?.length) {
     errors.push("Please add at least one Loader.");
   }
-  if (
+  if (!trip.isRentedVehicle &&
     required("openingMeter") &&
     (trip.openingMeter == null || !Number.isFinite(Number(trip.openingMeter)) || Number(trip.openingMeter) <= 0)
   ) {
@@ -43,8 +43,7 @@ export function validateStartStep(trip: Trip): TripValidationResult {
   ) {
     errors.push("Opening Meter must be greater than zero.");
   }
-  if (
-    required("advanceAmount") && (
+  if (required("advanceAmount") && (
       trip.advanceAmount == null ||
       Number.isNaN(trip.advanceAmount) ||
       trip.advanceAmount < 0
@@ -82,7 +81,7 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (!hasFarmGps) {
     errors.push("Please capture the farm GPS location.");
   }
-  if (required("destMeter") && (!trip.destMeter || trip.destMeter <= 0)) {
+  if (!trip.isRentedVehicle && required("destMeter") && (!trip.destMeter || trip.destMeter <= 0)) {
     errors.push("Valid Farm Meter reading is required.");
   }
   const legIndex = Math.max(1, Number(trip.activeLegIndex ?? 1));
@@ -299,7 +298,7 @@ export function validateDeliveriesStep(
 
 export function validateEndStep(trip: Trip): TripValidationResult {
   const errors: string[] = [];
-  if (required("closingMeter") && (!trip.closingMeter || trip.closingMeter <= 0)) {
+  if (!trip.isRentedVehicle && required("closingMeter") && (!trip.closingMeter || trip.closingMeter <= 0)) {
     errors.push("Valid End Meter reading is required.");
   }
   const maxDest = Math.max(
@@ -314,7 +313,7 @@ export function validateEndStep(trip: Trip): TripValidationResult {
       .filter((n) => Number.isFinite(n) && n > 0)
   );
   const floor = Math.max(Number(trip.openingMeter ?? 0), maxDest, dieselMax);
-  if (floor > 0 && trip.closingMeter < floor) {
+  if (!trip.isRentedVehicle && floor > 0 && trip.closingMeter < floor) {
     errors.push(`Closing Meter must be greater than or equal to the last entered meter (${floor} KM).`);
   }
   if (required("deliveryTolls")) {
@@ -341,7 +340,7 @@ export function validateFinalTrip(trip: Trip): TripValidationResult {
       `Weight Mismatch: Delivered Weight + Mortality Weight exceeds DC Weight by ${Math.abs(loss).toFixed(2)} Kg.`
     );
   }
-  if (trip.closingMeter <= trip.destMeter && trip.destMeter > 0) {
+  if (!trip.isRentedVehicle && trip.closingMeter <= trip.destMeter && trip.destMeter > 0) {
     errors.push("KM Logic Error: Closing Meter must be greater than Destination Meter.");
   }
   return result(errors);

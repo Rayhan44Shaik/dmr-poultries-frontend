@@ -16,9 +16,10 @@ interface GeneralExpensesTableProps {
   averageKmLtr: string;
   openingMeter: number;
   destMeter: number;
-  trip?: any;
   readOnly?: boolean;
   onMeterNotice?: (message: string) => void;
+  dieselOtherAmount?: number;
+  hideMeters?: boolean;
 }
 
 export default function GeneralExpensesTable({
@@ -32,9 +33,10 @@ export default function GeneralExpensesTable({
   averageKmLtr: _averageKmLtr,
   openingMeter,
   destMeter,
-  trip,
   readOnly = false,
   onMeterNotice,
+  dieselOtherAmount = 0,
+  hideMeters = false,
 }: GeneralExpensesTableProps) {
   const { t } = useI18n();
   const meterInvalidRef = useRef(false);
@@ -127,10 +129,6 @@ export default function GeneralExpensesTable({
     computedDistance > 0 && totalDieselLiters > 0
       ? (computedDistance / totalDieselLiters).toFixed(2)
       : null;
-  const dieselOtherAmount = Array.isArray(trip?.dieselEntries)
-    ? trip.dieselEntries.reduce((sum: number, entry: any) =>
-        entry?.bunkSource === "OTHER" ? sum + Number(entry?.amount || 0) : sum, 0)
-    : 0;
   /** Coloured icon chip for expense category labels. */
   const CatIcon = ({
     icon: Icon,
@@ -204,8 +202,7 @@ export default function GeneralExpensesTable({
               derived?: boolean;
             }> = [
               { key: "others1Amt", label: t("ops.trip.exp_rto"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
-              { key: "dieselOthers", label: "Diesel Others", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
-              { key: "supervisorPc", label: "Supervisor (PC)", value: trip?.advanceAmount || 0, tone: "bg-blue-50/70 text-blue-600", Icon: Users, derived: true, rightBg: "bg-blue-50/30" },
+              { key: "dieselOthers", label: "Other diesel (non-master bunk)", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
               { key: "others2Amt", label: sheetData.others2Name || t("common.other"), value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", nameField: "others2Name", rightBg: "bg-slate-50/50" },
               { key: "others3Amt", label: sheetData.others3Name || t("common.other"), value: sheetData.others3Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others3Amt", nameField: "others3Name", rightBg: "bg-slate-50/50" },
               { key: "others4Amt", label: sheetData.others4Name || t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", nameField: "others4Name", rightBg: "bg-slate-50/50" },
@@ -323,6 +320,7 @@ export default function GeneralExpensesTable({
             </td>
           </tr>
 
+          {!hideMeters && <>
           {/* ODOMETER — compact single-line rows (same height as Total Pickup Tolls) */}
           <tr className="border-b border-slate-100">
             <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">
@@ -421,6 +419,7 @@ export default function GeneralExpensesTable({
               {computedAverage ? computedAverage : t("ops.trip.not_available")}
             </td>
           </tr>
+          </>}
 
           <tr className="bg-slate-50/50 border-b border-slate-100">
             <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">

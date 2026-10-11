@@ -20,6 +20,8 @@ import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
 import { withMinSaveDuration } from "../../utils/withMinSaveDuration";
+import { dieselExpenseBreakdown } from "../../utils/dieselExpenseBreakdown";
+import { formatVehicleNumber } from "../../../../../utils/format";
 
 /** System `order:<tripNo>` tags written by Finish Assignment — not user notes. */
 function splitRemarks(raw: unknown): { orderTags: string[]; userNotes: string } {
@@ -97,6 +99,7 @@ export default function StepEnd({
   clearForm,
   hideWizardClose = false,
 }: Props) {
+  const isRentedVehicle = Boolean(trip.isRentedVehicle);
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   // ─── State ─────────────────────────────────────────────────────────
@@ -362,6 +365,12 @@ export default function StepEnd({
     return acc + ltr * rate;
   }, 0);
   const totalDieselLiters = dieselIndices.reduce((acc, idx) => acc + Number(sheetData[`dieselLtr${idx}`] || 0), 0);
+  const dieselBreakdown = dieselExpenseBreakdown(dieselIndices.map((idx) => ({
+    litres: sheetData[`dieselLtr${idx}`],
+    rate: sheetData[`dieselRate${idx}`],
+    bunkName: sheetData[`dieselBunk${idx}`],
+    bunkSource: sheetData[`dieselBunkSource${idx}`],
+  })));
 
   let averageKmLtr = "";
   if (totalDistanceCovered > 0 && totalDieselLiters > 0) {
@@ -430,7 +439,7 @@ export default function StepEnd({
     return val > max ? val : max;
   }, 0);
   const requiredMinEndMeter = Math.max(openingMeter, destMeter, highestDieselMeter, 0);
-  const endMeterInvalid =
+  const endMeterInvalid = !isRentedVehicle &&
     sheetData.endMeter !== "" &&
     sheetData.endMeter != null &&
     requiredMinEndMeter > 0 &&
@@ -472,8 +481,7 @@ export default function StepEnd({
       others3Name: String(sheetData.others3Name ?? "").trim(),
       others4Name: String(sheetData.others4Name ?? "").trim(),
       others5Name: String(sheetData.others5Name ?? "").trim(),
-      endMeter: sheetData.endMeter,
-      closingMeter: Number(sheetData.endMeter) || 0,
+      ...(isRentedVehicle ? { isRentedVehicle: true } : { endMeter: sheetData.endMeter, closingMeter: Number(sheetData.endMeter) || 0 }),
       destinationTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
       deliveryTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
       remarks,
@@ -578,7 +586,7 @@ export default function StepEnd({
       return;
     }
     const endMeterNum = Number(sheetData.endMeter);
-    if (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum)) {
+    if (!isRentedVehicle && (sheetData.endMeter === "" || sheetData.endMeter === null || isNaN(endMeterNum))) {
       setErrorMsg(t("ops.trip.end_meter_required"));
       return;
     }
@@ -610,7 +618,7 @@ export default function StepEnd({
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
     }
-    if (requiredMinMeter > 0 && endMeterNum < requiredMinMeter) {
+    if (!isRentedVehicle && requiredMinMeter > 0 && endMeterNum < requiredMinMeter) {
       setErrorMsg(t("ops.trip.meter_must_gt", { min: requiredMinMeter }));
       return;
     }
@@ -800,7 +808,7 @@ export default function StepEnd({
               },
               {
                 label: t("operations.vehicle_no"),
-                value: trip.vehicleNo || "—",
+                value: formatVehicleNumber(trip.vehicleNo) || "—",
                 tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
               },
               {
@@ -815,13 +823,9 @@ export default function StepEnd({
               },
               {
                 label: t("ops.trip.total_diesel"),
-                value: formatInr(totalDieselAmount),
+                value: <><span className="block">{formatInr(totalDieselAmount)}</span><span className="block text-[11px] font-semibold text-slate-500">{totalDieselLiters.toFixed(2)} L</span></>,
                 tone: "border-blue-100 bg-blue-50/40 text-blue-500",
-              },
-              {
-                label: t("ops.trip.total_diesel_litres"),
-                value: `${totalDieselLiters.toFixed(2)} L`,
-                tone: "border-cyan-100 bg-cyan-50/40 text-cyan-600",
+                title: dieselBreakdown.tooltip,
               },
               {
                 label: t("ops.trip.field_total_all"),
@@ -831,10 +835,12 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
+                tabIndex={f.title ? 0 : undefined}
+                className={`group relative rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-[13px] uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
                 <p className={`${f.wide ? "overflow-visible whitespace-normal text-[12px] leading-none" : "truncate text-[15px]"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
+                {f.title ? <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-max max-w-[min(24rem,80vw)] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-relaxed text-white shadow-xl group-hover:block group-focus:block">{f.title}</span> : null}
               </div>
             ))}
           </div>
@@ -849,11 +855,12 @@ export default function StepEnd({
             averageKmLtr={averageKmLtr}
             openingMeter={openingMeter}
             destMeter={destMeter}
-            trip={trip}
             readOnly
             onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
+            dieselOtherAmount={dieselBreakdown.otherAmount}
+            hideMeters={isRentedVehicle}
           />
-          <DieselExpensesTable
+          {!isRentedVehicle && <DieselExpensesTable
             tripId={trip.id}
             sheetData={sheetData}
             handleChange={handleChange}
@@ -862,7 +869,7 @@ export default function StepEnd({
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
             readOnly
-          />
+          />}
         </div>
       ) : (
         // ─── Editable View ────────────────────────────────────────────
@@ -899,7 +906,7 @@ export default function StepEnd({
               },
               {
                 label: t("operations.vehicle_no"),
-                value: trip.vehicleNo || "—",
+                value: formatVehicleNumber(trip.vehicleNo) || "—",
                 tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
               },
               {
@@ -914,13 +921,9 @@ export default function StepEnd({
               },
               {
                 label: t("ops.trip.total_diesel"),
-                value: formatInr(totalDieselAmount),
+                value: <><span className="block">{formatInr(totalDieselAmount)}</span><span className="block text-[11px] font-semibold text-slate-500">{totalDieselLiters.toFixed(2)} L</span></>,
                 tone: "border-blue-100 bg-blue-50/40 text-blue-500",
-              },
-              {
-                label: t("ops.trip.total_diesel_litres"),
-                value: `${totalDieselLiters.toFixed(2)} L`,
-                tone: "border-cyan-100 bg-cyan-50/40 text-cyan-600",
+                title: dieselBreakdown.tooltip,
               },
               {
                 label: t("ops.trip.field_total_all"),
@@ -930,10 +933,12 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
+                tabIndex={f.title ? 0 : undefined}
+                className={`group relative rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-[13px] uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
                 <p className={`${f.wide ? "overflow-visible whitespace-normal text-[12px] leading-none" : "truncate text-[15px]"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
+                {f.title ? <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden w-max max-w-[min(24rem,80vw)] -translate-x-1/2 rounded-lg bg-slate-900 px-3 py-2 text-center text-[11px] font-semibold leading-relaxed text-white shadow-xl group-hover:block group-focus:block">{f.title}</span> : null}
               </div>
             ))}
           </div>
@@ -951,11 +956,12 @@ export default function StepEnd({
             averageKmLtr={averageKmLtr}
             openingMeter={openingMeter}
             destMeter={destMeter}
-            trip={trip}
             onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
+            dieselOtherAmount={dieselBreakdown.otherAmount}
+            hideMeters={isRentedVehicle}
           />
 
-          <DieselExpensesTable
+          {!isRentedVehicle && <DieselExpensesTable
             key={`diesel-${trip.id}`}
             readOnly={trip.meterLocked === true}
             tripId={trip.id}
@@ -965,7 +971,7 @@ export default function StepEnd({
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
-          />
+          />}
 
           {trip.meterLocked ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">

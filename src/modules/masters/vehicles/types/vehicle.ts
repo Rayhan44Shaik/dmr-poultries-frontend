@@ -12,6 +12,8 @@ export type Vehicle = {
 
   capacityKg: number;
 
+  isRented: boolean;
+
   trackingId: string;
 
   fastagBank: string;

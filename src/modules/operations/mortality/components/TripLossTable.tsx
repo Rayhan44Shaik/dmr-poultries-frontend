@@ -32,7 +32,6 @@ import {
   HeartCrack,
   Percent,
   Scale,
-  SearchX,
   ShoppingBag,
   TrendingDown,
   UserCog,
@@ -483,27 +482,17 @@ export default function TripLossTable({
               </>
             ) : showEmptyAll ? (
               <tr>
-                <td colSpan={COLUMNS.length} className="px-4 py-12">
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
-                      <SearchX size={18} />
-                    </span>
-                    <p className="text-[13px] font-semibold text-slate-700">{t("ops.mortality.empty.title")}</p>
-                    <p className="max-w-md text-xs text-slate-400">{t("ops.mortality.empty.hint")}</p>
-                  </div>
+                <td colSpan={COLUMNS.length} className="py-12 text-center text-[13px] font-medium text-slate-400">
+                  {t("ops.mortality.empty.title")}
                 </td>
               </tr>
             ) : showEmptyFiltered ? (
               <tr>
                 <td colSpan={COLUMNS.length} className="px-4 py-12">
                   <div className="flex flex-col items-center gap-2 text-center">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-500">
-                      <SearchX size={18} />
-                    </span>
                     <p className="text-[13px] font-semibold text-slate-700">
                       {t("ops.mortality.empty.filtered_title")}
                     </p>
-                    <p className="max-w-md text-xs text-slate-400">{t("ops.mortality.empty.hint")}</p>
                     {onReset && (
                       <button
                         type="button"

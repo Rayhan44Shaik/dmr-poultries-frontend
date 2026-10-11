@@ -57,7 +57,7 @@ function shiftYmd(ymd: string, days: number): string {
   return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;
 }
 
-type VehicleOption = { id: number; vehicleNumber: string; noOfBoxes?: number };
+type VehicleOption = { id: number; vehicleNumber: string; noOfBoxes?: number; isRented?: boolean };
 type EmployeeOption = {
   id: number;
   employeeName: string;
@@ -279,18 +279,18 @@ const VehicleField = React.memo(function VehicleField({
   options: VehicleOption[];
   disabled: boolean;
   invalid?: boolean;
-  onSelect: (vehicleId: number, vehicleNo: string, noOfBoxes?: number) => void;
+  onSelect: (vehicleId: number, vehicleNo: string, noOfBoxes?: number, isRented?: boolean) => void;
 }) {
   const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: String(option.id), label: formatVehicleNumber(localizeTripViewText(option.vehicleNumber, language)), searchText: option.vehicleNumber || "" })),
+    () => options.map((option) => ({ value: String(option.id), label: `${formatVehicleNumber(localizeTripViewText(option.vehicleNumber, language))}${option.isRented ? " · Rental" : ""}`, searchText: option.vehicleNumber || "" })),
     [options, language]
   );
   const handleChange = useCallback(
     (value: string) => {
       const id = Number(value) || 0;
       const option = options.find((o) => o.id === id);
-      onSelect(id, option?.vehicleNumber || "", option?.noOfBoxes);
+      onSelect(id, option?.vehicleNumber || "", option?.noOfBoxes, option?.isRented);
     },
     [options, onSelect]
   );
@@ -742,7 +742,7 @@ function StepStart({
   // field-level validation only — the backend remains the authority on submit.
   useEffect(() => {
     let cancelled = false;
-    if (!form.vehicleId) {
+    if (!form.vehicleId || loadSnapshot.isRentedVehicle) {
       queueMicrotask(() => { if (!cancelled) setLatestMeter(null); });
       return () => { cancelled = true; };
     }
@@ -780,7 +780,7 @@ function StepStart({
     return () => {
       cancelled = true;
     };
-  }, [form.vehicleId, tripId, tripNo]);
+  }, [form.vehicleId, tripId, tripNo, loadSnapshot.isRentedVehicle]);
 
   const driverOptions = useMemo(
     () => employeeOptions.filter((employee) => employee.department === "Driver"),
@@ -834,10 +834,10 @@ function StepStart({
     });
   }, []);
 
-  const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string, noOfBoxes?: number) => {
-    patchForm({ vehicleId, vehicleNo });
+  const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string, noOfBoxes?: number, isRented?: boolean) => {
+    patchForm({ vehicleId, vehicleNo, openingMeterText: isRented ? "" : formRef.current.openingMeterText });
     const capacity = Number(noOfBoxes) > 0 ? Number(noOfBoxes) : undefined;
-    updateTrip({ vehicleId, vehicleNo, vehicleBoxCapacity: capacity });
+    updateTrip({ vehicleId, vehicleNo, vehicleBoxCapacity: capacity, isRentedVehicle: Boolean(isRented), openingMeter: isRented ? null : loadSnapshot.openingMeter });
   }, [patchForm, updateTrip]);
 
   const handleSupervisorSelect = useCallback((supervisorId: number, supervisorName: string) => {
@@ -888,7 +888,7 @@ function StepStart({
       vehicle: showErrors && (!patch.vehicleId || !patch.vehicleNo),
       supervisor: showErrors && (!patch.supervisorId || !patch.supervisorName),
       driver: showErrors && (!patch.driverId || !patch.driverName),
-      openingMeter: (showErrors && meterNumericBad) || meterBelowLatest,
+      openingMeter: !loadSnapshot.isRentedVehicle && ((showErrors && meterNumericBad) || meterBelowLatest),
       advance:
         showErrors &&
         form.advanceText.trim() !== "" &&
@@ -896,13 +896,13 @@ function StepStart({
       helpers: showErrors && (!patch.helpers || patch.helpers.length === 0),
       loaders: showErrors && (!patch.loaders || patch.loaders.length === 0),
     };
-  }, [form, showErrors, latestMeter]);
+  }, [form, showErrors, latestMeter, loadSnapshot.isRentedVehicle]);
 
   const openingMeterError = useMemo(() => {
     const meterValue = Number(form.openingMeterText);
     const meterNumericBad =
       form.openingMeterText.trim() === "" || !Number.isFinite(meterValue) || meterValue <= 0;
-    if (showErrors && meterNumericBad) {
+    if (!loadSnapshot.isRentedVehicle && showErrors && meterNumericBad) {
       return t("ops.trip.invalid_meter_reading");
     }
     if (
@@ -915,7 +915,7 @@ function StepStart({
       return t("ops.trip.meter_must_exceed", { meter: latestMeter.meter, ref });
     }
     return null;
-  }, [form.openingMeterText, latestMeter, showErrors, t]);
+  }, [form.openingMeterText, latestMeter, showErrors, t, loadSnapshot.isRentedVehicle]);
 
   const handleFormKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "Enter") return;
@@ -1310,7 +1310,12 @@ function StepStart({
             onChange={handleAdvanceChange}
           />
           {/* Opening Meter stays LAST in Step 1 (after Loaders and Advance). */}
-          <OpeningMeterField
+          {loadSnapshot.isRentedVehicle ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div className="font-semibold">Rental vehicle</div>
+              <div className="mt-0.5 text-xs">Fuel and meter readings are handled by the rental provider.</div>
+            </div>
+          ) : <OpeningMeterField
             value={form.openingMeterText}
             locked={meterLocked}
             lockRef={meterLockRef}
@@ -1319,7 +1324,7 @@ function StepStart({
             error={openingMeterError}
             latestMeter={latestMeter}
             onChange={handleOpeningMeterChange}
-          />
+          />}
         </div>
 
         <WizardActionBar

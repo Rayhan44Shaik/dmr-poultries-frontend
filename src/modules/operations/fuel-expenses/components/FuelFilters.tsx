@@ -6,6 +6,7 @@ import {
   Calendar,
   Truck,
   User,
+  Fuel,
   Layers,
   ArrowUpDown,
   Plus,
@@ -30,6 +31,7 @@ interface Props {
   toDate: string;
   vehicle: string;
   driver: string;
+  bunk: string;
   sourceType: string;
   sortBy: FuelSortKey | null;
   sortDir: "asc" | "desc";
@@ -38,12 +40,14 @@ interface Props {
   setToDate: (v: string) => void;
   setVehicle: (v: string) => void;
   setDriver: (v: string) => void;
+  setBunk: (v: string) => void;
   setSourceType: (v: string) => void;
   setSort: (sortBy: FuelSortKey | null, sortDir: "asc" | "desc") => void;
   setSearch: (v: string) => void;
   onReset: () => void;
   vehicles?: readonly MasterDropdownOption[];
   drivers?: readonly MasterDropdownOption[];
+  bunks?: readonly MasterDropdownOption[];
   onAddFuelBill?: () => void;
   isFormOpen?: boolean;
   onExportPDF?: () => void;
@@ -57,6 +61,7 @@ function FuelFilters({
   toDate,
   vehicle,
   driver,
+  bunk,
   sourceType,
   sortBy,
   sortDir,
@@ -65,12 +70,14 @@ function FuelFilters({
   setToDate,
   setVehicle,
   setDriver,
+  setBunk,
   setSourceType,
   setSort,
   setSearch,
   onReset,
   vehicles = [],
   drivers = [],
+  bunks = [],
   onAddFuelBill,
   isFormOpen = false,
   onExportPDF,
@@ -94,6 +101,7 @@ function FuelFilters({
 
   const vehicleOptions = localizeOptions(withoutSentinel(vehicles, "All Vehicles"));
   const driverOptions = localizeOptions(withoutSentinel(drivers, "All Drivers"));
+  const bunkOptions = localizeOptions(withoutSentinel(bunks, "All Bunks"));
 
   const sourceOptions: MasterDropdownOption[] = [
     { value: "TRIP", label: t("ops.fuel.trip_diesel") },
@@ -134,7 +142,7 @@ function FuelFilters({
   return (
     <div className={opsFilterCardClass}>
       {/* ── Top Filters Row: 4 Primary Filters ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
@@ -191,6 +199,24 @@ function FuelFilters({
             options={driverOptions}
             onChange={(next) => setDriver(next || "All Drivers")}
             placeholder={t("ops.fuel.all_drivers")}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className={opsFilterLabelClass}>
+            <Fuel size={17} className="text-amber-500 flex-shrink-0" />
+            <span>Fuel Bunk</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Fuel Bunk"
+            value={bunk === "All Bunks" ? "" : bunk}
+            options={bunkOptions}
+            onChange={(next) => setBunk(next || "All Bunks")}
+            placeholder="All Bunks"
             searchable
             allowClear
             className="w-full"
@@ -261,6 +287,7 @@ function FuelFilters({
             search.trim() !== "",
             !/^all\b/i.test(vehicle.trim()) && vehicle !== "",
             !/^all\b/i.test(driver.trim()) && driver !== "",
+            !/^all\b/i.test(bunk.trim()) && bunk !== "",
             !/^all$/i.test(sourceType.trim()) && sourceType !== "",
             fromDate !== "" || toDate !== "",
             sortBy !== null,

@@ -11,6 +11,7 @@ import { DatePicker } from "../../../../components/common/DatePicker";
 import { amountInWords } from "../../collections/utils/amountInWords";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
 import { compressImageFile } from "../../../../utils/compressImage";
+import type { BirdType } from "../../../masters/bird-types/types/birdType";
 
 interface Props {
   onSave: (data: FuelExpenseDraft) => void;
@@ -19,6 +20,7 @@ interface Props {
   initialData?: FuelExpense | null;
   vehicles: Array<{ id: number; status?: string; vehicleNumber: string }>;
   drivers: Array<{ id: number; employeeName: string }>;
+  fuelBunks: BirdType[];
   onCancel?: () => void;
 }
 
@@ -33,6 +35,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   initialData,
   vehicles,
   drivers,
+  fuelBunks,
   onCancel,
 }, ref) => {
   const { t, language } = useI18n();
@@ -50,6 +53,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [rate, setRate] = useState<number>(0);
   const [litres, setLitres] = useState<number>(0);
   const [petrolBunk, setPetrolBunk] = useState("");
+  const [bunkSelection, setBunkSelection] = useState("");
   const [gpsAddress, setGpsAddress] = useState("");
   const [image, setImage] = useState<string>("");
   const [gpsLat, setGpsLat] = useState<number | null>(null);
@@ -77,6 +81,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setRate(initialData.rate);
       setLitres(initialData.litres);
       setPetrolBunk(initialData.petrolBunk);
+      setBunkSelection(fuelBunks.some((bunk) => bunk.birdType === initialData.petrolBunk) ? initialData.petrolBunk : "__OTHER__");
       setGpsAddress(initialData.gpsAddress || "");
       setImage(initialData.image || "");
       setImageName(initialData.imageName || "");
@@ -85,7 +90,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setGpsAccuracy(initialData.gpsAccuracy ?? null);
       setGpsCapturedAt(initialData.gpsCapturedAt ?? null);
     }
-  }, [initialData, editingId]);
+  }, [initialData, editingId, fuelBunks]);
 
   useEffect(() => {
     if (litres > 0 && rate > 0) {
@@ -107,6 +112,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setRate(0);
     setLitres(0);
     setPetrolBunk("");
+    setBunkSelection("");
     setGpsAddress("");
     setImage("");
     setImageName("");
@@ -132,6 +138,32 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     value: String(d.id),
     label: localizeTripViewText(d.employeeName, language),
   }));
+
+  const bunkOptions = [
+    ...fuelBunks.map((bunk) => ({ value: bunk.birdType, label: bunk.birdType })),
+    { value: "__OTHER__", label: t("common.other") },
+  ];
+
+  const handleBunkChange = (selectedValue: string) => {
+    setBunkSelection(selectedValue);
+    setGpsError(null);
+    if (selectedValue === "__OTHER__") {
+      setPetrolBunk("");
+      setGpsAddress("");
+      setGpsLat(null);
+      setGpsLon(null);
+      setGpsAccuracy(null);
+      setGpsCapturedAt(null);
+      return;
+    }
+    const bunk = fuelBunks.find((item) => item.birdType === selectedValue);
+    setPetrolBunk(bunk?.birdType ?? "");
+    setGpsAddress(bunk?.address ?? "");
+    setGpsLat(bunk?.latitude ?? null);
+    setGpsLon(bunk?.longitude ?? null);
+    setGpsAccuracy(bunk?.latitude != null && bunk.longitude != null ? 0 : null);
+    setGpsCapturedAt(bunk?.latitude != null && bunk.longitude != null ? new Date().toISOString() : null);
+  };
 
   const handleVehicleChange = (selectedValue: string) => {
     const v = activeVehicles.find((x) => String(x.id) === selectedValue);
@@ -420,10 +452,11 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <div className="mt-1 min-h-4 text-[11px] font-medium italic text-emerald-700">{amountInWords(amount, language)}</div>
           </div>
 
-          {/* Bunk City */}
+          {/* Fuel bunk master — identical source and Other behavior as Trip Step 5. */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">{t("ops.fuel.bunk_city")} <span className="text-red-500">*</span></label>
-            <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder={t("ops.fuel.enter_bunk")} />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">{t("ops.fuel.petrol_bunk")} <span className="text-red-500">*</span></label>
+            <SearchableSelect label="" options={bunkOptions} value={bunkSelection} onChange={handleBunkChange} placeholder="Select bunk" searchable allowClear={false} widthClass="w-full" />
+            {bunkSelection === "__OTHER__" && <input type="text" value={petrolBunk} maxLength={150} onChange={(e) => setPetrolBunk(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder={t("ops.fuel.enter_bunk")} />}
           </div>
 
           {/* GPS */}
@@ -433,11 +466,11 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               <button
                 type="button"
                 onClick={fetchGPSLocation}
-                disabled={isFetchingLocation}
+                disabled={isFetchingLocation || (bunkSelection !== "__OTHER__" && Boolean(bunkSelection))}
                 className="flex w-full items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60 cursor-pointer"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-                <span className="hidden sm:inline">GPS</span>
+                <span className="hidden sm:inline">{bunkSelection && bunkSelection !== "__OTHER__" ? "Master GPS" : "GPS"}</span>
               </button>
             </div>
             {gpsLat != null && gpsLon != null ? (

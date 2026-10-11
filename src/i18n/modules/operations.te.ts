@@ -1053,15 +1053,15 @@ export default {
 
   // Table columns
   'ops.mortality.col.source_farm': 'ఫారం',
-  'ops.mortality.col.farm_birds': 'ఫారం పక్షులు',
-  'ops.mortality.col.farm_weight': 'ఫారం బరు',
-  'ops.mortality.col.delivery_shops': 'షాపులు',
-  'ops.mortality.col.delivered_birds': 'డెలి. పక్షులు',
-  'ops.mortality.col.delivery_weight': 'డెలి. బరు',
-  'ops.mortality.col.mortality': 'మరణాలు',
-  'ops.mortality.col.mortality_weight': 'మరణాల బరు',
-  'ops.mortality.col.weight_loss': 'బరు నష్టం',
-  'ops.mortality.col.loss_pct': 'నష్టం %',
+  'ops.mortality.col.farm_birds': 'F.BIRDS',
+  'ops.mortality.col.farm_weight': 'F.WT',
+  'ops.mortality.col.delivery_shops': 'SHOPS',
+  'ops.mortality.col.delivered_birds': 'D.BIRDS',
+  'ops.mortality.col.delivery_weight': 'D.WT',
+  'ops.mortality.col.mortality': 'MOR',
+  'ops.mortality.col.mortality_weight': 'M.WT',
+  'ops.mortality.col.weight_loss': 'W.L',
+  'ops.mortality.col.loss_pct': 'L.%',
 
   // Empty states
   'ops.mortality.empty.title': 'పూర్తయిన ట్రిప్పులు కనుగొనబడలేదు',

@@ -197,6 +197,7 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     startTime: formatStartTimeForDisplay(raw.startTime ?? raw.start_time) || defaults.startTime,
     vehicleId: numOrZero(raw.vehicleId ?? raw.vehicle_id ?? defaults.vehicleId),
     vehicleNo: str(raw.vehicleNo ?? raw.vehicle_no, defaults.vehicleNo),
+    isRentedVehicle: Boolean(raw.isRentedVehicle ?? raw.is_rented_vehicle ?? defaults.isRentedVehicle),
     driverId: numOrZero(raw.driverId ?? raw.driver_id ?? defaults.driverId),
     driverName: str(raw.driverName ?? raw.driver_name, defaults.driverName),
     supervisorId: numOrZero(raw.supervisorId ?? raw.supervisor_id ?? defaults.supervisorId),
@@ -329,6 +330,7 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
     status: trip.status ?? "Draft",
     vehicleId: trip.vehicleId || null,
     vehicleNo: trip.vehicleNo || null,
+    isRentedVehicle: Boolean(trip.isRentedVehicle),
     driverId: trip.driverId || null,
     driverName: trip.driverName || null,
     supervisorId: trip.supervisorId || null,
@@ -361,6 +363,7 @@ export function toStep2Payload(trip: Partial<Trip>): Record<string, unknown> {
     avgBirdWeight: avgBirdWeight === 0 ? null : avgBirdWeight,
     farmRemarks: String(trip.farmRemarks ?? "").toLocaleUpperCase("en-IN"),
     farmStepSubmitted: trip.farmStepSubmitted ?? false,
+    isRentedVehicle: Boolean(trip.isRentedVehicle),
   };
   // Farm bird type — backend canonical body keys are farmBirdTypeId /
   // farmBirdType (columns farm_bird_type_id / farm_bird_type). Send only when a
@@ -433,6 +436,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   ] as const;
   const payload: Record<string, unknown> = {
     remarks: String(trip.remarks ?? "").toLocaleUpperCase("en-IN"),
+    isRentedVehicle: Boolean(trip.isRentedVehicle),
   };
   for (const key of EXPENSE_KEYS) {
     const x = n(trip[key]);
@@ -844,7 +848,7 @@ export async function saveTripStepProgress(
 }
 
 export type AvailableTripResources = {
-  vehicles: Array<{ id: number; vehicleNumber: string; noOfBoxes?: number }>;
+  vehicles: Array<{ id: number; vehicleNumber: string; noOfBoxes?: number; isRented?: boolean }>;
   drivers: Array<{ id: number; employeeName: string; department: string }>;
   supervisors: Array<{ id: number; employeeName: string; department: string }>;
   helpers: Array<{

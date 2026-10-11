@@ -1,5 +1,5 @@
 import React from "react";
-import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp, Gauge } from "lucide-react";
+import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp, Gauge, MapPin } from "lucide-react";
 import { compactKpiValue, KpiCardGrid, KpiMetricValue, type KpiCardItem } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
 
@@ -10,6 +10,7 @@ interface Props {
   approvedCount: number;
   avgMileage: number | null;
   recentTripMileage?: number | null;
+  bunkDetails?: Array<{ name: string; bills: number; litres: number; amount: number }>;
 }
 
 export function FuelKPICards({
@@ -19,6 +20,7 @@ export function FuelKPICards({
   approvedCount,
   avgMileage,
   recentTripMileage = null,
+  bunkDetails = [],
 }: Props) {
   const { t, language } = useI18n();
 
@@ -65,6 +67,16 @@ export function FuelKPICards({
       tone: "cyan",
     },
     {
+      id: "bunks",
+      label: "Fuel Bunks",
+      value: String(bunkDetails.length),
+      tooltip: bunkDetails.length
+        ? bunkDetails.map((bunk) => `${bunk.name}: ${bunk.bills} bill${bunk.bills === 1 ? "" : "s"} · ${bunk.litres.toFixed(2)} L · ₹${bunk.amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`).join("\n")
+        : "No bunk details for the selected filters",
+      Icon: MapPin,
+      tone: "rose",
+    },
+    {
       id: "mileage",
       label: t("ops.fuel.avg_efficiency"),
       value: mileage ? <KpiMetricValue metric={mileage} unit="KM/L" /> : "—",
@@ -85,7 +97,7 @@ export function FuelKPICards({
     });
   }
 
-  const gridClass = cards.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5";
+  const gridClass = cards.length >= 6 ? "lg:grid-cols-6" : "lg:grid-cols-5";
 
   return <KpiCardGrid items={cards} gridClassName={gridClass} ariaLabel={t("ops.fuel.title")} />;
 }

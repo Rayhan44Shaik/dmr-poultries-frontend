@@ -13,6 +13,7 @@ interface MasterFormProps {
   isSaving?: boolean;
   submitLabel: string;
   children: ReactNode;
+  headerActions?: ReactNode;
 }
 
 /** One frame for all six master forms; only the body scrolls on small screens. */
@@ -27,6 +28,7 @@ export default function MasterForm({
   isSaving = false,
   submitLabel,
   children,
+  headerActions,
 }: MasterFormProps) {
   const { t } = useI18n();
   const titleId = useId();
@@ -62,6 +64,7 @@ export default function MasterForm({
           </div>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {headerActions}
           <span className="text-xs font-medium text-slate-500">
             {t("common.status")}
           </span>

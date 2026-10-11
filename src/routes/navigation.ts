@@ -304,7 +304,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "cyan",
         keywords: "trips history list completed",
       },
-
       {
         label: "Rate Entry",
         labelKey: "nav.rateEntry",
@@ -346,6 +345,13 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Scale,
         tone: "rose",
         keywords: "weight loss mortality death birds",
+      },
+      {
+        label: "Expenses",
+        path: "/operations?tab=expenses",
+        icon: ReceiptText,
+        tone: "amber",
+        keywords: "trip operation expenses meals loading tiffin diesel",
       },
       {
         label: "Fuel Expenses",

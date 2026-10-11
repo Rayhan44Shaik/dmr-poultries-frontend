@@ -136,9 +136,13 @@ function VehicleTable({
                 {formatVehicleNumber(f.vehicleNumber)}
               </td>
               <td className={masterTdClass}>
-                <span className="block truncate">
-                  {shown(f.vehicleType) || "—"}
-                </span>
+                {f.isRented ? (
+                  <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
+                    Rental
+                  </span>
+                ) : (
+                  <span className="block truncate">{shown(f.vehicleType) || "—"}</span>
+                )}
               </td>
               <td className={`${masterTdClass} text-right tabular-nums`}>
                 {f.noOfBoxes}

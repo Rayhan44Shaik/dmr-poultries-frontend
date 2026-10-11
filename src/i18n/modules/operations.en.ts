@@ -1015,15 +1015,15 @@ export default {
 
   // Table columns
   'ops.mortality.col.source_farm': 'Farm',
-  'ops.mortality.col.farm_birds': 'Farm Birds',
-  'ops.mortality.col.farm_weight': 'Farm Wt',
-  'ops.mortality.col.delivery_shops': 'Shops',
-  'ops.mortality.col.delivered_birds': 'Del. Birds',
-  'ops.mortality.col.delivery_weight': 'Del. Wt',
-  'ops.mortality.col.mortality': 'Mortality',
-  'ops.mortality.col.mortality_weight': 'Mort. Wt',
-  'ops.mortality.col.weight_loss': 'Wt Loss',
-  'ops.mortality.col.loss_pct': 'Loss %',
+  'ops.mortality.col.farm_birds': 'F.BIRDS',
+  'ops.mortality.col.farm_weight': 'F.WT',
+  'ops.mortality.col.delivery_shops': 'SHOPS',
+  'ops.mortality.col.delivered_birds': 'D.BIRDS',
+  'ops.mortality.col.delivery_weight': 'D.WT',
+  'ops.mortality.col.mortality': 'MOR',
+  'ops.mortality.col.mortality_weight': 'M.WT',
+  'ops.mortality.col.weight_loss': 'W.L',
+  'ops.mortality.col.loss_pct': 'L.%',
 
   // Empty states
   'ops.mortality.empty.title': 'No completed trips found',

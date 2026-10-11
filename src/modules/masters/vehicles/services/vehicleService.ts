@@ -32,8 +32,9 @@ const LEGACY_STORAGE_KEYS = [
 /** Cache filled exclusively by GET /api/masters/vehicles. */
 let vehiclesCache: Vehicle[] = [];
 
-export type VehicleInput = Omit<Vehicle, "id" | "vehicleNo"> & {
+export type VehicleInput = Omit<Vehicle, "id" | "vehicleNo" | "isRented"> & {
   vehicleNo?: number;
+  isRented?: boolean;
   emiDay?: number;
   totalEMIs?: number;
 };
@@ -87,6 +88,7 @@ export function mapVehicle(raw: Record<string, unknown>): Vehicle {
     noOfBoxes: Number(raw.noOfBoxes ?? raw.no_of_boxes ?? 0),
     birdCapacity: Number(raw.birdCapacity ?? raw.bird_capacity ?? 0),
     capacityKg: Number(raw.capacityKg ?? raw.capacity_kg ?? 0),
+    isRented: raw.isRented === true || raw.is_rented === true,
     trackingId: String(raw.trackingId ?? raw.tracking_id ?? ""),
     fastagBank: String(raw.fastagBank ?? raw.fastag_bank ?? ""),
     engineNumber: String(raw.engineNumber ?? raw.engine_number ?? ""),
@@ -118,6 +120,7 @@ function toPayload(input: VehicleInput | Partial<Vehicle> & { emiDay?: number; t
     noOfBoxes: Number(input.noOfBoxes ?? 0),
     birdCapacity: Number(input.birdCapacity ?? 0),
     capacityKg: Number(input.capacityKg ?? 0),
+    isRented: Boolean(input.isRented),
     trackingId: input.trackingId?.trim() ?? "",
     fastagBank: input.fastagBank?.trim() ?? "",
     engineNumber: input.engineNumber?.trim() ?? "",

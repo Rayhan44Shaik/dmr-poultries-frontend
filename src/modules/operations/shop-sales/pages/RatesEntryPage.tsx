@@ -166,11 +166,8 @@ export default function RatesEntryPage({ embedded = false }: Props) {
             </span>
           </div>
         ) : filteredTrips.length === 0 && !loadError ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-              <Store size={20} />
-            </span>
-            <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
+          <div className="py-12 text-center text-[13px] font-medium text-slate-400">
+            {t("ops.rate.no_trips")}
           </div>
         ) : (
           <>

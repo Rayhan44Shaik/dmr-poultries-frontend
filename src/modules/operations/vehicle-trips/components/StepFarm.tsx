@@ -212,6 +212,7 @@ export default function StepFarm({
   };
 
   const activeLoadIndex = Math.max(1, Number(trip.activeLegIndex ?? 1));
+  const isRentedVehicle = Boolean(trip.isRentedVehicle);
   const previousMeterFloor = Math.max(
     Number(trip.openingMeter ?? 0),
     ...(trip.legs ?? [])
@@ -259,7 +260,7 @@ export default function StepFarm({
       return;
     }
     setFieldErrors({});
-    if (destMeterError) {
+    if (!isRentedVehicle && destMeterError) {
       setFieldErrors({ destMeter: destMeterError });
       notify(destMeterError, "warning");
       return;
@@ -362,12 +363,12 @@ export default function StepFarm({
 
         {/* Time first, then remaining fields; GPS last */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <StepKpiCard
+          {!isRentedVehicle && <StepKpiCard
             icon={Clock}
             tone="bg-sky-50/70 text-sky-500"
             label={t("ops.trip.field.reached_time")}
             value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
-          />
+          />}
           <StepKpiCard
             icon={Store}
             tone="bg-emerald-50/70 text-emerald-500"
@@ -595,7 +596,12 @@ export default function StepFarm({
             />
           </div>
 
-          <div>
+          {isRentedVehicle ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <div className="font-semibold">Rental vehicle</div>
+              <div className="mt-0.5 text-xs">Destination meter is not required.</div>
+            </div>
+          ) : <div>
             <FieldLabel
               icon={Gauge}
               tone="bg-purple-50/70 text-purple-500"
@@ -635,7 +641,7 @@ export default function StepFarm({
                 </span>
               </p>
             )}
-          </div>
+          </div>}
 
           <div>
             <FieldLabel
@@ -728,7 +734,7 @@ export default function StepFarm({
           onSubmit={handleSubmit}
           busy={isSubmitting}
           saveDisabled={!hasUnsavedChanges}
-          submitDisabled={!!destMeterError}
+          submitDisabled={!isRentedVehicle && !!destMeterError}
           submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
         />
       </div>

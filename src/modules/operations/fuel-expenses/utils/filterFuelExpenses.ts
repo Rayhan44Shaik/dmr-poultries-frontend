@@ -9,6 +9,8 @@ export interface FuelClientFilters {
   vehicleNo?: string;
   driverId?: number;
   driverName?: string;
+  petrolBunk?: string;
+  masterBunkNames?: readonly string[];
   sourceType?: string;
   quickTab?: FuelQuickTab;
   search?: string;
@@ -95,6 +97,8 @@ export function filterFuelExpenses(
     vehicleNo,
     driverId,
     driverName,
+    petrolBunk,
+    masterBunkNames = [],
     sourceType,
     quickTab = "ALL",
     search = "",
@@ -116,6 +120,10 @@ export function filterFuelExpenses(
 
     if (driverId != null && Number(bill.driverId) !== driverId) return false;
     if (driverName && driverName !== "All Drivers" && bill.driverName !== driverName) return false;
+    if (petrolBunk === "__OTHER__") {
+      const masterNames = new Set(masterBunkNames.map((name) => name.trim().toLocaleLowerCase()));
+      if (masterNames.has(String(bill.petrolBunk || "").trim().toLocaleLowerCase())) return false;
+    } else if (petrolBunk && petrolBunk !== "All Bunks" && bill.petrolBunk !== petrolBunk) return false;
 
     // Quick tab filtering:
     if (quickTab === "DELETED") {

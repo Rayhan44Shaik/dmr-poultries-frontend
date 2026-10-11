@@ -305,7 +305,9 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
     if (form.garage) formData.append('garage', form.garage);
     if (form.mechanic) formData.append('mechanic', form.mechanic);
     formData.append('parts', JSON.stringify(cleanedParts));
-    if (form.remarks) formData.append('remarks', form.remarks);
+    // Always send remarks, including an empty value while editing. This keeps
+    // the database in sync when a user adds, changes, or clears the note.
+    formData.append('remarks', form.remarks.trim());
     if (removeIds.length > 0) formData.append('removeDocumentIds', JSON.stringify(removeIds));
     for (const item of newFiles) {
       if (item.file) formData.append('documents', item.file, item.fileName);

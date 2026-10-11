@@ -22,7 +22,13 @@ import { formatTripViewStamp } from "../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "./TripTimestampDisplay";
 import { withMinSaveDuration } from "../utils/withMinSaveDuration";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
-import { parsePickupImport, validatePickupImport } from "../utils/pickupImport";
+import {
+  continuePickupBoxNumbers,
+  parsePickupImport,
+  validatePickupAppend,
+  type PickupImportMetadata,
+} from "../utils/pickupImport";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 interface Props {
   trip: Trip;
@@ -266,6 +272,9 @@ export default function StepPickup({
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState<BoxDetail[]>([]);
+  const [importBaseRows, setImportBaseRows] = useState<BoxDetail[]>([]);
+  const [importMetadata, setImportMetadata] = useState<PickupImportMetadata>({});
+  const [importFileName, setImportFileName] = useState("");
   const [importError, setImportError] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [selectedImportIndex, setSelectedImportIndex] = useState(0);
@@ -275,19 +284,11 @@ export default function StepPickup({
   const importEditOriginalRef = useRef<BoxDetail | null>(null);
   useEffect(() => {
     if (!importOpen) return;
-    const appScroll = document.getElementById("app-scroll");
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
-    const previousAppOverflow = appScroll?.style.overflow ?? "";
-    const previousAppOverscroll = appScroll?.style.overscrollBehavior ?? "";
-    const lockedScrollTop = appScroll?.scrollTop ?? 0;
 
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
-    if (appScroll) {
-      appScroll.style.overflow = "hidden";
-      appScroll.style.overscrollBehavior = "none";
-    }
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setImportOpen(false);
     };
@@ -295,11 +296,6 @@ export default function StepPickup({
     return () => {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
-      if (appScroll) {
-        appScroll.style.overflow = previousAppOverflow;
-        appScroll.style.overscrollBehavior = previousAppOverscroll;
-        appScroll.scrollTop = lockedScrollTop;
-      }
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [importOpen]);
@@ -604,18 +600,26 @@ export default function StepPickup({
     setImportError("");
     try {
       const parsed = await parsePickupImport(file);
-      const errors = validatePickupImport(parsed, maxBoxes);
+      const existing = getBoxDetails().filter((row) => row.birds > 0 && row.weight > 0);
+      const continued = continuePickupBoxNumbers(parsed.boxes, existing.length);
+      const errors = validatePickupAppend(existing, continued, maxBoxes);
+      setImportFileName(file.name);
+      setImportMetadata(parsed.metadata);
+      setImportBaseRows(existing);
       if (errors.length) {
-        setImportRows(parsed);
+        setImportRows(continued);
         setImportError(errors.join(" "));
         return;
       }
-      setImportRows(parsed);
+      setImportRows(continued);
       setSelectedImportIndex(0);
       setEditingImportIndex(null);
       requestAnimationFrame(() => importGridRef.current?.focus());
     } catch (error) {
       setImportRows([]);
+      setImportBaseRows([]);
+      setImportMetadata({});
+      setImportFileName("");
       setImportError(error instanceof Error ? error.message : "Unable to read this file.");
     } finally {
       setImportBusy(false);
@@ -624,12 +628,13 @@ export default function StepPickup({
   };
 
   const applyImportedRows = () => {
-    const errors = validatePickupImport(importRows, maxBoxes);
+    const errors = validatePickupAppend(importBaseRows, importRows, maxBoxes);
     if (errors.length) return setImportError(errors.join(" "));
-    setRows(importRows.map((row) => ({ ...row, uid: generateUid() })));
+    const combined = [...importBaseRows, ...importRows];
+    setRows(combined.map((row) => ({ ...row, uid: generateUid() })));
     setRemovedBoxNos([]);
     setImportOpen(false);
-    setToast({ message: `Imported ${importRows.length} box entries.`, type: "success" });
+    setToast({ message: `Added ${importRows.length} boxes. ${combined.length} / ${maxBoxes || "—"} boxes loaded.`, type: "success" });
   };
 
   const updateImportedRow = (index: number, field: "boxNo" | "birds" | "weight", value: string) => {
@@ -667,7 +672,7 @@ export default function StepPickup({
   };
 
   const finishImportEdit = () => {
-    const errors = validatePickupImport(importRows, maxBoxes);
+    const errors = validatePickupAppend(importBaseRows, importRows, maxBoxes);
     setImportError(errors.join(" "));
     importEditOriginalRef.current = null;
     setEditingImportIndex(null);
@@ -1312,7 +1317,7 @@ export default function StepPickup({
             <div className="inline-flex items-end gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => { setImportOpen(true); setImportRows([]); setImportError(""); }}
+              onClick={() => { setImportOpen(true); setImportRows([]); setImportBaseRows([]); setImportMetadata({}); setImportFileName(""); setImportError(""); }}
               className="inline-flex h-[42px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
             >
               <Upload size={14} /> Import Excel / PDF
@@ -1544,10 +1549,13 @@ export default function StepPickup({
 
       {/* Confirmation Modal */}
       {importOpen && (
-        <div className="fixed inset-0 z-[90] grid touch-none place-items-center overflow-hidden bg-slate-950/25 p-4 backdrop-blur-[0.5px]">
-          <div role="dialog" aria-modal="true" className="flex max-h-[calc(100vh-2rem)] w-full max-w-4xl touch-pan-y flex-col overflow-hidden overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div
+          className="pointer-events-none fixed inset-0 z-[90] grid touch-none place-items-start justify-items-center overflow-hidden bg-slate-950/25 p-4 backdrop-blur-[0.5px]"
+          style={{ paddingLeft: 16, paddingTop: 80 }}
+        >
+          <div role="dialog" aria-modal="true" className="pointer-events-auto flex max-h-[calc(100vh-5rem)] w-full max-w-4xl touch-pan-y flex-col overflow-hidden overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
-              <div><h3 className="font-bold text-slate-800">Import pickup boxes</h3><p className="text-xs text-slate-500">1. Choose file · 2. Validate totals and capacity · 3. Import entries</p></div>
+              <div><h3 className="font-bold text-slate-800">Import pickup boxes</h3><p className="text-xs text-slate-500">Choose one or more files. Every import continues from the last loaded box, up to vehicle capacity.</p></div>
               <button type="button" onClick={() => setImportOpen(false)} className="group grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500"><X size={16} className={uiActionIconMotionClass.close} /></button>
             </div>
             <div className="min-h-0 flex-1 touch-pan-y space-y-4 overflow-y-auto overscroll-contain p-5">
@@ -1556,8 +1564,24 @@ export default function StepPickup({
               {importError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{importError}</div>}
               {importRows.length > 0 && (
                 <div className="space-y-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <div className="grid grid-cols-2 gap-x-5 gap-y-2 text-xs sm:grid-cols-5">
+                      {[
+                        ["File", importFileName],
+                        ["Vehicle", formatVehicleNumber(importMetadata.vehicleNo || trip.vehicleNo) || "—"],
+                        ["Driver", importMetadata.driverName || trip.driverName || "—"],
+                        ["Trip", importMetadata.tripNo || trip.tripNo || "—"],
+                        ["Date", importMetadata.tripDate || trip.tripDate || "—"],
+                      ].map(([label, value]) => (
+                        <div key={label} className="min-w-0">
+                          <span className="block font-semibold uppercase tracking-wide text-slate-400">{label}</span>
+                          <span className="block truncate font-bold text-slate-700" title={value}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Boxes</span><strong>{importRows.length} / {maxBoxes || "—"}</strong></div>
+                    <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">After import</span><strong>{importBaseRows.length + importRows.length} / {maxBoxes || "—"}</strong><span className="block text-[11px] text-slate-400">Adding {importRows.length} from box {importRows[0]?.boxNo ?? "—"}</span></div>
                     <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Total birds</span><strong>{importRows.reduce((sum, row) => sum + row.birds, 0)}</strong></div>
                     <div className="rounded-xl border border-slate-200 p-3"><span className="block text-xs text-slate-500">Total weight</span><strong>{importRows.reduce((sum, row) => sum + row.weight, 0).toFixed(2)} kg</strong></div>
                   </div>

@@ -470,8 +470,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : displayedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-slate-400">
-                  <History size={24} className="mx-auto mb-2" />
+                <td colSpan={8} className="py-12 text-center text-[13px] font-medium text-slate-400">
                   {getEmptyStateMessage()}
                 </td>
               </tr>
