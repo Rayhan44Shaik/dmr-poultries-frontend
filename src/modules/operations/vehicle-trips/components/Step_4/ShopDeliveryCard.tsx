@@ -9,8 +9,9 @@ import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewL
 import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
+import { deliveryWeightLoss } from "./deliveryKpis";
 
-interface Props { row: ShopDeliveryWithExtra; readOnly: boolean; onEdit: (row: ShopDelivery) => void; onPDF: (row: ShopDeliveryWithExtra) => void; communicationEnabled?: boolean; emailStatus?: DeliveryEmailStatusValue; emailSending?: boolean; emailSendCount?: number; emailDisabled?: boolean; emailFailureReason?: string | null; onSendEmail?: (row: ShopDelivery) => void; whatsappStatus?: DeliveryWhatsAppStatusValue; whatsappSending?: boolean; whatsappSendCount?: number; whatsappDisabled?: boolean; whatsappFailureReason?: string | null; onSendWhatsApp?: (row: ShopDelivery) => void; }
+interface Props { row: ShopDeliveryWithExtra; displaySerialNo: number; readOnly: boolean; onEdit: (row: ShopDelivery) => void; onPDF: (row: ShopDeliveryWithExtra) => void; communicationEnabled?: boolean; emailStatus?: DeliveryEmailStatusValue; emailSending?: boolean; emailSendCount?: number; emailDisabled?: boolean; emailFailureReason?: string | null; onSendEmail?: (row: ShopDelivery) => void; whatsappStatus?: DeliveryWhatsAppStatusValue; whatsappSending?: boolean; whatsappSendCount?: number; whatsappDisabled?: boolean; whatsappFailureReason?: string | null; onSendWhatsApp?: (row: ShopDelivery) => void; }
 
 function CommunicationButton({ kind, busy, count, disabled, onClick, label }: { kind: "mail" | "whatsapp"; busy: boolean; count: number; disabled: boolean; onClick: () => void; label: string }) {
   const Icon = kind === "mail" ? Mail : WhatsAppIcon;
@@ -43,11 +44,11 @@ function BoxDetailsTooltip({ boxes, row, emptyLabel }: { boxes: number[]; row: S
   </span>;
 }
 
-function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled = false, emailStatus = "pending", emailSending = false, emailSendCount = 0, emailDisabled = false, onSendEmail, whatsappStatus = "pending", whatsappSending = false, whatsappSendCount = 0, whatsappDisabled = false, onSendWhatsApp }: Props) {
+function ShopDeliveryCard({ row, displaySerialNo, readOnly, onEdit, onPDF, communicationEnabled = false, emailStatus = "pending", emailSending = false, emailSendCount = 0, emailDisabled = false, onSendEmail, whatsappStatus = "pending", whatsappSending = false, whatsappSendCount = 0, whatsappDisabled = false, onSendWhatsApp }: Props) {
   const { t, language } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const boxes = row.selectedBoxIds ?? [];
-  const weightLoss = isWeightMode ? Math.max(0, Number(row.farmWeight || 0) - Number(row.weight || 0)) : 0;
+  const weightLoss = deliveryWeightLoss(row);
   const shopName = localizeTripViewText(cleanDeliveryShopName(row.shopName), language, { cleanShopCode: true }) || "—";
   const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
   return (
@@ -55,7 +56,7 @@ function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled =
       className="grid min-w-[1000px] grid-cols-[3.5rem_4rem_minmax(11rem,1.35fr)_repeat(5,minmax(0,1fr))_8.5rem] items-center gap-3 border-b border-slate-100 bg-white px-4 py-2.5 text-sm last:border-b-0 hover:bg-slate-50/70"
       data-auto-capture-time={row.autoCaptureTime ?? ""}
     >
-      <div className="text-center font-bold tabular-nums text-slate-600">{row.serialNo ?? "—"}</div>
+      <div className="text-center font-bold tabular-nums text-slate-600">{displaySerialNo}</div>
       <div className="flex justify-center">
         <span
           title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
@@ -110,6 +111,7 @@ function ShopDeliveryCard({ row, readOnly, onEdit, onPDF, communicationEnabled =
 // dialog unless its row or communication state actually changes.
 export default memo(ShopDeliveryCard, (previous, next) =>
   previous.row === next.row &&
+  previous.displaySerialNo === next.displaySerialNo &&
   previous.readOnly === next.readOnly &&
   previous.communicationEnabled === next.communicationEnabled &&
   previous.emailStatus === next.emailStatus &&

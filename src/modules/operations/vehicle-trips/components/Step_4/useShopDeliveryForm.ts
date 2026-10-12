@@ -15,6 +15,13 @@ export type ShopDeliveryWithExtra = ShopDelivery & {
 const roundWeight = (value: number): number =>
   Number.isFinite(value) ? Math.round((value + Number.EPSILON) * 100) / 100 : 0;
 
+/** Weight-mode default: all selected farm birds minus entered mortality. */
+export function deliveredBirdsFromFarm(farmBirds: number, mortality: number): number {
+  const available = Number.isFinite(Number(farmBirds)) ? Math.max(0, Number(farmBirds)) : 0;
+  const lost = Number.isFinite(Number(mortality)) ? Math.max(0, Number(mortality)) : 0;
+  return Math.max(0, available - lost);
+}
+
 export type ValidationErrors = {
   birdsExceed: boolean;
   birdsMismatch: boolean;
@@ -169,7 +176,6 @@ export function useShopDeliveryForm(
 
   const availableBoxDetails = useMemo<BoxDetail[]>(() => {
     const used = new Set(usedBoxIds);
-    const selected = new Set(formData.selectedBoxIds);
     return safeBoxDetails
       .map((b: BoxDetail) => {
         const remain = remainingByBox.get(b.boxNo) ?? { birds: b.birds, weight: b.weight };
@@ -177,9 +183,9 @@ export function useShopDeliveryForm(
       })
       .filter(
         (b: BoxDetail) =>
-          (b.birds > 0 && (!used.has(b.boxNo) || selected.has(b.boxNo)))
+          b.birds > 0 && !used.has(b.boxNo)
       );
-  }, [safeBoxDetails, usedBoxIds, formData.selectedBoxIds, remainingByBox]);
+  }, [safeBoxDetails, usedBoxIds, remainingByBox]);
 
   // ─── Farm values ──────────────────────────────────────────────
   const selectedFarmTotals = useMemo(() => {
@@ -221,11 +227,12 @@ export function useShopDeliveryForm(
   const deliveredWeight = mode === "box" ? roundWeight(Math.max(0, farmWeight - mortKg)) : roundWeight(weightModeTotals.weight);
 
   // ─── Weight Loss (weight mode only) ─────────────────────────────
-  // Farm weight of selected boxes − entered delivery weight.
+  // Farm weight − delivered weight − mortality weight. This is the same
+  // canonical balance used by the saved row and the cumulative KPI.
   const weightLoss = useMemo<number>(() => {
     if (mode !== "weight") return 0;
-    return Math.max(0, Number((farmWeight - weightModeTotals.weight).toFixed(2)));
-  }, [mode, farmWeight, weightModeTotals.weight]);
+    return Math.max(0, Number((farmWeight - weightModeTotals.weight - mortKg).toFixed(2)));
+  }, [mode, farmWeight, weightModeTotals.weight, mortKg]);
 
   // ─── Derived validation (live — recomputed from current state) ──
   const validationErrors = useMemo<ValidationErrors>(

@@ -22,6 +22,7 @@ import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStor
 import { withMinSaveDuration } from "../../utils/withMinSaveDuration";
 import { dieselExpenseBreakdown } from "../../utils/dieselExpenseBreakdown";
 import { formatVehicleNumber } from "../../../../../utils/format";
+import { tripMealEmployeeCount } from "../../utils/tripCrewCount";
 
 /** System `order:<tripNo>` tags written by Finish Assignment — not user notes. */
 function splitRemarks(raw: unknown): { orderTags: string[]; userNotes: string } {
@@ -100,6 +101,7 @@ export default function StepEnd({
   hideWizardClose = false,
 }: Props) {
   const isRentedVehicle = Boolean(trip.isRentedVehicle);
+  const mealEmployeeCount = tripMealEmployeeCount(trip);
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   // ─── State ─────────────────────────────────────────────────────────
@@ -157,7 +159,8 @@ export default function StepEnd({
         ? ((tripData as any).endMeter ?? (tripData as any).closingMeter ?? "")
         : "",
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
-      others2Name: (tripData as any).others2Name ?? "",
+      // This is a fixed business category, not a free-form Other expense.
+      others2Name: "SUPERVISOR (PC)",
       others3Name: (tripData as any).others3Name ?? "",
       others4Name: (tripData as any).others4Name ?? "",
       others5Name: (tripData as any).others5Name ?? "",
@@ -859,6 +862,7 @@ export default function StepEnd({
             onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
             dieselOtherAmount={dieselBreakdown.otherAmount}
             hideMeters={isRentedVehicle}
+            mealEmployeeCount={mealEmployeeCount}
           />
           {!isRentedVehicle && <DieselExpensesTable
             tripId={trip.id}
@@ -959,6 +963,7 @@ export default function StepEnd({
             onMeterNotice={(msg) => setToast({ message: msg, type: "warning" })}
             dieselOtherAmount={dieselBreakdown.otherAmount}
             hideMeters={isRentedVehicle}
+            mealEmployeeCount={mealEmployeeCount}
           />
 
           {!isRentedVehicle && <DieselExpensesTable

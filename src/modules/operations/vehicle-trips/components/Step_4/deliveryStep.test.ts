@@ -11,15 +11,18 @@ import {
   remainingBoxesByNumber,
   sortShopsAssignedFirst,
   step4ShopsCount,
+  sanitizeSelectedBoxIds,
 } from "./remainingBoxes";
 // Delivery Tracking's progress maths — what the tracking tables render.
 import { computeOrdersProgress } from "../../../../orders/utils/ordersUtils";
 import { createEmptyTrip, type Trip } from "../../../../../shared/trip";
 import {
   computeValidationErrors,
+  deliveredBirdsFromFarm,
   validationIsValid,
   EMPTY_DELIVERY_FORM,
 } from "./useShopDeliveryForm";
+import { compareDeliveryDisplayOrder, deliveryDisplaySerials } from "./deliverySerials";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 
 function box(boxNo: number, birds: number, weight: number): BoxDetail {
@@ -44,6 +47,27 @@ function row(overrides: Record<string, unknown> = {}): ShopDelivery {
   } as ShopDelivery;
 }
 
+test("weight mode defaults delivered birds to farm birds and subtracts mortality", () => {
+  assert.equal(deliveredBirdsFromFarm(120, 0), 120);
+  assert.equal(deliveredBirdsFromFarm(120, 3), 117);
+  assert.equal(deliveredBirdsFromFarm(2, 5), 0);
+});
+
+test("delivery serials stay contiguous for duplicate values and repeated shop names", () => {
+  const deliveries = [
+    row({ id: 101, shopId: 7, shopName: "NAVODAYA", serialNo: 6, birds: 38, weight: 81.3, autoCaptureTime: "2026-10-09T10:00:00Z" }),
+    row({ id: 102, shopId: 7, shopName: "NAVODAYA", serialNo: 6, birds: 38, weight: 79.8, autoCaptureTime: "2026-10-09T11:00:00Z" }),
+    row({ id: 103, shopId: 8, shopName: "OTHER", serialNo: 9, birds: 20, weight: 40, autoCaptureTime: "2026-10-09T12:00:00Z" }),
+  ];
+  const serials = deliveryDisplaySerials(deliveries);
+
+  assert.deepEqual([...serials.entries()], [[101, 1], [102, 2], [103, 3]]);
+  assert.deepEqual(
+    [...deliveries].sort((a, b) => compareDeliveryDisplayOrder(serials, a, b)).map((delivery) => serials.get(delivery.id)),
+    [3, 2, 1],
+  );
+});
+
 // ─── Live KPI totals ──────────────────────────────────────────────
 test("KPI totals are LIVE from current rows and keep bird/weight units separate", () => {
   const rows = [
@@ -53,6 +77,7 @@ test("KPI totals are LIVE from current rows and keep bird/weight units separate"
   const kpi = computeDeliveryKpiTotals(rows);
   assert.equal(kpi.shops, 2);
   assert.equal(kpi.birds, 56);
+  assert.equal(kpi.completedBoxes, 2);
   assert.equal(kpi.weight, 998);
   // Mortality is a BIRD COUNT (2), never the 2.159 kg weight.
   assert.equal(kpi.mortality, 2);
@@ -89,7 +114,16 @@ test("KPI mortKg is box-mode only; weightLoss is weight-mode only", () => {
   assert.equal(kpi.boxMortality, 2);
   assert.equal(kpi.weightMortality, 1);
   assert.equal(kpi.mortKg, 3.5);
-  assert.equal(kpi.weightLoss, 20);
+  assert.equal(kpi.weightLoss, 12);
+});
+
+test("Birds KPI counts unique completed pickup boxes and ignores duplicate links", () => {
+  const kpi = computeDeliveryKpiTotals([
+    row({ id: 1, birds: 38, weight: 80, boxNo: 2, selectedBoxIds: [43, 44], autoCaptureTime: "2026-10-12T10:00:00Z" }),
+    row({ id: 2, birds: 19, weight: 40, boxNo: 2, selectedBoxIds: [44, 45], autoCaptureTime: "2026-10-12T10:01:00Z" }),
+  ]);
+
+  assert.equal(kpi.completedBoxes, 3);
 });
 
 test("KPI totals ignore in-progress rows without shop/birds/weight", () => {
@@ -378,6 +412,17 @@ test("remaining boxes: editing row is excluded from consumption", () => {
   assert.deepEqual(pendingExcluded.map((b) => b.boxNo), [1]);
   const pendingIncluded = pendingBoxesFromRows(boxes, rows);
   assert.deepEqual(pendingIncluded.map((b) => b.boxNo), []);
+});
+
+test("editing a row keeps its own boxes but removes boxes consumed by another delivery", () => {
+  const boxes = [box(58, 30, 500), box(59, 30, 500), box(60, 30, 500)];
+  const editing = row({ id: 100, selectedBoxIds: [58, 59], birds: 0, weight: 0 });
+  const other = row({ id: 200, selectedBoxIds: [59, 60], birds: 60, weight: 1000 });
+
+  assert.deepEqual(
+    sanitizeSelectedBoxIds(boxes, [editing, other], [58, 59, 60], 100),
+    [58],
+  );
 });
 
 // ─── Derived weight-mode validation (farm weight 29) ─────────────────

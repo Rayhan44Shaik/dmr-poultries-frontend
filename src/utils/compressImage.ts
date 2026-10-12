@@ -40,14 +40,16 @@ export interface CompressImageOptions {
   maxDimension?: number;
   /** Hard floor for the long edge — below this slips become unreadable. */
   minDimension?: number;
+  /** Optimise photographed paperwork for legible text at very small sizes. */
+  documentMode?: boolean;
 }
 
 /** Default: keep the PERSISTED (base64) size ≤ 100 KB. */
 export const DEFAULT_IMAGE_MAX_BYTES = 100 * 1024;
 
-// Prefer higher JPEG quality so fuel slips stay sharp; only drop lower when
-// the byte budget still can't be met after a dimension shrink.
-const QUALITY_STEPS = [0.92, 0.88, 0.82, 0.76, 0.7, 0.64, 0.58];
+// A short descending search is intentionally used here. The old eleven-step
+// search could encode the same multi-megapixel canvas dozens of times.
+const QUALITY_STEPS = [0.86, 0.7, 0.54, 0.4, 0.32];
 
 async function decodeImage(file: File): Promise<HTMLImageElement | ImageBitmap> {
   if (typeof createImageBitmap === "function") {
@@ -78,12 +80,36 @@ function sourceSize(source: HTMLImageElement | ImageBitmap): { w: number; h: num
   return { w: source.width, h: source.height };
 }
 
-function drawToJpegDataUrl(
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("blob_read_failed"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("file_read_failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Canvas.toDataURL performs image encoding synchronously on the browser's UI
+ * thread. Large phone photos can therefore make the whole application appear
+ * hung while the quality search runs. toBlob schedules the encode
+ * asynchronously and gives Chromium opportunities to paint/respond.
+ */
+function drawToCanvas(
   source: HTMLImageElement | ImageBitmap,
   width: number,
   height: number,
-  quality: number
-): string {
+  documentMode: boolean
+): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -92,8 +118,25 @@ function drawToJpegDataUrl(
   // White backdrop keeps transparent PNGs solid instead of turning black.
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, width, height);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  if (documentMode) ctx.filter = "grayscale(1) contrast(1.18) brightness(1.04)";
   ctx.drawImage(source, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", quality);
+  return canvas;
+}
+
+function encodeCanvas(
+  canvas: HTMLCanvasElement,
+  mime: "image/webp" | "image/jpeg",
+  quality: number,
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (encoded) => encoded ? resolve(encoded) : reject(new Error("image_encode_failed")),
+      mime,
+      quality,
+    );
+  });
 }
 
 /** Base64-decoded byte size of a data URL (what the DB actually stores). */
@@ -113,32 +156,30 @@ export async function compressImageFile(
   const maxBytes = options.maxBytes ?? DEFAULT_IMAGE_MAX_BYTES;
   const maxDimension = options.maxDimension ?? 1600;
   const minDimension = options.minDimension ?? 640;
+  const documentMode = options.documentMode ?? false;
 
-  const originalDataUrl = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("file_read_failed"));
-    reader.readAsDataURL(file);
-  });
-
-  const passthrough = (note: { w?: number; h?: number } = {}): CompressImageResult => ({
-    dataUrl: originalDataUrl,
-    mime: file.type || "image/png",
-    width: note.w ?? 0,
-    height: note.h ?? 0,
-    originalBytes: file.size,
-    storedBytes: dataUrlBytes(originalDataUrl),
-    compressed: false,
-  });
+  const passthrough = async (note: { w?: number; h?: number } = {}): Promise<CompressImageResult> => {
+    const originalDataUrl = await fileToDataUrl(file);
+    return {
+      dataUrl: originalDataUrl,
+      mime: file.type || "image/png",
+      width: note.w ?? 0,
+      height: note.h ?? 0,
+      originalBytes: file.size,
+      storedBytes: dataUrlBytes(originalDataUrl),
+      compressed: false,
+    };
+  };
 
   // Already small enough → store as-is (best possible quality: untouched).
-  if (dataUrlBytes(originalDataUrl) <= maxBytes) {
+  if (file.size <= maxBytes) {
     try {
       const source = await decodeImage(file);
       const { w, h } = sourceSize(source);
-      return passthrough({ w, h });
+      if ("close" in source) source.close();
+      return await passthrough({ w, h });
     } catch {
-      return passthrough();
+      return await passthrough();
     }
   }
 
@@ -147,57 +188,82 @@ export async function compressImageFile(
     source = await decodeImage(file);
   } catch {
     // Undecodable by the browser (e.g. HEIC) → keep the original upload.
-    return passthrough();
+    return await passthrough();
   }
 
   const { w: naturalW, h: naturalH } = sourceSize(source);
-  if (!naturalW || !naturalH) return passthrough({ w: naturalW, h: naturalH });
+  if (!naturalW || !naturalH) {
+    if ("close" in source) source.close();
+    return await passthrough({ w: naturalW, h: naturalH });
+  }
 
   let scale = Math.min(1, maxDimension / Math.max(naturalW, naturalH));
-  let bestDataUrl = "";
-  let bestBytes = Number.POSITIVE_INFINITY;
+  let bestBlob: Blob | null = null;
   let bestW = naturalW;
   let bestH = naturalH;
 
-  for (;;) {
-    const width = Math.max(1, Math.round(naturalW * scale));
-    const height = Math.max(1, Math.round(naturalH * scale));
-    for (const quality of QUALITY_STEPS) {
-      const dataUrl = drawToJpegDataUrl(source, width, height, quality);
-      const bytes = dataUrlBytes(dataUrl);
-      if (bytes < bestBytes) {
-        bestBytes = bytes;
-        bestDataUrl = dataUrl;
-        bestW = width;
-        bestH = height;
+  try {
+    for (;;) {
+      const width = Math.max(1, Math.round(naturalW * scale));
+      const height = Math.max(1, Math.round(naturalH * scale));
+      const canvas = drawToCanvas(source, width, height, documentMode);
+      try {
+        // WebP is substantially smaller for document photos. Fall back to
+        // JPEG only when the browser does not actually support WebP.
+        for (const requestedMime of ["image/webp", "image/jpeg"] as const) {
+          let formatSupported = false;
+          for (const quality of QUALITY_STEPS) {
+            const blob = await encodeCanvas(canvas, requestedMime, quality);
+            if (requestedMime === "image/webp" && blob.type !== requestedMime) break;
+            formatSupported = true;
+            if (!bestBlob || blob.size < bestBlob.size) {
+              bestBlob = blob;
+              bestW = width;
+              bestH = height;
+            }
+            if (blob.size <= maxBytes) {
+              return {
+                dataUrl: await blobToDataUrl(blob),
+                mime: blob.type || requestedMime,
+                width,
+                height,
+                originalBytes: file.size,
+                storedBytes: blob.size,
+                compressed: true,
+              };
+            }
+          }
+          if (formatSupported) break;
+        }
+      } finally {
+        // Release the potentially large backing buffer before resizing.
+        canvas.width = 1;
+        canvas.height = 1;
       }
-      if (bytes <= maxBytes) {
+      // Still over budget at the lowest quality → shrink and try again.
+      // The only stop is the legibility floor: never go below `minDimension`
+      // on the long edge (slips/receipts stay readable at 640px+).
+      if (Math.max(width, height) <= minDimension) {
+        // Floor reached: return the smallest/clearest version we achieved.
+        if (!bestBlob) return await passthrough({ w: naturalW, h: naturalH });
         return {
-          dataUrl,
-          mime: "image/jpeg",
-          width,
-          height,
+          dataUrl: await blobToDataUrl(bestBlob),
+          mime: bestBlob.type || "image/jpeg",
+          width: bestW,
+          height: bestH,
           originalBytes: file.size,
-          storedBytes: bytes,
+          storedBytes: bestBlob.size,
           compressed: true,
         };
       }
+      // Jump toward the required byte area instead of shrinking by a fixed
+      // 15% and repeating many near-identical encodes.
+      const byteRatio = bestBlob ? maxBytes / bestBlob.size : 0.5;
+      const shrink = Math.max(0.68, Math.min(0.84, Math.sqrt(byteRatio) * 0.94));
+      const floorScale = minDimension / Math.max(naturalW, naturalH);
+      scale = Math.max(floorScale, scale * shrink);
     }
-    // Still over budget at the lowest quality → shrink and try again.
-    // The only stop is the legibility floor: never go below `minDimension`
-    // on the long edge (slips/receipts stay readable at 640px+).
-    if (Math.max(width, height) <= minDimension) {
-      // Floor reached: return the smallest/clearest version we achieved.
-      return {
-        dataUrl: bestDataUrl || originalDataUrl,
-        mime: bestDataUrl ? "image/jpeg" : file.type || "image/png",
-        width: bestW,
-        height: bestH,
-        originalBytes: file.size,
-        storedBytes: bestDataUrl ? bestBytes : dataUrlBytes(originalDataUrl),
-        compressed: Boolean(bestDataUrl),
-      };
-    }
-    scale *= 0.75;
+  } finally {
+    if ("close" in source) source.close();
   }
 }

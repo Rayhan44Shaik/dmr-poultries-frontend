@@ -344,6 +344,15 @@ export function toStep1Payload(trip: Partial<Trip>): Record<string, unknown> {
   };
 }
 
+/** Strict request body for updating a submitted Step 1. */
+export function toStep1SubmitPayload(trip: Partial<Trip>): Record<string, unknown> {
+  return {
+    ...toStep1Payload({ ...trip, startStepSubmitted: true }),
+    mode: "submit",
+    startStepSubmitted: true,
+  };
+}
+
 function normalizeTolls(value: unknown): number {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n) || n < 0) return 0;
@@ -445,6 +454,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   for (const key of ["others2Name", "others3Name", "others4Name", "others5Name"] as const) {
     payload[key] = String(trip[key] ?? "").trim().slice(0, 120);
   }
+  payload.others2Name = "SUPERVISOR (PC)";
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;
   if (endRaw !== "" && endRaw != null && Number.isFinite(Number(endRaw))) {
@@ -720,12 +730,12 @@ export async function submitTripStep(
   step: TripWizardStep,
   trip: Partial<Trip>
 ): Promise<Trip> {
-  let body: Record<string, unknown> = { ...trip, mode: "submit" };
+  // Build a strict per-step request. Sending the entire hydrated trip here
+  // leaks stale foreign keys from unrelated steps (for example a deleted
+  // sourceFarmId while editing Step 1), making an otherwise valid update fail.
+  let body: Record<string, unknown> = { mode: "submit" };
   if (step === "start") {
-    delete body.startTime;
-    body.startStepSubmitted = true;
-    Object.assign(body, toStep1Payload({ ...trip, startStepSubmitted: true }));
-    body.mode = "submit";
+    body = toStep1SubmitPayload(trip);
   }
   if (step === "farm") {
     body = withLegIndex(trip, {

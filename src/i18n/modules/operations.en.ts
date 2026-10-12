@@ -700,6 +700,7 @@ export default {
   'ops.trip.gps_unable_fetch': 'Unable to fetch your location.',
   'ops.trip.gps_zero_invalid': 'Zero coordinates are invalid.',
   'ops.trip.image_size_5mb': 'Image must be under 5 MB',
+  'ops.trip.image_size_50mb': 'Each image must be 50 MB or smaller.',
   'ops.trip.photo_auto_compressed': 'Photo optimised: {from} KB → {to} KB',
   'ops.trip.add_photo': 'Add Photo',
   'ops.trip.time_locked': 'Locked',

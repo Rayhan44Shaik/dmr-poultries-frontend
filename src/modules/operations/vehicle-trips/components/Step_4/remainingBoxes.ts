@@ -112,6 +112,26 @@ export function pendingBoxesFromRows(
     .filter((b) => b.birds > 0);
 }
 
+/**
+ * Keep only box numbers that are still available to the row being added or
+ * edited. Excluding the edited row preserves its own boxes, while boxes used
+ * by every other delivery are removed. This is also a stale-state guard for
+ * a form that was opened before another save completed.
+ */
+export function sanitizeSelectedBoxIds(
+  boxDetails: BoxDetail[],
+  rows: ShopDelivery[],
+  requested: number[],
+  excludeRowId?: number | null,
+): number[] {
+  const available = new Set(
+    pendingBoxesFromRows(boxDetails, rows, { excludeRowId }).map((box) => Number(box.boxNo)),
+  );
+  return [...new Set(requested.map(Number))].filter(
+    (boxNo) => Number.isSafeInteger(boxNo) && boxNo > 0 && available.has(boxNo),
+  );
+}
+
 /** Assigned shops still awaiting a captured Step 4 delivery. */
 export function pendingShopsFromRows(rows: ShopDelivery[]): number {
   const assigned = new Set<number>();

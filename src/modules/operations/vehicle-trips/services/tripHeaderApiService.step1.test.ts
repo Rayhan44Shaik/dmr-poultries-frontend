@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mapApiTripToTrip, toStep1Payload, uniqueTripsById } from "./tripHeaderApiService";
+import { mapApiTripToTrip, toStep1Payload, toStep1SubmitPayload, uniqueTripsById } from "./tripHeaderApiService";
 import { createEmptyTrip } from "../../../../shared/trip";
 
 test("toStep1Payload keeps explicit 0 and sends empty as null, without startTime or tripNo", () => {
@@ -47,6 +47,22 @@ test("selected tripDate is forwarded for server-side TR-YYYYMMDD-NNN allocation"
   });
   assert.equal(payload.tripDate, "2026-08-13");
   assert.equal("tripNo" in payload, false);
+});
+
+test("Step 1 update excludes stale fields belonging to later steps", () => {
+  const payload = toStep1SubmitPayload({
+    ...createEmptyTrip({ tripDate: "2026-10-11" }),
+    vehicleId: 9,
+    driverId: 8,
+    supervisorId: 7,
+    sourceFarmId: 999,
+    pickupPhotos: [{ key: "old", mime: "image/jpeg", data: "data:image/jpeg;base64,AA==" }],
+  });
+
+  assert.equal(payload.startStepSubmitted, true);
+  assert.equal(payload.mode, "submit");
+  assert.equal("sourceFarmId" in payload, false);
+  assert.equal("pickupPhotos" in payload, false);
 });
 
 test("mapApiTripToTrip preserves null KM/Advance instead of coercing to 0", () => {

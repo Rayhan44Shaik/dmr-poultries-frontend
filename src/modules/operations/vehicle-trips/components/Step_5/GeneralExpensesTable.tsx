@@ -20,6 +20,7 @@ interface GeneralExpensesTableProps {
   onMeterNotice?: (message: string) => void;
   dieselOtherAmount?: number;
   hideMeters?: boolean;
+  mealEmployeeCount?: number;
 }
 
 export default function GeneralExpensesTable({
@@ -37,6 +38,7 @@ export default function GeneralExpensesTable({
   onMeterNotice,
   dieselOtherAmount = 0,
   hideMeters = false,
+  mealEmployeeCount = 0,
 }: GeneralExpensesTableProps) {
   const { t } = useI18n();
   const meterInvalidRef = useRef(false);
@@ -184,7 +186,7 @@ export default function GeneralExpensesTable({
               Icon: React.ComponentType<{ size?: number; className?: string }>;
               field?: string;
             }> = [
-              { key: "meals", label: t("ops.trip.exp_meals"), value: sheetData.meals, tone: "bg-orange-50/70 text-orange-500", Icon: UtensilsCrossed, field: "meals" },
+              { key: "meals", label: `${t("ops.trip.exp_meals")} (${mealEmployeeCount})`, value: sheetData.meals, tone: "bg-orange-50/70 text-orange-500", Icon: UtensilsCrossed, field: "meals" },
               { key: "loading", label: t("ops.trip.exp_loading"), value: sheetData.loading, tone: "bg-blue-50/70 text-blue-500", Icon: Package, field: "loading" },
               { key: "mealsTiffin", label: t("ops.trip.exp_meals_tiffin"), value: sheetData.mealsTiffin, tone: "bg-amber-50/70 text-amber-500", Icon: Coffee, field: "mealsTiffin" },
               { key: "vehicleMaintenance", label: t("ops.trip.exp_vehicle_maintenance"), value: sheetData.vehicleMaintenance, tone: "bg-slate-100 text-slate-600", Icon: Wrench, field: "vehicleMaintenance" },
@@ -201,9 +203,9 @@ export default function GeneralExpensesTable({
               nameField?: string;
               derived?: boolean;
             }> = [
-              { key: "others1Amt", label: t("ops.trip.exp_rto"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
-              { key: "dieselOthers", label: "Other diesel (non-master bunk)", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
-              { key: "others2Amt", label: sheetData.others2Name || t("common.other"), value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", nameField: "others2Name", rightBg: "bg-slate-50/50" },
+              { key: "others1Amt", label: "RTO", value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
+              { key: "dieselOthers", label: "OTHER DIESEL BILL", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
+              { key: "others2Amt", label: "SUPERVISOR (PC)", value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", rightBg: "bg-slate-50/50" },
               { key: "others3Amt", label: sheetData.others3Name || t("common.other"), value: sheetData.others3Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others3Amt", nameField: "others3Name", rightBg: "bg-slate-50/50" },
               { key: "others4Amt", label: sheetData.others4Name || t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", nameField: "others4Name", rightBg: "bg-slate-50/50" },
               { key: "others5Amt", label: sheetData.others5Name || t("common.other"), value: sheetData.others5Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others5Amt", nameField: "others5Name", rightBg: "bg-slate-50/50" },

@@ -30,6 +30,7 @@ export const apiClient: AxiosInstance = axios.create({
 });
 
 const MUTATING = new Set(["post", "put", "patch", "delete"]);
+let authExpiryEventActive = false;
 
 function newIdempotencyKey(): string {
   try {
@@ -68,6 +69,12 @@ apiClient.interceptors.request.use(
 /** Response interceptor — normalize success logging and error shape */
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
+    const responseUrl = String(response.config.url ?? "");
+    // A successful identity check or login proves requests may flow normally
+    // again. This rearms the one-event gate for a future genuine expiry.
+    if (responseUrl.includes("/auth/me") || responseUrl.includes("/auth/login")) {
+      authExpiryEventActive = false;
+    }
     const started = response.config.metadata?.startTime;
     const ms = started ? Date.now() - started : undefined;
 
@@ -90,8 +97,10 @@ apiClient.interceptors.response.use(
       !url.includes("/auth/login") &&
       !url.includes("/auth/logout") &&
       !url.includes("/auth/change-password") &&
-      !url.includes("/auth/activity")
+      !url.includes("/auth/activity") &&
+      !authExpiryEventActive
     ) {
+      authExpiryEventActive = true;
       window.dispatchEvent(new Event("dmr:auth-expired"));
     }
     return Promise.reject(toApiError(error));

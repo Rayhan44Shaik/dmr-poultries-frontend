@@ -696,6 +696,7 @@ export default {
   'ops.trip.gps_unable_fetch': 'మీ స్థానాన్ని పొందలేకపోయాము.',
   'ops.trip.gps_zero_invalid': 'సున్నా కోఆర్డినేట్లు చెల్లవు.',
   'ops.trip.image_size_5mb': 'ఇమేజ్ 5 ఎంబీ కంటే తక్కువ ఉండాలి',
+  'ops.trip.image_size_50mb': 'ప్రతి ఇమేజ్ 50 ఎంబీ లేదా అంతకంటే తక్కువగా ఉండాలి.',
   'ops.trip.photo_auto_compressed': 'ఫోటో సైజు తగ్గించాం: {from} కేబీ → {to} కేబీ',
   'ops.trip.add_photo': 'ఫోటో జోడించు',
   'ops.trip.time_locked': 'లాక్',

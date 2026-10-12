@@ -1,5 +1,6 @@
 import { Hash, Truck, UserRound, UserRoundCog } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 /**
  * Compact trip-number chip shown on every wizard step header so the operator
@@ -55,7 +56,7 @@ export function TripContextBadges({
 }) {
   const { t } = useI18n();
   const details = [
-    { label: t("operations.vehicle_no"), value: vehicleNo, Icon: Truck },
+    { label: t("operations.vehicle_no"), value: vehicleNo ? formatVehicleNumber(vehicleNo) : null, Icon: Truck },
     { label: t("operations.supervisor_name"), value: supervisorName, Icon: UserRoundCog },
     { label: t("operations.driver_name"), value: driverName, Icon: UserRound },
   ];

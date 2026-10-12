@@ -50,6 +50,9 @@ interface Props {
 
 type Row = BoxDetail & { uid: string };
 type PickupPhoto = { key: string; mime: string; data: string };
+const PICKUP_PHOTO_MAX_BYTES = 50 * 1024;
+const PICKUP_PHOTO_MAX_KB = PICKUP_PHOTO_MAX_BYTES / 1024;
+const PICKUP_PHOTO_SOURCE_MAX_BYTES = 50 * 1024 * 1024;
 /** One calm tone per ROW (not per box). All three boxes in a row share the
  * same light band, and the next row takes the next tone, so rows stay
  * visually distinct across the dense 3-up table. */
@@ -247,6 +250,7 @@ export default function StepPickup({
   }, [trip.vehicleId, trip.vehicleNo, trip.vehicleBoxCapacity]);
 
   const [photos, setPhotos] = useState<PickupPhoto[]>(() => photosFromTrip(trip));
+  const [isCompressingPhotos, setIsCompressingPhotos] = useState(false);
   const persistedPhotos = useMemo(() => photosFromTrip({
     id: trip.id,
     dcPhotoKey: trip.dcPhotoKey,
@@ -730,21 +734,32 @@ export default function StepPickup({
     const files = Array.from(e.target.files ?? []);
     if (!files.length || uploadBusyRef.current) return;
     uploadBusyRef.current = true;
+    setIsCompressingPhotos(true);
 
     try {
       if (files.some((file) => !file.type.startsWith("image/"))) {
         setToast({ message: t("ops.trip.valid_image"), type: "error" });
         return;
       }
-    if (files.some((file) => file.size > 20 * 1024 * 1024)) {
-      setToast({ message: t("ops.trip.image_size_5mb"), type: "error" });
-      return;
-    }
-      const results = await Promise.all(files.map((file) =>
-        compressImageFile(file, { maxBytes: 50 * 1024, maxDimension: 2000, minDimension: 640 })
-      ));
-      if (results.some((result) => result.storedBytes > 50 * 1024)) {
-        setToast({ message: "An image could not be reduced below 50 KB without becoming unreadable.", type: "error" });
+      if (files.some((file) => file.size > PICKUP_PHOTO_SOURCE_MAX_BYTES)) {
+        setToast({ message: t("ops.trip.image_size_50mb"), type: "error" });
+        return;
+      }
+      // Compress sequentially. Running several large phone photos through the
+      // quality search together causes a severe CPU/memory spike in Chromium.
+      const results = [];
+      for (const file of files) {
+        results.push(await compressImageFile(file, {
+          maxBytes: PICKUP_PHOTO_MAX_BYTES,
+          // A 50 KB output cannot retain meaningful detail at 2200 px. Starting
+          // at 1600 avoids an expensive encode that would always be discarded.
+          maxDimension: 1600,
+          minDimension: 640,
+          documentMode: true,
+        }));
+      }
+      if (results.some((result) => result.storedBytes > PICKUP_PHOTO_MAX_BYTES)) {
+        setToast({ message: `An image could not be reduced below ${PICKUP_PHOTO_MAX_KB} KB without becoming unreadable.`, type: "error" });
         return;
       }
       const stamp = Date.now();
@@ -766,7 +781,7 @@ export default function StepPickup({
       });
       if (results.some((result) => result.compressed)) {
         setToast({
-          message: `${files.length} image${files.length === 1 ? "" : "s"} ready (each 50 KB or below).`,
+          message: `${files.length} image${files.length === 1 ? "" : "s"} ready (each ${PICKUP_PHOTO_MAX_KB} KB or below).`,
           type: "success",
         });
       }
@@ -775,6 +790,7 @@ export default function StepPickup({
       setToast({ message: t("ops.trip.failed_read_image"), type: "error" });
     } finally {
       uploadBusyRef.current = false;
+      setIsCompressingPhotos(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -1264,7 +1280,7 @@ export default function StepPickup({
             </span>
             {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
             <span className="text-[13px] font-normal text-slate-400">
-              {photos.length} uploaded · each 50 KB or below
+              {photos.length} uploaded · each {PICKUP_PHOTO_MAX_KB} KB or below
             </span>
           </label>
           <div className="mt-2 flex items-center gap-3 flex-wrap">
@@ -1288,10 +1304,14 @@ export default function StepPickup({
                 <button
                   type="button"
                   onClick={() => openFilePicker(photos.length)}
-                  className="h-24 w-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50/60 text-slate-400 hover:text-sky-500 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
+                  disabled={isCompressingPhotos}
+                  aria-busy={isCompressingPhotos}
+                  className="h-24 w-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50/60 text-slate-400 hover:text-sky-500 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 disabled:cursor-wait disabled:opacity-60"
                 >
-                  <Camera size={18} />
-                  <span className="text-[11px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
+                  <Camera size={18} className={isCompressingPhotos ? "animate-pulse" : ""} />
+                  <span className="text-[11px] font-bold uppercase tracking-wide">
+                    {isCompressingPhotos ? "Compressing…" : t("ops.trip.add_photo")}
+                  </span>
                 </button>
             <input
               ref={fileInputRef}

@@ -18,6 +18,23 @@ const VISIBLE_ITEMS = 5;
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
+function focusNextTabStop(current: HTMLElement | null) {
+  if (!current || typeof document === "undefined") return;
+  const candidates = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), [role="button"][tabindex], input:not(:disabled), select:not(:disabled), textarea:not(:disabled)',
+    ),
+  )
+    .filter((element) => element.tabIndex >= 0 && element.offsetParent !== null)
+    .sort((a, b) => {
+      const aIndex = a.tabIndex > 0 ? a.tabIndex : Number.MAX_SAFE_INTEGER;
+      const bIndex = b.tabIndex > 0 ? b.tabIndex : Number.MAX_SAFE_INTEGER;
+      return aIndex - bIndex;
+    });
+  const index = candidates.indexOf(current);
+  candidates[index + 1]?.focus();
+}
+
 export type DropdownOption = {
   value: string;
   label: string;
@@ -139,6 +156,7 @@ function useDropdownPanel(matchMode: "includes" | "prefix" = "includes") {
   const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
@@ -165,7 +183,11 @@ function useDropdownPanel(matchMode: "includes" | "prefix" = "includes") {
     [query, matchMode]
   );
 
-  return { open, setOpen, query, setQuery, ref, searchRef, filtered };
+  const restoreTriggerFocus = useCallback(() => {
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
+
+  return { open, setOpen, query, setQuery, ref, searchRef, triggerRef, restoreTriggerFocus, filtered };
 }
 
 export const SearchDropdown = React.memo(function SearchDropdown({
@@ -191,8 +213,17 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   /** Allows a form to omit already-prefilled controls from its Tab flow. */
   tabIndex?: number;
 }) {
-  const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel(matchMode);
+  const { open, setOpen, query, setQuery, ref, searchRef, triggerRef, restoreTriggerFocus, filtered } = useDropdownPanel(matchMode);
   const { t } = useI18n();
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const visibleOptions = useMemo(
+    () => filtered(options).filter((option) => !option.disabled),
+    [filtered, options],
+  );
+
+  // Opening a dropdown must not make its first row look selected. A keyboard
+  // candidate appears only after typing or pressing an arrow key.
+  useEffect(() => setActiveIndex(query.trim() ? 0 : -1), [query, open]);
 
   const selected = useMemo(
     () => options.find((option) => option.value === value) || null,
@@ -200,17 +231,23 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   );
 
   const pick = useCallback(
-    (next: string) => {
+    (next: string, moveNext = false) => {
       onChange(next);
       setOpen(false);
       setQuery("");
+      if (moveNext) {
+        requestAnimationFrame(() => focusNextTabStop(triggerRef.current));
+      } else {
+        restoreTriggerFocus();
+      }
     },
-    [onChange, setOpen, setQuery]
+    [onChange, setOpen, setQuery, restoreTriggerFocus, triggerRef]
   );
 
   return (
     <div className="relative" ref={ref}>
       <button
+        ref={triggerRef as React.RefObject<HTMLButtonElement>}
         type="button"
         tabIndex={tabIndex}
         disabled={disabled}
@@ -236,6 +273,42 @@ export const SearchDropdown = React.memo(function SearchDropdown({
             query={query}
             setQuery={setQuery}
             searchPlaceholder={searchPlaceholder}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+                restoreTriggerFocus();
+                return;
+              }
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveIndex((current) => {
+                  if (!visibleOptions.length) return 0;
+                  const direction = event.key === "ArrowDown" ? 1 : -1;
+                  if (current < 0) return direction > 0 ? 0 : visibleOptions.length - 1;
+                  return (current + direction + visibleOptions.length) % visibleOptions.length;
+                });
+                return;
+              }
+              if (event.key !== "Enter" && event.key !== "Tab") return;
+              const active = activeIndex >= 0
+                ? visibleOptions[activeIndex]
+                : query.trim()
+                  ? visibleOptions[0]
+                  : selected;
+              event.preventDefault();
+              if (active) {
+                pick(active.value, event.key === "Tab");
+              } else {
+                setOpen(false);
+                setQuery("");
+                if (event.key === "Tab") {
+                  requestAnimationFrame(() => focusNextTabStop(triggerRef.current));
+                } else {
+                  restoreTriggerFocus();
+                }
+              }
+            }}
           />
 
           {/* Pinned "clear" row — same affordance as the Salary Register filter. */}
@@ -256,13 +329,19 @@ export const SearchDropdown = React.memo(function SearchDropdown({
           >
             {filtered(options).map((option) => {
               const isSelected = value === option.value;
+              const keyboardIndex = visibleOptions.findIndex((visible) => visible.value === option.value);
+              const isActive = activeIndex >= 0 && keyboardIndex === activeIndex;
               return (
                 <li key={option.value}>
                   <button
                     type="button"
                     onClick={() => pick(option.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-emerald-500 bg-emerald-50/70" : "text-slate-700"
+                      isSelected
+                        ? "text-emerald-500 bg-emerald-50/70"
+                        : isActive
+                          ? "text-blue-700 bg-blue-50/80"
+                          : "text-slate-700"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
@@ -319,7 +398,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   /** Allows a form to omit already-prefilled controls from its Tab flow. */
   tabIndex?: number;
 }) {
-  const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
+  const { open, setOpen, query, setQuery, ref, searchRef, triggerRef, restoreTriggerFocus, filtered } = useDropdownPanel();
   const { t } = useI18n();
 
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
@@ -339,6 +418,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   return (
     <div className="relative" ref={ref}>
       <div
+        ref={triggerRef as React.RefObject<HTMLDivElement>}
         role="button"
         tabIndex={disabled ? -1 : tabIndex}
         aria-disabled={disabled}
@@ -406,18 +486,27 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             setQuery={setQuery}
             searchPlaceholder={searchPlaceholder}
             onKeyDown={(event) => {
-              if (!numericRangeSelection || event.key !== "Enter") return;
-              const additions = parseBoxSelectionQuery(
-                query,
-                options
-                  .filter((option) => !option.disabled)
-                  .map((option) => option.value),
-              );
-              if (!additions.length) return;
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setOpen(false);
+                restoreTriggerFocus();
+                return;
+              }
+              if (event.key !== "Enter") return;
+              const allowed = options
+                .filter((option) => !option.disabled)
+                .map((option) => option.value);
+              const additions = numericRangeSelection
+                ? parseBoxSelectionQuery(query, allowed)
+                : [];
+              const fallback = filtered(options).find((option) => !option.disabled)?.value;
+              const accepted = additions.length ? additions : fallback ? [fallback] : [];
+              if (!accepted.length) return;
               event.preventDefault();
-              onChange(Array.from(new Set([...selectedValues, ...additions])));
+              onChange(Array.from(new Set([...selectedValues, ...accepted])));
               setQuery("");
               setOpen(false);
+              restoreTriggerFocus();
             }}
           />
 

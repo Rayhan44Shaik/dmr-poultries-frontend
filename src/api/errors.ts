@@ -237,6 +237,11 @@ const loggedApiErrors = new WeakSet<ApiError>();
 export function handleApiError(error: unknown): string {
   const apiError = toApiError(error);
   if (apiError.code === "CANCELED") return apiError.message;
+  // A 401 is handled centrally by AuthProvider (one /auth/me confirmation,
+  // then a clean sign-in transition). Logging every rejected dashboard query
+  // during that transition creates an alarming error storm without adding
+  // diagnostic value; request IDs remain visible in the Network panel/server.
+  if (isAuthFailureCode(apiError.code)) return apiError.message;
   if (!loggedApiErrors.has(apiError)) {
     loggedApiErrors.add(apiError);
     logger.error(

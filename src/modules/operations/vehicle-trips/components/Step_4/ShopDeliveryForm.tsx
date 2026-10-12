@@ -48,7 +48,7 @@ export interface Props {
   mortKg: number;
   deliveredBirds: number;
   deliveredWeight: number;
-  /** Weight mode only: farmWeight − delivery weight. */
+  /** Weight mode only: farm weight − delivered weight − mortality weight. */
   weightLoss?: number;
 
   usedBoxIds: number[];
@@ -168,6 +168,8 @@ export default function ShopDeliveryForm({
   isFormValid,
 }: Props) {
   const { t, language } = useI18n();
+  const boxModeRef = React.useRef<HTMLButtonElement>(null);
+  const weightModeRef = React.useRef<HTMLButtonElement>(null);
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
   const isEditing = editingId !== null;
 
@@ -284,9 +286,21 @@ export default function ShopDeliveryForm({
         {/* Mode toggle — shows the NAME (Box Mode / Weight Mode) with its icon. */}
         <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1">
             <button
+              ref={boxModeRef}
               type="button"
-              tabIndex={-1}
+              // Keep BOTH choices in the keyboard path. With only the active
+              // choice tabbable, Add Shop -> Box Mode skipped Weight Mode and
+              // jumped straight to Shop, so keyboard users could not choose
+              // Weight Mode without using an arrow key.
+              tabIndex={1}
+              autoFocus={mode === "box"}
               onClick={() => setMode("box")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowDown") return;
+                event.preventDefault();
+                setMode("weight");
+                requestAnimationFrame(() => weightModeRef.current?.focus());
+              }}
               aria-label={t("ops.trip.box_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "box"
@@ -298,9 +312,17 @@ export default function ShopDeliveryForm({
               {t("ops.trip.box_mode")}
             </button>
             <button
+              ref={weightModeRef}
               type="button"
-              tabIndex={-1}
+              tabIndex={2}
+              autoFocus={mode === "weight"}
               onClick={() => setMode("weight")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowUp") return;
+                event.preventDefault();
+                setMode("box");
+                requestAnimationFrame(() => boxModeRef.current?.focus());
+              }}
               aria-label={t("ops.trip.weight_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "weight"
@@ -339,7 +361,7 @@ export default function ShopDeliveryForm({
               placeholder={shopOptions.length > 0 ? t("ops.trip.select_shop_ellipsis") : t("ops.trip.no_shops_available")}
               searchPlaceholder={t("ops.trip.search_shop_bird")}
               disabled={shopOptions.length === 0 || shopOptions[0]?.isDisabled}
-              tabIndex={!isEditing && formData.shopId ? -1 : 0}
+              tabIndex={3}
               matchMode="prefix"
               onChange={(value) => {
                 if (!value) {
@@ -363,7 +385,7 @@ export default function ShopDeliveryForm({
                 placeholder={t("ops.trip.select_boxes_from_pickup")}
                 searchPlaceholder={t("ops.trip.search_box_number")}
                 disabled={readOnly}
-                tabIndex={!isEditing && formData.selectedBoxIds.length > 0 ? -1 : 0}
+                tabIndex={4}
                 chipSummary={(count) => t("ops.trip.boxes_selected", { count })}
                 renderOptionLabel={renderBoxOptionLabel}
                 selectAllLabel={t("ops.trip.select_all_boxes")}
@@ -505,6 +527,7 @@ export default function ShopDeliveryForm({
                   onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
                   placeholder="0"
                   min="0"
+                  tabIndex={5}
                   className={neutralInputClass(validationErrors.birdsExceed)}
                 />
                 {validationErrors.birdsExceed && (
@@ -556,6 +579,7 @@ export default function ShopDeliveryForm({
                     onChange={(e) => handleFormChange("birds", Number(e.target.value))}
                     placeholder="0"
                     min="0"
+                    tabIndex={6}
                     className={neutralInputClass(validationErrors.birdsExceedFarm)}
                   />
                   {validationErrors.birdsExceedFarm && (
@@ -577,6 +601,7 @@ export default function ShopDeliveryForm({
                     onChange={(e) => handleFormChange("weight", Number(e.target.value))}
                     placeholder="0.00"
                     min="0"
+                    tabIndex={7}
                     className={neutralInputClass(validationErrors.weightExceedFarm)}
                   />
                   {validationErrors.weightExceedFarm && (
@@ -601,6 +626,7 @@ export default function ShopDeliveryForm({
                     onChange={(e) => handleFormChange("mortality", Number(e.target.value))}
                     placeholder="0"
                     min="0"
+                  tabIndex={5}
                     className={neutralInputClass()}
                   />
                 </MetricTile>
@@ -620,6 +646,7 @@ export default function ShopDeliveryForm({
                     }}
                     placeholder={t("ops.trip.optional")}
                     min="0"
+                    tabIndex={-1}
                     className={neutralInputClass()}
                   />
                 </MetricTile>
@@ -659,6 +686,7 @@ export default function ShopDeliveryForm({
               onChange={(e) => handleFormChange("subShopName", e.target.value)}
               placeholder="Optional sub shop name"
               maxLength={200}
+              tabIndex={8}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
             />
           </div>
@@ -670,6 +698,7 @@ export default function ShopDeliveryForm({
               value={formData.remarks || ""}
               onChange={(e) => handleFormChange("remarks", e.target.value)}
               placeholder={t("ops.trip.optional_delivery_notes")}
+              tabIndex={-1}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-slate-800 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200 h-[40px] transition-all placeholder:text-slate-400"
             />
           </div>
@@ -694,6 +723,7 @@ export default function ShopDeliveryForm({
           </button>
           <button
             type="button"
+            tabIndex={9}
             onClick={onSubmit}
             disabled={!isFormValid}
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${

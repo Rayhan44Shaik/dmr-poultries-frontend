@@ -6,12 +6,20 @@ type ActionTooltipProps = {
   label: ReactNode;
   placement?: "top" | "bottom";
   side?: "top" | "bottom";
+  /** Horizontal anchoring within the trigger. Use end for right-edge actions. */
+  align?: "start" | "center" | "end";
   className?: string;
 };
 
 const placementClass = {
-  top: "bottom-full left-1/2 mb-2.5 -translate-x-1/2",
-  bottom: "top-full left-1/2 mt-2.5 -translate-x-1/2",
+  top: "bottom-full mb-2.5",
+  bottom: "top-full mt-2.5",
+};
+
+const alignmentClass = {
+  start: "left-0",
+  center: "left-1/2 -translate-x-1/2",
+  end: "right-0",
 };
 
 /**
@@ -22,7 +30,7 @@ const placementClass = {
  * - arrow with same bg
  * Place inside a `relative group` button/link/container.
  */
-export function ActionTooltip({ label, placement = "top", side, className }: ActionTooltipProps) {
+export function ActionTooltip({ label, placement = "top", side, align = "center", className }: ActionTooltipProps) {
   const resolvedPlacement = side ?? placement;
   const isTop = resolvedPlacement === "top";
   return (
@@ -30,7 +38,7 @@ export function ActionTooltip({ label, placement = "top", side, className }: Act
       role="tooltip"
       className={cn(
         // base - neat perfect global
-        "pointer-events-none absolute z-[90] max-w-[320px] min-w-[72px]",
+        "pointer-events-none absolute z-[90] w-max max-w-[min(320px,calc(100vw-2rem))] min-w-[72px]",
         "rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl",
         "px-3.5 py-2.5 text-center text-[12px] font-semibold leading-[1.6] tracking-wide text-white",
         "shadow-[0_8px_32px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.12)] ring-1 ring-white/5",
@@ -42,6 +50,7 @@ export function ActionTooltip({ label, placement = "top", side, className }: Act
         // origin for scale
         isTop ? "origin-bottom" : "origin-top",
         placementClass[resolvedPlacement],
+        alignmentClass[align],
         className,
       )}
       style={{
@@ -55,7 +64,8 @@ export function ActionTooltip({ label, placement = "top", side, className }: Act
       {/* arrow - neat diamond */}
       <span
         className={cn(
-          "absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-slate-900/95 border-r border-b border-white/10 backdrop-blur-xl",
+          "absolute h-2.5 w-2.5 rotate-45 bg-slate-900/95 border-r border-b border-white/10 backdrop-blur-xl",
+          align === "start" ? "left-5" : align === "end" ? "right-5" : "left-1/2 -translate-x-1/2",
           isTop ? "-bottom-[5px]" : "-top-[5px] border-r-0 border-b-0 border-l border-t",
         )}
         aria-hidden="true"

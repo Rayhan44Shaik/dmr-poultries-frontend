@@ -10,9 +10,10 @@ import {
 } from "lucide-react";
 import TripPagination from "../TripPagination";
 import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles";
-import { useShopDeliveryForm, EMPTY_DELIVERY_FORM } from "./useShopDeliveryForm";
+import { useShopDeliveryForm, EMPTY_DELIVERY_FORM, deliveredBirdsFromFarm } from "./useShopDeliveryForm";
 import ShopDeliveryForm from "./ShopDeliveryForm";
 import ShopDeliveryCard from "./ShopDeliveryCard";
+import { compareDeliveryDisplayOrder, deliveryDisplaySerials } from "./deliverySerials";
 import { generateShopPDF } from "../../utils/generateShopPDF";
 import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
 import { generateAssignmentSheetPdf } from "../../../../orders/pdf/generateAssignmentSheetPdf";
@@ -25,6 +26,7 @@ import {
   isDeliveredRow,
   orderAssignedShops,
   pendingBoxesFromRows,
+  sanitizeSelectedBoxIds,
   sortShopsAssignedFirst,
   step4ShopsCount,
 } from "./remainingBoxes";
@@ -326,9 +328,9 @@ export default function UnLoadingTable({
   const submitLockRef = useRef(false);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const autosaveInFlightRef = useRef(false);
-  const formAutosaveTimerRef = useRef<number | undefined>(undefined);
-  const formAutosaveInFlightRef = useRef(false);
+  const lastAutosaveAttemptRef = useRef("");
   const draftIdentityRef = useRef<{ id: number; clientKey: string } | null>(null);
+  const addShopButtonRef = useRef<HTMLButtonElement>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const toastTimerRef = useRef<number | undefined>(undefined);
   // Background autosave for Step 4 — same silent pattern as Step 3 Pickup:
@@ -364,6 +366,8 @@ export default function UnLoadingTable({
       if (autosaveInFlightRef.current) return;
       const fingerprint = JSON.stringify({ legIndex: Number(safeTrip?.activeLegIndex ?? 1), rows: safeRows });
       if (fingerprint === lastSavedDeliveriesFingerprint) return;
+      if (fingerprint === lastAutosaveAttemptRef.current) return;
+      lastAutosaveAttemptRef.current = fingerprint;
       autosaveInFlightRef.current = true;
       void (async () => {
         try {
@@ -427,72 +431,9 @@ export default function UnLoadingTable({
     validate,
   } = useShopDeliveryForm(safeRows, safeBoxDetails, editingId);
 
-  // Persist the open Add/Edit Shop form itself after 2.5 seconds of inactivity.
-  // Previously the row-level autosave was disabled while this form was open,
-  // which meant the values users were actively entering never reached the API.
-  const formDraftFingerprint = useMemo(
-    () => JSON.stringify({ mode, editingId, formData }),
-    [mode, editingId, formData],
-  );
-  useEffect(() => {
-    if (readOnly || !showForm || !saveDeliveries || isSubmitting || isSaving) return;
-    if (Number(formData.shopId) <= 0) return; // backend requires a real shop
-
-    window.clearTimeout(formAutosaveTimerRef.current);
-    formAutosaveTimerRef.current = window.setTimeout(() => {
-      if (formAutosaveInFlightRef.current) return;
-      const identity = draftIdentityRef.current;
-      if (!identity) return;
-
-      const selectedBoxIds = [...formData.selectedBoxIds];
-      const isBoxMode = mode === "box";
-      const birds = isBoxMode ? Math.max(0, farmBirds - Number(formData.mortality || 0)) : Number(formData.birds || 0);
-      const weight = Number((isBoxMode ? Math.max(0, farmWeight - mortKg) : Number(formData.weight || 0)).toFixed(2));
-      const existing = editingId == null ? undefined : safeRows.find((row) => Number(row.id) === Number(editingId));
-      const capturedAt = String((existing as any)?.autoCaptureTime ?? autoCaptureTime ?? "").trim();
-      const draftRow = {
-        ...(existing ?? {}),
-        id: identity.id,
-        clientKey: identity.clientKey,
-        serialNo: existing?.serialNo ?? safeRows.reduce((max, row) => Math.max(max, Number(row.serialNo || 0)), 0) + 1,
-        shopId: Number(formData.shopId),
-        shopName: formData.shopName,
-        subShopName: formData.subShopName.trim(),
-        birdTypeId: Number(formData.birdTypeId || 0),
-        birdType: formData.birdType,
-        boxNo: selectedBoxIds.length,
-        birds,
-        weight,
-        mortality: Number(formData.mortality || 0),
-        mortKg: Number((isBoxMode ? mortKg : Number(formData.mortWeight || 0)).toFixed(2)),
-        rate: Number(existing?.rate || 0),
-        amount: Number(existing?.amount || 0),
-        remarks: captureRemarksFor(safeRows, Number(formData.shopId), formData.remarks),
-        deliveryMode: mode,
-        selectedBoxIds,
-        farmBirds,
-        farmWeight,
-        perBoxData: isBoxMode ? formData.perBoxData : [],
-        // Autosave is draft persistence only. The official per-shop capture
-        // timestamp is still created by the explicit Save Shop action.
-        autoCaptureTime: capturedAt || undefined,
-      } as ShopDelivery;
-      const rowsToSave = existing
-        ? safeRows.map((row) => Number(row.id) === Number(existing.id) ? draftRow : row)
-        : [draftRow, ...safeRows];
-
-      formAutosaveInFlightRef.current = true;
-      void saveDeliveries({ silent: true }, rowsToSave).finally(() => {
-        formAutosaveInFlightRef.current = false;
-      });
-    }, 2500);
-
-    return () => window.clearTimeout(formAutosaveTimerRef.current);
-  }, [
-    autoCaptureTime, editingId, farmBirds, farmWeight, formData,
-    formDraftFingerprint, isSaving, isSubmitting, mode, mortKg, readOnly,
-    safeRows, saveDeliveries, showForm,
-  ]);
+  // An open Add/Edit form is not a delivery. Persist only after Save Shop has
+  // produced a captured row. The former form-level autosave wrote abandoned
+  // forms into trip_deliveries and inflated shop counts and weight loss.
 
   // Sync editing ID from parent
   useEffect(() => {
@@ -788,6 +729,12 @@ export default function UnLoadingTable({
     };
     setMode(rowWithExtra.deliveryMode || "box");
     setAutoCaptureTime(rowWithExtra.autoCaptureTime || "");
+    const selectedBoxIds = sanitizeSelectedBoxIds(
+      safeBoxDetails,
+      safeRows,
+      rowWithExtra.selectedBoxIds || [],
+      Number(row.id),
+    );
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
@@ -795,7 +742,7 @@ export default function UnLoadingTable({
       birdTypeId: row.birdTypeId || tripBirdTypeId || 0,
       birdType: row.birdType || tripBirdType || "",
       // Keep assigned boxes from Order Assignment as a starting selection.
-      selectedBoxIds: rowWithExtra.selectedBoxIds || [],
+      selectedBoxIds,
       // Planned order quantities are reference only — never treat them as
       // delivered weight/birds until the driver actually captures.
       birds: isUncapturedOrderPlan ? 0 : row.birds,
@@ -809,11 +756,54 @@ export default function UnLoadingTable({
   };
 
   const handleFormChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev) => {
+      if (mode === "weight" && field === "mortality") {
+        const selected = new Set(prev.selectedBoxIds.map(Number));
+        const selectedFarmBirds = availableBoxDetails.reduce(
+          (sum, box) => selected.has(Number(box.boxNo)) ? sum + Number(box.birds || 0) : sum,
+          0,
+        );
+        const mortality = Math.max(0, Number(value) || 0);
+        return {
+          ...prev,
+          mortality,
+          birds: deliveredBirdsFromFarm(selectedFarmBirds, mortality),
+        };
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleBoxSelection = (newSelectedIds: number[]) => {
-    setFormData((prev) => ({ ...prev, selectedBoxIds: newSelectedIds }));
+    setFormData((prev) => {
+      if (mode !== "weight") return { ...prev, selectedBoxIds: newSelectedIds };
+      const selected = new Set(newSelectedIds.map(Number));
+      const selectedFarmBirds = availableBoxDetails.reduce(
+        (sum, box) => selected.has(Number(box.boxNo)) ? sum + Number(box.birds || 0) : sum,
+        0,
+      );
+      return {
+        ...prev,
+        selectedBoxIds: newSelectedIds,
+        birds: deliveredBirdsFromFarm(selectedFarmBirds, Number(prev.mortality || 0)),
+      };
+    });
+  };
+
+  const handleModeChange = (nextMode: "box" | "weight") => {
+    setMode(nextMode);
+    if (nextMode !== "weight") return;
+    setFormData((prev) => {
+      const selected = new Set(prev.selectedBoxIds.map(Number));
+      const selectedFarmBirds = availableBoxDetails.reduce(
+        (sum, box) => selected.has(Number(box.boxNo)) ? sum + Number(box.birds || 0) : sum,
+        0,
+      );
+      return {
+        ...prev,
+        birds: deliveredBirdsFromFarm(selectedFarmBirds, Number(prev.mortality || 0)),
+      };
+    });
   };
 
   const handleShopSelect = (selected: any) => {
@@ -975,6 +965,11 @@ export default function UnLoadingTable({
     setToast({ message: t("ops.trip.shop_saved", { name: formData.shopName }), type: "success" });
     closeForm();
     setCurrentPage(1);
+    // The Add Shop action is immediately available for the next delivery.
+    // Two frames allow the portal to unmount and the header button to remount.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => addShopButtonRef.current?.focus());
+    });
   };
 
   // ─── Select Options ───────────────────────────────────────────────
@@ -1080,6 +1075,9 @@ export default function UnLoadingTable({
   );
 
   // ─── Filtered Search & Pagination ──────────────────────────────
+  // Hidden order-plan rows must not consume numbers in the visible table.
+  const displaySerials = useMemo(() => deliveryDisplaySerials(safeRows), [safeRows]);
+
   const displayRows = useMemo<ShopDelivery[]>(() => {
     // Only CAPTURED deliveries render as cards. Pending `[ORDER]` assignment
     // rows (the shops that still need a delivery) are NOT user-entered data,
@@ -1103,25 +1101,11 @@ export default function UnLoadingTable({
       return shopNameMatch || birdTypeMatch || remarksMatch || boxNumberMatch;
     });
 
-    // Route order for the card list: DELIVERED shops first with the most
-    // recent capture on TOP (older deliveries sink down), then the pending
-    // `[ORDER]` assignment rows in their listed sequence at the bottom.
-    return [...filtered].sort((a, b) => {
-      const aDone = isDeliveredRow(a);
-      const bDone = isDeliveredRow(b);
-      if (aDone !== bDone) return aDone ? -1 : 1;
-      if (aDone) {
-        return (
-          (Number(b.serialNo) || 0) - (Number(a.serialNo) || 0) ||
-          Number(b.id) - Number(a.id)
-        );
-      }
-      return (
-        (Number(a.serialNo) || 0) - (Number(b.serialNo) || 0) ||
-        Number(a.id) - Number(b.id)
-      );
-    });
-  }, [safeRows, searchTerm]);
+    // Show the corrected sequence in descending order. Sorting by the old
+    // persisted serial here caused duplicate legacy values to render as
+    // 6, 7, 5 even though their displayed numbers had already been repaired.
+    return [...filtered].sort((a, b) => compareDeliveryDisplayOrder(displaySerials, a, b));
+  }, [safeRows, searchTerm, displaySerials]);
 
   const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length, itemsPerPage]);
 
@@ -1229,6 +1213,7 @@ export default function UnLoadingTable({
 
           {!readOnly && !showForm && (
             <button
+              ref={addShopButtonRef}
               type="button"
               onClick={openAddForm}
               className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
@@ -1280,7 +1265,16 @@ export default function UnLoadingTable({
             </span>
             <span className="truncate">{t("common.birds")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-slate-800 tabular-nums">{topKpiTotals.birds || "—"}</span>
+            <span
+              className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-500 tabular-nums"
+              title={`${t("common.boxes")} ${t("common.completed")}`}
+            >
+              <Box size={13} className="shrink-0" />
+              {topKpiTotals.completedBoxes} {t("common.completed")}
+            </span>
+          </div>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
@@ -1360,7 +1354,7 @@ export default function UnLoadingTable({
           <div role="dialog" aria-modal="true" aria-label={editingId !== null ? t("ops.trip.edit_shop_delivery") : t("ops.trip.add_new_shop_delivery")} className="my-auto w-full max-w-6xl max-h-[calc(100vh-6rem)] overflow-y-auto rounded-2xl shadow-2xl shadow-slate-900/15">
           <ShopDeliveryForm
           mode={mode}
-          setMode={setMode}
+          setMode={handleModeChange}
           formData={formData}
           setFormData={setFormData}
           validationErrors={validationErrors}
@@ -1435,6 +1429,7 @@ export default function UnLoadingTable({
                     <ShopDeliveryCard
                       key={row.id}
                       row={row as any}
+                      displaySerialNo={displaySerials.get(Number(row.id)) ?? 1}
                       readOnly={readOnly}
                       onEdit={(selectedRow) => {
                         if (onEditShop) {

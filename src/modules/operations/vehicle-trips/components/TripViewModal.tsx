@@ -428,9 +428,6 @@ function TripViewModal({
                     <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
                       {viewTrip.tripNo || t("ops.trip.trip_details")}
                     </h2>
-                    <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                      Shell gaps • {language === "te" ? "తెలుగు" : "EN"}
-                    </span>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap mt-1.5">
                     {isCompleted ? (
@@ -460,7 +457,7 @@ function TripViewModal({
                   tone="emerald"
                   labelMode="target"
                   ariaLabel={t("ops.trip.popup_language_toggle")}
-                  tooltip={<ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />}
+                  tooltip={<ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" align="end" />}
                 />
                 <button
                   type="button"

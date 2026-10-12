@@ -28,6 +28,7 @@ test("toStep5Payload sends expenses only — no vehicle, advance, diesel, or tim
   assert.equal(payload.othersRC, 0);
   assert.equal(payload.endMeter, 50400);
   assert.equal(payload.destinationTolls, 0);
+  assert.equal(payload.others2Name, "SUPERVISOR (PC)");
 });
 
 test("View maps Step 5 submitted timestamps with the same formatter as Step 1–3", () => {
