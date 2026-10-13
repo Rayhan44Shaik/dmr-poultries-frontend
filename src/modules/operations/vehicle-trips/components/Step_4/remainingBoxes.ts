@@ -9,43 +9,24 @@ export interface BoxRemaining extends BoxDetail {
 }
 
 /** Consumption map keyed by boxNo — the single source of truth for which
- * boxes have been delivered. A row consumes boxes differently depending on
- * how it was captured:
- *   - per-box data (weight mode): consumes exactly the split per box.
- *   - box mode, single box: consumes birds + mortality and weight + mortKg.
- *   - box mode, multiple boxes (no per-box split): consumes the WHOLE box —
- *     the row takes the box's full remaining birds/weight, so the box can
- *     never be selected again.
+ * boxes have been allocated to a delivery.
  *
- * Once all birds from a pickup box are delivered, the box is FULLY consumed
- * even if a few hundred grams of farm-vs-DC weight variance remain. That
- * leftover kg is not stock for another shop.
+ * Box allocation is exclusive in the persistence API: once a captured row
+ * references a pickup box, that box belongs to that delivery and cannot be
+ * selected for another shop. Mark every selected box fully consumed here as
+ * well, even when the delivered birds/weight are lower than the pickup
+ * values. Keeping the browser rule identical to the API rule prevents a
+ * partially used box from being offered again and later rejected on save.
  */
 export function computeRemainingBoxes(
-  boxDetails: BoxDetail[],
+  _boxDetails: BoxDetail[],
   rows: ShopDelivery[],
   opts: { excludeRowId?: number | null } = {}
 ): Map<number, { birds: number; weight: number }> {
-  const byNo = new Map<number, BoxDetail>();
-  for (const b of boxDetails ?? []) {
-    byNo.set(Number(b.boxNo), b);
-  }
-
   const used = new Map<number, { birds: number; weight: number }>();
   const add = (boxNo: number, birds: number, weight: number) => {
     const cur = used.get(boxNo) ?? { birds: 0, weight: 0 };
     used.set(boxNo, { birds: cur.birds + birds, weight: cur.weight + weight });
-  };
-
-  const consumeBox = (boxNo: number, birdsTaken: number, weightTaken: number) => {
-    const orig = byNo.get(boxNo);
-    const origBirds = Number(orig?.birds || 0);
-    // All birds gone → box is done (ignore residual kg variance).
-    if (origBirds > 0 && birdsTaken >= origBirds) {
-      add(boxNo, FULLY_CONSUMED, FULLY_CONSUMED);
-      return;
-    }
-    add(boxNo, birdsTaken, weightTaken);
   };
 
   rows.forEach((row) => {
@@ -62,26 +43,13 @@ export function computeRemainingBoxes(
       ? extra.selectedBoxIds.map(Number).filter((n) => Number.isFinite(n) && n > 0)
       : [];
 
-    if (per.length) {
-      per.forEach((pb) =>
-        consumeBox(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0))
-      );
-      return;
-    }
-
-    if (selected.length === 1) {
-      consumeBox(
-        selected[0],
-        Number(row.birds || 0) + Number(row.mortality || 0),
-        Number(row.weight || 0) + Number(extra.mortKg || 0)
-      );
-      return;
-    }
-
-    if (selected.length > 1) {
-      selected.forEach((id) => add(id, FULLY_CONSUMED, FULLY_CONSUMED));
-      return;
-    }
+    // selectedBoxIds is canonical. Legacy weight-mode rows may only have a
+    // per-box breakdown, so retain that as an identity fallback.
+    const allocated = selected.length
+      ? selected
+      : per.map((pb) => Number(pb.boxNo)).filter((boxNo) => Number.isFinite(boxNo) && boxNo > 0);
+    allocated.forEach((boxNo) => add(boxNo, FULLY_CONSUMED, FULLY_CONSUMED));
+    if (allocated.length) return;
 
     // Fallback: birds/weight saved but selectedBoxIds missing — still mark
     // delivered quantity against nothing selectable (defense for old rows).

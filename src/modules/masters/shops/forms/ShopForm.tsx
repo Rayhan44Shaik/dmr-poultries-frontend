@@ -26,9 +26,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const { t } = useI18n();
   const formId = useId();
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
-  const [shopNumber, setShopNumber] = useState(
-    shop?.shopNumber || (shop ? String(shop.shopNo).padStart(6, "0") : ""),
-  );
+  const shopNumber = shop?.shopNumber ?? "";
   const [shopName, setShopName] = useState(shop?.shopName ?? "");
   const [ownerName, setOwnerName] = useState(shop?.ownerName ?? "");
   const [phoneNumber, setPhoneNumber] = useState(shop?.phoneNumber ?? "");
@@ -182,9 +180,7 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     if (Object.values(newErrors).some(Boolean)) return;
 
     onSave({
-      shopNumber: isEditing
-        ? shopNumber
-        : shopNumber || `SHOP-${String(Date.now()).slice(-6)}`,
+      shopNumber,
       shopName,
       ownerName,
       phoneNumber,
@@ -214,7 +210,6 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
     associationType,
     openingBalance,
     status,
-    isEditing,
     onSave,
     t,
   ]);
@@ -265,9 +260,9 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
       <section className="space-y-3">
         {sectionHeading(t("masters.shops.form.sections.shop_details"))}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {/* Shop Number — read-only when editing */}
+          {/* Shop Number — always generated from the backend sequence */}
           <div>
-            {fieldLabel(t("masters.shops.form.shop_number"), true)}
+            {fieldLabel(t("masters.shops.form.shop_number"))}
             <div className="relative">
               <div className={iconWrapperClass}>
                 <Store size={15} />
@@ -275,15 +270,10 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
               <input
                 id={fieldId(t("masters.shops.form.shop_number"))}
                 value={shopNumber}
-                onChange={(e) => setShopNumber(e.target.value.toUpperCase())}
-                placeholder={t("masters.shops.form.shop_number_placeholder")}
-                className={
-                  isEditing
-                    ? `${inputClass()} bg-slate-50 text-slate-500 cursor-not-allowed`
-                    : inputClass(!!errors.shopNumber)
-                }
-                disabled={isEditing}
-                readOnly={isEditing}
+                placeholder={isEditing ? "" : "Generated automatically"}
+                className={`${inputClass()} bg-slate-50 text-slate-500 cursor-not-allowed`}
+                disabled
+                readOnly
               />
             </div>
             {errors.shopNumber && (
@@ -291,11 +281,9 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
                 {errors.shopNumber}
               </p>
             )}
-            {isEditing && (
-              <p className="text-[11px] text-slate-400 mt-1">
-                Cannot be changed after creation
-              </p>
-            )}
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isEditing ? "Cannot be changed after creation" : "Assigned automatically when saved"}
+            </p>
           </div>
 
           {/* Shop Name */}

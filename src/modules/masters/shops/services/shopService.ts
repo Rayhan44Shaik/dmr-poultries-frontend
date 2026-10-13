@@ -133,11 +133,14 @@ export async function createShop(input: ShopInput): Promise<Shop> {
 /** POST /api/masters/shops/bulk */
 export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
   clearLegacyShopStorage();
-  const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
+  const { data } = await apiPost<{
+    created: Record<string, unknown>[];
+    updated?: Record<string, unknown>[];
+  }>(
     `${SHOPS_PATH}/bulk`,
     inputs.map(toPayload),
   );
-  return data.created.map(mapShop);
+  return [...data.created, ...(data.updated ?? [])].map(mapShop);
 }
 
 export async function updateShopOpeningBalancesBulk(

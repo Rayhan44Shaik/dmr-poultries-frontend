@@ -54,6 +54,8 @@ export type BulkImportConfig<T, E = T> = {
   icon?: React.ReactNode;
   /** Column definitions (template + accepted headers). */
   columns: BulkImportColumn[];
+  /** Optional live rows for a pre-populated downloadable template. */
+  getTemplateRows?: () => Promise<Record<string, unknown>[]>;
   /** Convert a normalized record (keyed by canonical column.key) to row data. */
   parseRow: (record: Record<string, unknown>) => T;
   /** Return a list of error strings for a row (empty = valid). */

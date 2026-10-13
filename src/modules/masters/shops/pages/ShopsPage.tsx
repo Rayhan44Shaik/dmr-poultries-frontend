@@ -12,7 +12,7 @@ import { useShops } from "../hooks/useShops";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
-import { handleApiError } from "../services/shopService";
+import { handleApiError, loadShops } from "../services/shopService";
 import type { Shop } from "../types/shop";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -39,7 +39,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const [editingShop, setEditingShop] = useState<Shop | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-  const [sortOrder, setSortOrder] = useState("number");
+  const [sortOrder, setSortOrder] = useState("name");
   const [cityFilter, setCityFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
@@ -69,11 +69,15 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   });
 
   const shopBulkImportConfig = useMemo(
-    () => buildShopBulkImportConfig({ addShopsBulk, reload }),
+    () => buildShopBulkImportConfig({ addShopsBulk, listShops: loadShops, reload }),
     [addShopsBulk, reload],
   );
   const openingBalanceImportConfig = useMemo(
-    () => buildOpeningBalanceImportConfig({ update: updateOpeningBalancesBulk, reload }),
+    () => buildOpeningBalanceImportConfig({
+      update: updateOpeningBalancesBulk,
+      reload,
+      listShops: loadShops,
+    }),
     [updateOpeningBalancesBulk, reload],
   );
 
@@ -93,7 +97,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setSearch("");
     setCityFilter("");
     setStatusFilter("");
-    setSortOrder("number");
+    setSortOrder("name");
     setCurrentPage(1);
   };
 
@@ -384,7 +388,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     search.trim() !== "",
     cityFilter !== "",
     statusFilter !== "",
-    sortOrder !== "number",
+    sortOrder !== "name",
   );
   const hasRows = paginatedShops.length > 0;
   const searchId = "shops-search";
@@ -422,6 +426,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
           setCurrentPage(1);
         }}
         sort={sortOrder}
+        defaultSort="name"
         onSortChange={(value) => {
           setSortOrder(value);
           setCurrentPage(1);
@@ -457,17 +462,17 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         pageSize={pageSize}
         onPageChange={setCurrentPage}
         onPageSizeChange={handlePageSizeChange}
-      >
-        <div className="flex justify-end border-b border-slate-100 px-3 py-2">
+        headerActions={
           <button
             type="button"
             onClick={() => setShowOpeningBalanceImport(true)}
-            className="inline-flex h-9 items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 transition hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-sm"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 text-xs font-bold text-emerald-700 transition hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-sm"
           >
-            <FileSpreadsheet size={15} />
+            <FileSpreadsheet size={14} />
             Import Opening Balances
           </button>
-        </div>
+        }
+      >
         <ShopTable
           shops={paginatedShops}
           onEdit={handleEditShop}

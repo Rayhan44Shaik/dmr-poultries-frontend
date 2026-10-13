@@ -6,6 +6,7 @@ type Row = { shopNumber: string; shopName: string; openingBalance: number };
 export function buildOpeningBalanceImportConfig(deps: {
   update: (rows: Row[]) => Promise<unknown>;
   reload: () => Promise<unknown>;
+  listShops: () => Promise<Shop[]>;
 }): BulkImportConfig<Row, Shop> {
   return {
     title: "Import Shop Opening Balances",
@@ -18,6 +19,22 @@ export function buildOpeningBalanceImportConfig(deps: {
       { key: "Shop Name", sample: "RAMESH CHICKEN SHOP" },
       { key: "Opening Balance", required: true, sample: "12000" },
     ],
+    getTemplateRows: async () => {
+      const shops = await deps.listShops();
+      return [...shops]
+        .filter((shop) => shop.status === "Active")
+        .sort((a, b) =>
+          String(a.shopName ?? "").localeCompare(String(b.shopName ?? ""), "en", {
+            sensitivity: "base",
+            numeric: true,
+          }) || String(a.shopNumber ?? "").localeCompare(String(b.shopNumber ?? ""), "en", { numeric: true })
+        )
+        .map((shop) => ({
+          "Shop Number": shop.shopNumber,
+          "Shop Name": shop.shopName,
+          "Opening Balance": "",
+        }));
+    },
     parseRow: (record) => ({
       shopNumber: String(record["Shop Number"] ?? "").trim(),
       shopName: String(record["Shop Name"] ?? "").trim(),

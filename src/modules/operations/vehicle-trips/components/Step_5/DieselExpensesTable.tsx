@@ -461,14 +461,14 @@ export default function DieselExpensesTable({
   };
 
   const absoluteDestMeter = destMeter || 0;
+  const rowIndicesKey = rowIndices.join(",");
 
   /**
-   * Each diesel meter must be greater than the previous reading:
-   *   row 1  > latest destination meter
-   *   row N  > previous filled bill meter (by visible order)
+   * Diesel readings are ordered only against other diesel bills. A filling
+   * may occur before or after the farm reading, so row 1 has no farm-meter
+   * minimum; row N must still be greater than the previous diesel bill.
    */
   const getMinAllowedMeter = (num: number, overrideData?: Record<string, unknown>) => {
-    const baseLabel = t("ops.trip.last_entered_meter_label", { meter: absoluteDestMeter });
     const ordered = [...rowIndices].sort((a, b) => a - b);
     const pos = ordered.indexOf(num);
     const prior = pos > 0 ? ordered.slice(0, pos).reverse() : [];
@@ -489,7 +489,7 @@ export default function DieselExpensesTable({
         };
       }
     }
-    return { minAllowed: absoluteDestMeter, referenceLabel: baseLabel };
+    return { minAllowed: 0, referenceLabel: "" };
   };
 
   /** Resolve meter value for a row (draft / override / sheet). */
@@ -548,7 +548,7 @@ export default function DieselExpensesTable({
         const idx = rowIndices.indexOf(row);
         return idx >= 0 ? idx : row - 1;
       });
-      const issues = findMeterChainIssues(slots, absoluteDestMeter);
+      const issues = findMeterChainIssues(slots);
       const errs: { [key: number]: string } = {};
       for (const issue of issues) {
         errs[issue.row] = formatMeterChainMsg(issue);
@@ -556,7 +556,7 @@ export default function DieselExpensesTable({
       return errs;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [absoluteDestMeter, rowIndices.join(","), resolveMeterValue, formatMeterChainMsg]
+    [rowIndicesKey, resolveMeterValue, formatMeterChainMsg]
   );
 
   // Flag bad chains on load / when dest meter or rows change (e.g. 36981 after 36985).
@@ -581,7 +581,7 @@ export default function DieselExpensesTable({
         return idx >= 0 ? idx : row - 1;
       }
     );
-    const fromScan = findMeterChainIssues(slots, absoluteDestMeter).map(formatMeterChainMsg);
+    const fromScan = findMeterChainIssues(slots).map(formatMeterChainMsg);
     if (fromScan.length) return [fromScan[0]];
     const fromState = Object.keys(meterErrors)
       .map((k) => meterErrors[Number(k)])
@@ -608,7 +608,7 @@ export default function DieselExpensesTable({
           return idx >= 0 ? idx : row - 1;
         }
       );
-      const issue = findMeterChainIssues(slots, absoluteDestMeter).find((i) => i.row === num);
+      const issue = findMeterChainIssues(slots).find((i) => i.row === num);
       if (issue) return formatMeterChainMsg(issue);
       return t("ops.trip.meter_must_gt", { min: minAllowed });
     }
@@ -811,7 +811,7 @@ export default function DieselExpensesTable({
     const dataForCheck = useDraft ? draftData : sheetData;
     const thisMeter = Number(dataForCheck[`dieselMeter${num}`]);
 
-    // Backward check: this reading must be > previous bill / farm meter.
+    // Backward check: this reading must be greater than the previous diesel bill.
     const liveMeterErr = meterViolation(num, dataForCheck[`dieselMeter${num}`], useDraft ? dataForCheck : undefined);
     if (liveMeterErr) {
       setMeterErrors((prev) => ({ ...prev, [num]: liveMeterErr }));

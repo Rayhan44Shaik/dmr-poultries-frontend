@@ -21,6 +21,7 @@ export type ShopBulkRow = {
   ownerName: string;
   phoneNumber: string;
   secondaryPhoneNumber: string;
+  whatsappNumber: string;
   email: string;
   city: string;
   address: string;
@@ -39,6 +40,7 @@ function toShopPayload(row: ShopBulkRow): ShopInput {
     ownerName: row.ownerName.trim(),
     phoneNumber: row.phoneNumber.trim(),
     secondaryPhoneNumber: row.secondaryPhoneNumber.trim(),
+    whatsappNumber: row.whatsappNumber.trim(),
     email: row.email.trim(),
     city: row.city.trim(),
     address: row.address.trim(),
@@ -118,19 +120,20 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
     );
   }
 
-  // Check for duplicate shop name in existing data
+  const matchingShop = shopNumber
+    ? existing.find(
+        (s) => s.shopNumber.trim().toLowerCase() === shopNumber.toLowerCase(),
+      )
+    : undefined;
+
+  // An existing Shop Number is an update. Its name may change, but it cannot
+  // take the name of a different shop.
   const duplicate = existing.some(
-    (s) => s.shopName.trim().toLowerCase() === shopName.toLowerCase(),
+    (s) =>
+      s.id !== matchingShop?.id &&
+      s.shopName.trim().toLowerCase() === shopName.toLowerCase(),
   );
   if (duplicate) errors.push("Shop Name already exists.");
-
-  // Check for duplicate shop number in existing data
-  if (shopNumber) {
-    const duplicateNumber = existing.some(
-      (s) => s.shopNumber.trim().toLowerCase() === shopNumber.toLowerCase(),
-    );
-    if (duplicateNumber) errors.push("Shop Number already exists.");
-  }
 
   return errors;
 }
@@ -138,6 +141,7 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
 type ShopBulkDeps = {
   /** Wraps the transactional POST /masters/shops/bulk endpoint. */
   addShopsBulk: (inputs: ShopInput[]) => Promise<unknown>;
+  listShops: () => Promise<Shop[]>;
   /** Re-fetch the shops list (hook's reload). */
   reload: () => Promise<unknown>;
 };
@@ -145,11 +149,12 @@ type ShopBulkDeps = {
 /** Build the full Shop BulkImportConfig wired to the shops hook. */
 export function buildShopBulkImportConfig({
   addShopsBulk,
+  listShops,
   reload,
 }: ShopBulkDeps): BulkImportConfig<ShopBulkRow, Shop> {
   return {
-    title: "Bulk Import Shops",
-    subtitle: "Upload shops in one batch",
+    title: "Import or Update Shops",
+    subtitle: "Existing Shop Numbers are updated; new Shop Numbers create shops",
     noun: "Shop",
     nounPlural: "Shops",
     filenamePrefix: "Shops",
@@ -169,6 +174,11 @@ export function buildShopBulkImportConfig({
         sample: "9876543211",
       },
       {
+        key: "WhatsApp Number",
+        aliases: ["WhatsApp", "Whatsapp Number"],
+        sample: "9876543210",
+      },
+      {
         key: "Email",
         aliases: ["Email ID", "email"],
         sample: "shop@example.com",
@@ -186,6 +196,32 @@ export function buildShopBulkImportConfig({
       { key: "Opening Balance", sample: "12000" },
       { key: "Status", sample: "Active" },
     ],
+    getTemplateRows: async () => {
+      const shops = await listShops();
+      return [...shops]
+        .sort(
+          (a, b) =>
+            (a.status === "Active" ? 0 : 1) - (b.status === "Active" ? 0 : 1) ||
+            a.shopName.localeCompare(b.shopName, "en", { sensitivity: "base", numeric: true }),
+        )
+        .map((shop) => ({
+          "Shop Number": shop.shopNumber,
+          "Shop Name": shop.shopName,
+          "Owner Name": shop.ownerName,
+          Phone: shop.phoneNumber,
+          "Secondary Phone": shop.secondaryPhoneNumber ?? "",
+          "WhatsApp Number": shop.whatsappNumber ?? "",
+          Email: shop.email,
+          City: shop.city,
+          Address: shop.address,
+          Latitude: shop.latitude ?? "",
+          Longitude: shop.longitude ?? "",
+          "Paper Rate": shop.paperRate,
+          "Association Type": shop.associationType,
+          "Opening Balance": shop.openingBalance,
+          Status: shop.status,
+        }));
+    },
     parseRow: (record): ShopBulkRow => {
       const status = String(record["Status"] ?? "Active").trim();
       return {
@@ -194,6 +230,7 @@ export function buildShopBulkImportConfig({
         ownerName: String(record["Owner Name"] ?? "").trim(),
         phoneNumber: String(record["Phone"] ?? "").trim(),
         secondaryPhoneNumber: String(record["Secondary Phone"] ?? "").trim(),
+        whatsappNumber: String(record["WhatsApp Number"] ?? "").trim(),
         email: String(record["Email"] ?? "").trim(),
         city: String(record["City"] ?? "").trim(),
         address: String(record["Address"] ?? "").trim(),
@@ -207,7 +244,7 @@ export function buildShopBulkImportConfig({
       };
     },
     validateRow: validateShopRow,
-    duplicateKey: (row) => `${row.shopName}|${row.shopNumber}`,
+    duplicateKey: (row) => row.shopNumber.toLowerCase() || `name:${row.shopName.toLowerCase()}`,
     toPayload: toShopPayload,
     createMany: async (rows, onProgress) => {
       const total = rows.length;

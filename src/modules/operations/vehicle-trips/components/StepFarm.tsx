@@ -217,8 +217,7 @@ export default function StepFarm({
     Number(trip.openingMeter ?? 0),
     ...(trip.legs ?? [])
       .filter((leg) => Number(leg.legIndex) < activeLoadIndex)
-      .map((leg) => Number(leg.destMeter ?? 0)),
-    ...(trip.dieselEntries ?? []).map((entry) => Number(entry.meter ?? 0))
+      .map((leg) => Number(leg.destMeter ?? 0))
   );
 
   const handleDestMeterChange = (value: string) => {

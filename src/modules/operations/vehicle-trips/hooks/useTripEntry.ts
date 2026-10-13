@@ -725,6 +725,7 @@ export function useTripEntry(
         setSavedTrip(overlaid);
         tripRef.current = overlaid;
       }
+      onTripsChangedRef.current?.();
       notifyRef.current?.(`Load ${nextIndex} started — same vehicle & crew`, "success");
       return true;
     } catch (error) {

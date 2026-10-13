@@ -13,17 +13,30 @@ import type {
   ParsedImportRow,
 } from "./bulkImportTypes";
 
-/** Download an .xlsx template containing headers + one sample row. */
-export function downloadImportTemplate<T, E = T>(
+/** Download an .xlsx template. Most masters are blank; selected workflows may
+ * populate authoritative live rows (for example existing Shop balances). */
+export async function downloadImportTemplate<T, E = T>(
   config: BulkImportConfig<T, E>,
-): void {
+): Promise<void> {
   const headers = config.columns.map((c) =>
     c.required ? `${c.key} *` : c.key,
   );
   const sampleRow = config.columns.map((c) => c.sample);
 
-  const worksheet = XLSX.utils.aoa_to_sheet([headers]);
-  worksheet["!cols"] = config.columns.map(() => ({ wch: 22 }));
+  const templateRecords = config.getTemplateRows
+    ? await config.getTemplateRows()
+    : [];
+  const templateRows = templateRecords.map((record) =>
+    config.columns.map((column) => record[column.key] ?? ""),
+  );
+  const worksheet = XLSX.utils.aoa_to_sheet([headers, ...templateRows]);
+  worksheet["!cols"] = config.columns.map((column) => ({
+    wch: column.key === "Shop Name" ? 38 : 22,
+  }));
+  worksheet["!autofilter"] = {
+    ref: `A1:${XLSX.utils.encode_col(Math.max(0, headers.length - 1))}${Math.max(1, templateRows.length + 1)}`,
+  };
+  worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
 
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Template");

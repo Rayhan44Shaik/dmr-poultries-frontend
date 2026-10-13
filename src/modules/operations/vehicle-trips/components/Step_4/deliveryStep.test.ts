@@ -203,7 +203,7 @@ test("isDeliveredRow: [ORDER] plan row with assigned boxes is still pending", ()
   assert.equal(isDeliveredRow(emptyPlan), false, "planned quantities alone are not a capture");
 });
 
-test("remaining boxes: weight-mode per-box data consumes exact split", () => {
+test("remaining boxes: weight-mode allocation consumes selected boxes exclusively", () => {
   const boxes = [box(1, 30, 500), box(2, 26, 480)];
   const rows = [
     row({
@@ -217,9 +217,23 @@ test("remaining boxes: weight-mode per-box data consumes exact split", () => {
     }),
   ];
   const pending = pendingBoxesFromRows(boxes, rows);
-  assert.deepEqual(pending.map((b) => b.boxNo), [1, 2]);
-  assert.equal(pending[0].birds, 18);
-  assert.equal(pending[1].birds, 11);
+  assert.deepEqual(pending, []);
+});
+
+test("remaining boxes: a partial single-box delivery cannot offer the allocated box again", () => {
+  const boxes = [box(1, 100, 455.4), box(2, 50, 220)];
+  const rows = [
+    row({
+      birds: 60,
+      weight: 300,
+      selectedBoxIds: [1],
+      perBoxData: [],
+      autoCaptureTime: "2026-10-13T10:00:00Z",
+    }),
+  ];
+
+  assert.deepEqual(pendingBoxesFromRows(boxes, rows).map((b) => b.boxNo), [2]);
+  assert.deepEqual(sanitizeSelectedBoxIds(boxes, rows, [1, 2]), [2]);
 });
 
 test("pending shops: assigned [ORDER] shops without capture stay pending", () => {

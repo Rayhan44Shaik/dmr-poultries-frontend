@@ -59,6 +59,8 @@ export type MasterDirectoryFiltersProps = {
   onStatusChange: (v: string) => void;
   sort: string;
   onSortChange: (v: string) => void;
+  /** Sort value treated as the page default when counting active filters. */
+  defaultSort?: string;
   /** One optional extra field rendered between Search and Status (e.g. City). */
   extraFilter?: ReactNode;
   /** Whether the extra filter is currently active (feeds the Reset count). */
@@ -86,6 +88,7 @@ export function MasterDirectoryFilters({
   onStatusChange,
   sort,
   onSortChange,
+  defaultSort = "number",
   extraFilter,
   extraActive = false,
   onReset,
@@ -106,7 +109,7 @@ export function MasterDirectoryFilters({
     search.trim() !== "",
     extraActive,
     status !== "",
-    sort !== "number",
+    sort !== defaultSort,
   );
   const cols = extraFilter ? "lg:grid-cols-4" : "lg:grid-cols-3";
   return (
@@ -276,6 +279,8 @@ export type MasterDirectoryCardProps = {
   pageSize: number;
   onPageChange: (p: number) => void;
   onPageSizeChange: (s: number) => void;
+  /** Optional actions displayed in the table header beside the record count. */
+  headerActions?: ReactNode;
   children: ReactNode;
 };
 
@@ -291,6 +296,7 @@ export function MasterDirectoryCard({
   pageSize,
   onPageChange,
   onPageSizeChange,
+  headerActions,
   children,
 }: MasterDirectoryCardProps) {
   return (
@@ -304,12 +310,15 @@ export function MasterDirectoryCard({
             {title}
           </h3>
         </div>
-        <span
-          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600"
-          aria-live="polite"
-        >
-          {total.toLocaleString("en-IN")}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span
+            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600"
+            aria-live="polite"
+          >
+            {total.toLocaleString("en-IN")}
+          </span>
+          {headerActions}
+        </div>
       </div>
 
       {error && !loading && (

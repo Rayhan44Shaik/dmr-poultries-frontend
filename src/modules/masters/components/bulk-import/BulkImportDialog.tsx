@@ -51,6 +51,7 @@ export default function BulkImportDialog<T, E>({
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [result, setResult] = useState<CreateManyResult | null>(null);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validCount = useMemo(
@@ -237,11 +238,23 @@ export default function BulkImportDialog<T, E>({
                   </div>
                 </div>
                 <button
-                  onClick={() => downloadImportTemplate(config)}
+                  onClick={async () => {
+                    if (isDownloadingTemplate) return;
+                    setIsDownloadingTemplate(true);
+                    setParseError(null);
+                    try {
+                      await downloadImportTemplate(config);
+                    } catch (error) {
+                      setParseError(config.errorToString(error));
+                    } finally {
+                      setIsDownloadingTemplate(false);
+                    }
+                  }}
+                  disabled={isDownloadingTemplate}
                   className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
                 >
-                  <FileSpreadsheet size={16} />
-                  Download Template
+                  {isDownloadingTemplate ? <Loader2 size={16} className="animate-spin" /> : <FileSpreadsheet size={16} />}
+                  {isDownloadingTemplate ? "Preparing…" : "Download Template"}
                 </button>
               </div>
 
@@ -464,7 +477,7 @@ export default function BulkImportDialog<T, E>({
                   <p className="text-xs text-slate-500 mt-1">
                     {result.failed} row{result.failed === 1 ? "" : "s"} failed ·{" "}
                     {result.total} row
-                    {result.total === 1 ? "" : "s"} imported
+                    {result.total === 1 ? "" : "s"} processed
                   </p>
                 </div>
               </div>

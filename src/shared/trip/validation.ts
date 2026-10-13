@@ -90,37 +90,18 @@ export function validateFarmStep(trip: Trip): TripValidationResult {
   if (legIndex > 1) {
     const prev = trip.legs?.find((l) => l.legIndex === legIndex - 1);
     const prevDest = prev?.destMeter != null && Number(prev.destMeter) > 0 ? Number(prev.destMeter) : 0;
-    const dieselMax = Math.max(
-      0,
-      ...(trip.dieselEntries ?? [])
-        .map((e) => Number(e.meter ?? 0))
-        .filter((n) => Number.isFinite(n) && n > 0)
-    );
-    floor = Math.max(prevDest, dieselMax);
-    floorLabel =
-      dieselMax >= prevDest && dieselMax > 0
-        ? "last diesel meter on this trip"
-        : `Load ${legIndex - 1} farm meter`;
+    floor = prevDest;
+    floorLabel = `Load ${legIndex - 1} farm meter`;
   }
   if (trip.destMeter != null && floor > 0 && trip.destMeter <= floor) {
     errors.push(
       `Farm meter (${trip.destMeter} KM) must be strictly greater than the ${floorLabel} (${floor} KM).`
     );
   }
-  const activeLeg = trip.legs?.find((l) => Number(l.legIndex) === legIndex);
-  const activeSubmittedMs = activeLeg?.farmStepSubmittedAt
-    ? Date.parse(activeLeg.farmStepSubmittedAt)
-    : Number.NaN;
   const laterReadings = [
     ...(trip.legs ?? [])
       .filter((l) => Number(l.legIndex) > legIndex)
       .map((l) => Number(l.destMeter ?? 0)),
-    ...(trip.dieselEntries ?? [])
-      .filter((entry) => {
-        if (!Number.isFinite(activeSubmittedMs) || !entry.submittedAt) return false;
-        return Date.parse(entry.submittedAt) > activeSubmittedMs;
-      })
-      .map((entry) => Number(entry.meter ?? 0)),
     Number(trip.closingMeter ?? 0),
   ].filter((meter) => Number.isFinite(meter) && meter > 0);
   const nextReading = laterReadings.length ? Math.min(...laterReadings) : 0;

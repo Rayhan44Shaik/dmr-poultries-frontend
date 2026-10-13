@@ -786,6 +786,12 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
                       onClick={async () => {
                         const ok = await addAnotherLoad();
                         if (ok) {
+                          // A Pending trip was opened through Recent "Edit",
+                          // which scopes editing to its previously submitted
+                          // step. The new load is fresh work, so resume normal
+                          // next-incomplete-step editability for Load N.
+                          setEditingSubmittedStep(null);
+                          setIsEditing(true);
                           setViewStepIndex(1);
                           setStepRemountNonce((n) => n + 1);
                         }
