@@ -42,6 +42,7 @@ export interface DriverPerformanceRow {
 
 export interface DriverVehicleDetail {
   vehicleNo: string;
+  isRentedVehicle: boolean;
   trips: number;
   distance: number;
   avgDistancePerTrip: number;
@@ -56,6 +57,7 @@ export interface PerformanceRecentTrip {
   tripNo: string;
   tripDate: string;
   vehicleNo: string;
+  isRentedVehicle: boolean;
   totalShops: number;
   totalBirdsDelivered: number;
   totalDeliveredWeight: number;

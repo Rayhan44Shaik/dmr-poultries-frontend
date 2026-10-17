@@ -421,6 +421,7 @@ export default {
   'ops.trip.all_sources': 'All Sources',
   'ops.trip.all_supervisors': 'All Supervisors',
   'ops.trip.all_vehicles': 'All Vehicles',
+  'ops.trip.all_shops': 'All Shops',
   'ops.trip.amount_greater_zero': 'Amount must be greater than zero.',
   'ops.trip.amount_inr': 'Amount (₹)',
   'ops.trip.approved_success': 'Trip approved successfully.',

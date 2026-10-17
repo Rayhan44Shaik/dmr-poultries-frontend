@@ -192,6 +192,7 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                     </td>
                     <td className="px-4 py-4 text-[13px] text-slate-600 whitespace-nowrap">
                       {formatVehicleNumber(trip.vehicleNo)}
+                      {(payment.isRentedVehicle || trip.isRentedVehicle) ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-bold text-blue-600 whitespace-nowrap tabular-nums">
                       <div>{formatCount(totalBirdsLoaded)}</div>

@@ -184,6 +184,7 @@ export default function StepEnd({
       const empty = (v: unknown) => v == null || v === "";
       if (empty(d[`dieselLtr${n}`])) d[`dieselLtr${n}`] = entry.litres ?? "";
       if (empty(d[`dieselRate${n}`])) d[`dieselRate${n}`] = entry.rate ?? "";
+      if (empty(d[`dieselAmount${n}`])) d[`dieselAmount${n}`] = entry.amount ?? "";
       if (empty(d[`dieselMeter${n}`])) d[`dieselMeter${n}`] = entry.meter ?? "";
       if (empty(d[`dieselBunk${n}`])) d[`dieselBunk${n}`] = entry.bunkName ?? "";
       if (empty(d[`dieselBunkSource${n}`])) d[`dieselBunkSource${n}`] = entry.bunkSource ?? "OTHER";
@@ -243,6 +244,10 @@ export default function StepEnd({
         }
         if (empty(next[`dieselRate${n}`]) && entry.rate != null) {
           next[`dieselRate${n}`] = entry.rate as any;
+          changed = true;
+        }
+        if (empty(next[`dieselAmount${n}`]) && entry.amount != null) {
+          next[`dieselAmount${n}`] = entry.amount as any;
           changed = true;
         }
         if (empty(next[`dieselMeter${n}`]) && entry.meter != null) {
@@ -360,17 +365,20 @@ export default function StepEnd({
   const dieselAmounts = getDieselIndices(sheetData).map(idx => {
     const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
     const rate = Number(sheetData[`dieselRate${idx}`] || 0);
-    return ltr * rate;
+    const amount = Number(sheetData[`dieselAmount${idx}`]);
+    return Number.isFinite(amount) && amount > 0 ? amount : ltr * rate;
   });
   const totalDieselAmount = dieselIndices.reduce((acc, idx) => {
     const ltr = Number(sheetData[`dieselLtr${idx}`] || 0);
     const rate = Number(sheetData[`dieselRate${idx}`] || 0);
-    return acc + ltr * rate;
+    const amount = Number(sheetData[`dieselAmount${idx}`]);
+    return acc + (Number.isFinite(amount) && amount > 0 ? amount : ltr * rate);
   }, 0);
   const totalDieselLiters = dieselIndices.reduce((acc, idx) => acc + Number(sheetData[`dieselLtr${idx}`] || 0), 0);
   const dieselBreakdown = dieselExpenseBreakdown(dieselIndices.map((idx) => ({
     litres: sheetData[`dieselLtr${idx}`],
     rate: sheetData[`dieselRate${idx}`],
+    amount: sheetData[`dieselAmount${idx}`],
     bunkName: sheetData[`dieselBunk${idx}`],
     bunkSource: sheetData[`dieselBunkSource${idx}`],
   })));

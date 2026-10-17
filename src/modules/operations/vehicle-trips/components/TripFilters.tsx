@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, ArrowUpDown } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, Store, ArrowUpDown } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -24,6 +24,7 @@ interface Props {
   vehicle: string;
   supervisor: string;
   farm: string;
+  shop: string;
   sortBy: TripSortKey | null;
   sortDir: "asc" | "desc";
   search: string;
@@ -32,12 +33,14 @@ interface Props {
   setVehicle: (v: string) => void;
   setSupervisor: (v: string) => void;
   setFarm: (v: string) => void;
+  setShop: (v: string) => void;
   setSort: (sortBy: TripSortKey | null, sortDir: "asc" | "desc") => void;
   setSearch: (v: string) => void;
   onReset: () => void;
   vehicles?: readonly (string | MasterDropdownOption)[];
   supervisors?: readonly (string | MasterDropdownOption)[];
   farms?: readonly (string | MasterDropdownOption)[];
+  shops?: readonly (string | MasterDropdownOption)[];
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
@@ -54,6 +57,7 @@ function TripFilters({
   vehicle,
   supervisor,
   farm,
+  shop,
   sortBy,
   sortDir,
   search,
@@ -62,12 +66,14 @@ function TripFilters({
   setVehicle,
   setSupervisor,
   setFarm,
+  setShop,
   setSort,
   setSearch,
   onReset,
   vehicles = [],
   supervisors = [],
   farms = [],
+  shops = [],
   onExportPDF,
   onRefresh,
   onExportExcel,
@@ -93,6 +99,7 @@ function TripFilters({
   const vehicleOptions = localizeOptions(withoutSentinel(vehicles || [], "All Vehicles"));
   const supervisorOptions = localizeOptions(withoutSentinel(supervisors || [], "All Supervisors"));
   const farmOptions = localizeOptions(withoutSentinel(farms || [], "All Sources"));
+  const shopOptions = localizeOptions(withoutSentinel(shops || [], "All Shops"));
   // Field name + direction, both translated: the whole option list is built
   // from dictionary keys, so a Telugu session never reads "Weight (kg) —
   // Low to high" in English. "A to Z" keeps its Latin letters on purpose —
@@ -213,10 +220,29 @@ function TripFilters({
             className="w-full"
           />
         </div>
+
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[repeat(3,minmax(0,1fr))_max-content] gap-3.5 items-end pt-1">
+        <div className="min-w-0">
+          <label className={opsFilterLabelClass}>
+            <Store size={17} className="text-sky-500 flex-shrink-0" />
+            <span>{t("common.shop")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("common.shop")}
+            value={shop === "All Shops" ? "" : shop}
+            options={shopOptions}
+            onChange={(next) => setShop(next || "All Shops")}
+            placeholder={t("ops.trip.all_shops")}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div className="min-w-0">
           <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
             <span>{t("ops.trip.sort_by")}</span>
@@ -234,7 +260,7 @@ function TripFilters({
           />
         </div>
 
-        <div className="lg:col-span-3">
+        <div className="min-w-0">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("common.search")}</span>
@@ -250,7 +276,7 @@ function TripFilters({
           </div>
         </div>
 
-        <div className="lg:col-span-6 flex items-center gap-2 justify-end flex-wrap lg:flex-nowrap">
+        <div className="md:col-span-3 xl:col-span-1 flex min-w-0 items-center gap-2 justify-end flex-wrap xl:flex-nowrap">
           {onViewSelected && (
             <button
               ref={viewButtonRef}
@@ -269,6 +295,7 @@ function TripFilters({
               !isAllOption(vehicle),
               !isAllOption(supervisor),
               !isAllOption(farm),
+              !isAllOption(shop),
               fromDate !== "" || toDate !== "",
               sortBy !== null,
             )}

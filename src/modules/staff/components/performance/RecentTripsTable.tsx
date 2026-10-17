@@ -191,6 +191,7 @@ function LaggingTripCard({
           <span className="text-xs font-semibold text-slate-600">
             {formatVehicleNumber(trip.vehicleNo)}
           </span>
+          {trip.isRentedVehicle ? <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
         </div>
         <PaceChip offPace />
       </div>
@@ -313,6 +314,7 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
                   </td>
                   <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-semibold tabular-nums text-slate-800`}>
                     {formatVehicleNumber(trip.vehicleNo)}
+                    {trip.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                   </td>
                   {paceRow && (
                     <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-center`}>

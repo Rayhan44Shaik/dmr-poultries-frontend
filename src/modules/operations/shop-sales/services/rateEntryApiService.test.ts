@@ -59,6 +59,7 @@ function row(deliveries: RateEntryDeliveryDto[]): RateEntryTripDto {
     ratesEntered: 0,
     deliveriesCount: deliveries.length,
     totalAmount: 0,
+    loadAmounts: [{ load: 1, amount: 10040 }],
     deliveries,
   };
 }
@@ -78,4 +79,16 @@ test("mapRowToTrip defaults a missing mode to box like the backend", () => {
   delete (dto as Partial<RateEntryDeliveryDto>).deliveryMode;
   const trip = mapRowToTrip(row([dto]), true);
   assert.equal(trip.deliveries[0].deliveryMode, "box");
+});
+
+test("mapRowToTrip preserves shop mortality weight for the Rate Entry modal", () => {
+  const trip = mapRowToTrip(row([delivery({ mortality: 1, mortKg: 1.75 })]), true);
+  assert.equal(trip.deliveries[0].mortality, 1);
+  assert.equal(trip.deliveries[0].mortKg, 1.75);
+});
+
+test("mapRowToTrip preserves cumulative and per-load amounts for the queue table", () => {
+  const trip = mapRowToTrip(row([delivery({ rate: 125.5 })]), true);
+  assert.equal(trip.rateEntryTotalAmount, 0);
+  assert.deepEqual(trip.rateEntryLoadAmounts, [{ load: 1, amount: 10040 }]);
 });

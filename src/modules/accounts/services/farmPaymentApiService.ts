@@ -80,6 +80,7 @@ export function mapRawFarmPayment(raw: unknown): TripFarmPayment | null {
     paymentMode: typeof row.paymentMode === 'string' ? row.paymentMode : null,
     referenceNo: typeof row.referenceNo === 'string' ? row.referenceNo : null,
     vehicleNo: optionalText(row.vehicleNo),
+    isRentedVehicle: Boolean(row.isRentedVehicle),
     supervisorName: optionalText(row.supervisorName),
     loads: Array.isArray(row.loads)
       ? row.loads.map((value) => {

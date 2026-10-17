@@ -379,15 +379,20 @@ export function useTripEntry(
     saveStepProgress("pickup", data, opts);
   const saveDeliveriesProgress = async (
     rows: ShopDelivery[],
-    opts: { silent?: boolean } = {}
-  ): Promise<boolean> => {
+    opts: { silent?: boolean; changedRow?: ShopDelivery } = {}
+  ): Promise<ShopDelivery[] | null> => {
     const silent = Boolean(opts.silent);
     const current = tripRef.current;
     if (!current.id) {
       if (!silent) notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
-      return false;
+      return null;
     }
-    const withKeys = rows.map((row) => ({
+    // The per-shop endpoint is an upsert, not a full replacement. During an
+    // Add/Edit save send only that delivery: an unrelated historical row may
+    // temporarily be out of sync after Step 3 boxes are corrected and must
+    // not block persistence of the shop the user is currently editing.
+    const rowsToSave = opts.changedRow ? [opts.changedRow] : rows;
+    const withKeys = rowsToSave.map((row) => ({
       ...row,
       clientKey:
         row.clientKey ||
@@ -396,7 +401,7 @@ export function useTripEntry(
           : `ck-${row.id}`),
     }));
     const lockKey = silent ? "save-silent:deliveries" : "save:deliveries";
-    if (!acquireOperationLock(lockKey)) return false;
+    if (!acquireOperationLock(lockKey)) return null;
     // Silent background saves must never flash header loading or remount forms.
     if (!silent) setHeaderLoading(true);
     try {
@@ -415,10 +420,13 @@ export function useTripEntry(
       } else {
         applySavedTrip(saved);
       }
-      return true;
+      // Return the database-authoritative rows. Besides reflecting server-side
+      // normalization, these contain the persisted id/clientKey identities
+      // needed for the next shop edit to update rather than recreate a row.
+      return saved.deliveries ?? withKeys;
     } catch (error) {
       if (!silent) notifyRef.current?.(handleApiError(error), "error");
-      return false;
+      return null;
     } finally {
       releaseOperationLock(lockKey);
       if (!silent) setHeaderLoading(false);

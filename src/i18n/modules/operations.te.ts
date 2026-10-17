@@ -421,6 +421,7 @@ export default {
   'ops.trip.all_sources': 'అన్ని మూలాలు',
   'ops.trip.all_supervisors': 'అందరు సూపర్వైజర్లు',
   'ops.trip.all_vehicles': 'అన్ని వాహనాలు',
+  'ops.trip.all_shops': 'అన్ని షాపులు',
   'ops.trip.amount_greater_zero': 'మొత్తం 0 కంటే ఎక్కువ ఉండాలి.',
   'ops.trip.amount_inr': 'మొత్తం (₹)',
   'ops.trip.approved_success': 'ట్రిప్ ఆమోదించాం.',

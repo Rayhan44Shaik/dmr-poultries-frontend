@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   Bird,
   Scale,
+  IndianRupee,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
@@ -133,12 +134,15 @@ function CompletedTripsTable({
             <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
               {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="text-orange-500 flex-shrink-0" /><span>{t("ops.trip.weight_kg")}</span></div>, true)}
             </th>
+            <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-emerald-500" /><span>{t("ops.rate.modal.amount")}</span></div>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {trips.length === 0 ? (
             <tr>
-              <td colSpan={9} className="py-12 text-center text-slate-400 text-[13px] font-medium">
+              <td colSpan={10} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                 {t("ops.rate.no_waiting_trips")}
               </td>
             </tr>
@@ -147,6 +151,8 @@ function CompletedTripsTable({
               const serialNo = startIndex + index + 1;
               const isSelected = trip.id === selectedRowId;
               const totalShops = trip.totalShops ?? 0;
+              const loadAmounts = trip.rateEntryLoadAmounts ?? [];
+              const showLoadAmounts = loadAmounts.length > 1;
 
               return (
                 <tr
@@ -173,7 +179,10 @@ function CompletedTripsTable({
                   <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</td>
+                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                    {displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}
+                    {trip.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
+                  </td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
@@ -187,6 +196,20 @@ function CompletedTripsTable({
                     {trip.totalBirds.toLocaleString()}
                   </td>
                   <td className="px-4 py-4 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
+                  <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <div className="text-[13px] font-bold text-emerald-700 tabular-nums">
+                      {!trip.ratesEntered ? "—" : `₹ ${Math.round(trip.rateEntryTotalAmount ?? 0).toLocaleString("en-IN")}`}
+                    </div>
+                    {showLoadAmounts ? (
+                      <div className="mt-0.5 flex flex-col text-[10px] font-semibold leading-tight text-slate-500 tabular-nums">
+                        {loadAmounts.map((loadAmount) => (
+                          <span key={loadAmount.load}>
+                            Load {loadAmount.load}: {loadAmount.amount > 0 ? `₹ ${Math.round(loadAmount.amount).toLocaleString("en-IN")}` : "—"}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </td>
                 </tr>
               );
             })

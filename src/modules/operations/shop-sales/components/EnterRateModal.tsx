@@ -59,8 +59,12 @@ function resolveShopMaster(delivery: Trip["deliveries"][number], lookup: ShopMas
   return lookup.byName.get(shopLookupKey(delivery.shopName)) ?? null;
 }
 
+function roundRupees(n: number): number {
+  return Math.floor(n + 0.5);
+}
+
 function formatInr(n: number): string {
-  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return roundRupees(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
 }
 
 function formatDdMmYy(iso: string): string {
@@ -216,7 +220,7 @@ export default function EnterRateModal({
       totalBirds += d.birds ?? 0;
       if (isValidSellingRate(rate)) {
         ratedCount += 1;
-        totalAmount += (d.weight ?? 0) * (rate as number);
+        totalAmount += roundRupees((d.weight ?? 0) * (rate as number));
       }
     }
     const progressPct = deliveries.length ? Math.round((ratedCount / deliveries.length) * 100) : 0;
@@ -224,12 +228,16 @@ export default function EnterRateModal({
   }, [deliveries]);
 
   const loadTotals = useMemo(() => {
-    const byLoad = new Map<number, { birds: number; weight: number }>();
+    const byLoad = new Map<number, { birds: number; weight: number; amount: number }>();
     for (const delivery of deliveries) {
       const load = Math.max(1, Number(delivery.legIndex || 1));
-      const current = byLoad.get(load) ?? { birds: 0, weight: 0 };
+      const current = byLoad.get(load) ?? { birds: 0, weight: 0, amount: 0 };
+      const rate = normalizeRate(delivery.rate);
       current.birds += Number(delivery.birds || 0);
       current.weight += Number(delivery.weight || 0);
+      if (isValidSellingRate(rate)) {
+        current.amount += roundRupees(Number(delivery.weight || 0) * (rate as number));
+      }
       byLoad.set(load, current);
     }
     return [...byLoad.entries()].sort(([a], [b]) => a - b);
@@ -494,7 +502,7 @@ export default function EnterRateModal({
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[12px] font-bold text-amber-700">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg</p>)}</div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[12px] font-bold text-amber-700 tabular-nums">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg • ₹ {formatInr(value.amount)}</p>)}</div>
             </div>
           </div>
 
@@ -664,7 +672,7 @@ export default function EnterRateModal({
                       const serialNo = (shopPage - 1) * SHOPS_PAGE_SIZE + idx + 1;
                       const rate = normalizeRate(delivery.rate);
                       const isValid = isValidSellingRate(rate);
-                      const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
+                      const amount = isValid ? roundRupees(delivery.weight * (rate as number)) : 0;
                       const masterShop = resolveShopMaster(delivery, shopMasterLookup);
                       const association = masterShop?.associationType?.trim() ?? "";
                       const paperRate = Number(masterShop?.paperRate ?? 0);
@@ -672,6 +680,11 @@ export default function EnterRateModal({
                       const belowMin = rate != null && rate < 50;
                       const aboveMax = rate != null && rate > 300;
                       const missingForLock = lockAttempted && !isValid;
+                      const isBoxMode = delivery.deliveryMode !== "weight";
+                      const mortalityBirds = Number(delivery.mortality || 0);
+                      const mortalityWeight = Number(delivery.mortKg || 0);
+                      const hasBoxMortality =
+                        isBoxMode && (mortalityBirds > 0 || mortalityWeight > 0);
                       const load = Math.max(1, Number(delivery.legIndex || 1));
                       const previousLoad = idx > 0 ? Math.max(1, Number(pagedDeliveries[idx - 1]?.row.legIndex || 1)) : load;
                       const startsLoad = idx === 0 || load !== previousLoad;
@@ -687,8 +700,28 @@ export default function EnterRateModal({
                           </td>
                           <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
-                          <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
-                          <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
+                          <td className="px-2 py-3.5 text-center tabular-nums">
+                            <div className="text-[13px] font-normal leading-none text-slate-700">{delivery.birds.toLocaleString()}</div>
+                            {hasBoxMortality ? (
+                              <div
+                                className="mt-0.5 text-[11px] font-semibold leading-none text-red-600"
+                                title={`${t("ops.trip.mortality")}: ${mortalityBirds.toLocaleString()} ${t("common.birds")} • ${mortalityWeight.toFixed(2)} ${t("common.kg")}`}
+                              >
+                                {mortalityBirds.toLocaleString()}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="px-2 py-3.5 text-center tabular-nums">
+                            <div className="text-[13px] font-normal leading-none text-slate-700">{delivery.weight.toFixed(2)}</div>
+                            {hasBoxMortality ? (
+                              <div
+                                className="mt-0.5 text-[11px] font-semibold leading-none text-red-600"
+                                title={`${t("ops.trip.mortality")}: ${mortalityWeight.toFixed(2)} ${t("common.kg")}`}
+                              >
+                                {mortalityWeight.toFixed(2)}
+                              </div>
+                            ) : null}
+                          </td>
                           <td className="px-2 py-3.5">
                             {rateLocked ? (
                               <span className="block text-center text-[13px] font-semibold text-slate-800 tabular-nums rate-input-market valid">{rate != null ? rate.toFixed(2) : "—"}</span>

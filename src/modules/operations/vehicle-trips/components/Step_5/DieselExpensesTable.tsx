@@ -85,6 +85,7 @@ function dieselSlotActive(data: Record<string, unknown>, i: number): boolean {
     data[`dieselSubmitted${i}`] ||
     data[`dieselLtr${i}`] ||
     data[`dieselRate${i}`] ||
+    data[`dieselAmount${i}`] ||
     data[`dieselMeter${i}`] ||
     data[`dieselBunk${i}`] ||
     data[`dieselImage${i}`] ||
@@ -185,6 +186,7 @@ export default function DieselExpensesTable({
     const fields = [
       "dieselLtr",
       "dieselRate",
+      "dieselAmount",
       "dieselMeter",
       "dieselBunk",
       "dieselBunkSource",
@@ -645,7 +647,7 @@ export default function DieselExpensesTable({
   const rowReady = (num: number, useDraft = false) => {
     const data = useDraft && editingRow === num ? draftData : sheetData;
     const ltr = data[`dieselLtr${num}`];
-    const rate = data[`dieselRate${num}`];
+    const amount = data[`dieselAmount${num}`];
     const reading = data[`dieselMeter${num}`];
     const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
     const bunkName = selectedBunk === OTHER_BUNK_VALUE
@@ -659,8 +661,7 @@ export default function DieselExpensesTable({
     const laterBlock = laterBillsBlocking(num, useDraft).length > 0;
     return (
       isPositive(ltr) &&
-      isPositive(rate) &&
-      isPositive(Number(ltr) * Number(rate)) &&
+      isPositive(amount) &&
       isPositive(reading) &&
       bunkName.length > 0 &&
       hasRealBill(image) &&
@@ -675,8 +676,7 @@ export default function DieselExpensesTable({
     const reasons: string[] = [];
     if (meterErrors[num]) reasons.push(meterErrors[num]);
     if (!isPositive(data[`dieselLtr${num}`])) reasons.push(t("ops.trip.diesel_ltr_required"));
-    if (!isPositive(data[`dieselRate${num}`])) reasons.push(t("ops.trip.rate_required"));
-    if (!isPositive(Number(data[`dieselLtr${num}`]) * Number(data[`dieselRate${num}`]))) {
+    if (!isPositive(data[`dieselAmount${num}`])) {
       reasons.push(t("ops.trip.amount_greater_zero"));
     }
     if (!isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
@@ -876,7 +876,8 @@ export default function DieselExpensesTable({
     const payload = {
       clientKey,
       litres: Number(data[`dieselLtr${num}`]),
-      rate: Number(data[`dieselRate${num}`]),
+      amount: Number(data[`dieselAmount${num}`]),
+      rate: Number((Number(data[`dieselAmount${num}`]) / Number(data[`dieselLtr${num}`])).toFixed(2)),
       meter: Number(data[`dieselMeter${num}`]),
       bunkName: resolvedBunkName,
       bunkSource: selectedBunk === OTHER_BUNK_VALUE ? "OTHER" as const : "MASTER" as const,
@@ -909,7 +910,7 @@ export default function DieselExpensesTable({
         flattened[`dieselId${num}`] = entryId > 0 ? entryId : flattened[`dieselId${num}`] || "";
         flattened[`dieselLtr${num}`] = payload.litres;
         flattened[`dieselRate${num}`] = payload.rate;
-        flattened[`dieselAmount${num}`] = Math.round(payload.litres * payload.rate * 100) / 100;
+        flattened[`dieselAmount${num}`] = payload.amount;
         flattened[`dieselMeter${num}`] = payload.meter;
         flattened[`dieselBunk${num}`] = payload.bunkName;
         flattened[`dieselBunkSource${num}`] = payload.bunkSource;
@@ -1045,8 +1046,8 @@ export default function DieselExpensesTable({
             <tr className="bg-slate-50/95 text-[12px] font-bold uppercase tracking-wide text-slate-600 border-b border-slate-200">
               <th className="py-2.5 px-1.5 text-center">{t("table.s_no")}</th>
               <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_ltr")} <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_rate")} <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_amount")}</th>
+              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_rate")}</th>
+              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_amount")} <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_reading")} <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-1.5 text-left">{t("ops.trip.bunk_address")}</th>
               <th className="py-2.5 px-2 text-left">GPS <span className="text-red-500">*</span></th>
@@ -1063,7 +1064,7 @@ export default function DieselExpensesTable({
             {visibleRows.map((num, idx) => {
               const isEditingThisRow = editingRow === num;
               const ltrVal = getFieldValue(`dieselLtr${num}`, num) ?? "";
-              const rateVal = getFieldValue(`dieselRate${num}`, num) ?? "";
+              const amountVal = getFieldValue(`dieselAmount${num}`, num) ?? "";
               const meterVal = getFieldValue(`dieselMeter${num}`, num) ?? "";
               const bunkVal = getFieldValue(`dieselBunk${num}`, num) ?? "";
               const otherBunkVal = getFieldValue(`dieselOtherBunk${num}`, num) ?? "";
@@ -1072,16 +1073,14 @@ export default function DieselExpensesTable({
               const imageVal = getFieldValue(`dieselImage${num}`, num) ?? "";
               const imageNameVal = getFieldValue(`dieselImageName${num}`, num) || `BILL-${fallbackDateStr}-${String(num).padStart(3, "0")}.png`;
               const ltrNum = Number(ltrVal);
-              const rateNum = Number(rateVal);
-              // Always Ltr × Rate — never rely on a parallel array index that can drift.
-              const amountVal =
-                Number.isFinite(ltrNum) && Number.isFinite(rateNum) && (ltrNum > 0 || rateNum > 0)
-                  ? Math.round(ltrNum * rateNum * 100) / 100
-                  : 0;
-              const amountDisplay =
-                ltrVal === "" && rateVal === ""
+              const amountNum = Number(amountVal);
+              const rateNum = ltrNum > 0 && Number.isFinite(amountNum)
+                ? Number((amountNum / ltrNum).toFixed(2))
+                : 0;
+              const rateDisplay =
+                ltrVal === "" || amountVal === "" || ltrNum <= 0
                   ? "—"
-                  : amountVal.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  : rateNum.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
               const isSubmitted = !!sheetData[`dieselSubmitted${num}`];
               const locked = (isSubmitted && !isEditingThisRow) || readOnly;
               const { minAllowed: rowMinAllowed } = getMinAllowedMeter(
@@ -1142,37 +1141,21 @@ export default function DieselExpensesTable({
                     </div>
                   </td>
 
-                  {/* Rate — wider + extra right pad so ₹ never clips digits */}
+                  {/* Rate = Amount ÷ Litres (read-only) */}
                   <td className="py-2 px-1.5 align-middle">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        inputMode="decimal"
-                        disabled={locked}
-                        value={rateVal}
-                        onKeyDown={blockInvalidChar}
-                        onWheel={blockWheelChange}
-                        onChange={(e) =>
-                          handleFieldChange(`dieselRate${num}`, num, e.target.value === "" ? "" : Number(e.target.value))
-                        }
-                        placeholder="0.00"
-                        className={`${inputBase} ${inputOk} pr-5`}
-                        aria-label={t("ops.trip.diesel_rate")}
-                      />
-                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">
-                        ₹
-                      </span>
+                    <div className="w-full min-w-0 tabular-nums text-right pl-1.5 pr-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-[13px] font-bold text-slate-800 truncate" aria-label={t("ops.trip.diesel_rate")}>
+                      {rateDisplay === "—" ? "—" : `₹ ${rateDisplay}`}
                     </div>
                   </td>
 
-                  {/* Amount = Ltr × Rate (read-only) */}
+                  {/* Amount */}
                   <td className="py-2 px-1.5 align-middle">
-                    <div
-                      className="w-full min-w-0 tabular-nums text-right pl-1.5 pr-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-[13px] font-bold text-slate-800 truncate"
-                    >
-                      {amountDisplay === "—" ? "—" : `₹ ${amountDisplay}`}
+                    <div className="relative">
+                      <input type="number" step="0.01" min="0" inputMode="decimal" disabled={locked}
+                        value={amountVal} onKeyDown={blockInvalidChar} onWheel={blockWheelChange}
+                        onChange={(e) => handleFieldChange(`dieselAmount${num}`, num, e.target.value === "" ? "" : Number(e.target.value))}
+                        placeholder="0.00" className={`${inputBase} ${inputOk} pr-5`} aria-label={t("ops.trip.diesel_amount")} />
+                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">₹</span>
                     </div>
                   </td>
 

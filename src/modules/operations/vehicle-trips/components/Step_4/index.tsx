@@ -58,7 +58,7 @@ interface Props {
   editingShopId?: string | number | null;
   onEditShop?: (shopId: string | number) => void;
   onCancelEdit?: () => void;
-  onSaveRow?: (row: ShopDelivery) => void;
+  onSaveRow?: (row: ShopDelivery) => boolean | Promise<boolean>;
   tripNo?: string;
   vehicleNo?: string;
   supervisorName?: string;
@@ -328,6 +328,7 @@ export default function UnLoadingTable({
   const submitLockRef = useRef(false);
   const autosaveTimerRef = useRef<number | undefined>(undefined);
   const autosaveInFlightRef = useRef(false);
+  const rowSaveInFlightRef = useRef(false);
   const lastAutosaveAttemptRef = useRef("");
   const draftIdentityRef = useRef<{ id: number; clientKey: string } | null>(null);
   const addShopButtonRef = useRef<HTMLButtonElement>(null);
@@ -839,7 +840,8 @@ export default function UnLoadingTable({
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (rowSaveInFlightRef.current || isSaving) return;
     if (validationErrors.birdsExceedFarm) {
       setToast({ message: t("ops.trip.cannot_exceed_farm_birds", { count: farmBirds }), type: "warning" });
       return;
@@ -952,14 +954,22 @@ export default function UnLoadingTable({
       })(),
     };
 
-    if (editingId !== null) {
+    // A shop capture/update is a durable row action, not only a local draft.
+    // Wait for the backend before closing the form or showing success.
+    if (onSaveRow) {
+      rowSaveInFlightRef.current = true;
+      setIsSaving(true);
+      try {
+        const saved = await onSaveRow(newRow);
+        if (!saved) return;
+      } finally {
+        rowSaveInFlightRef.current = false;
+        setIsSaving(false);
+      }
+    } else if (editingId !== null) {
       setRows((prev) => prev.map((r) => (r.id === editingId ? newRow : r)));
-      if (onSaveRow) onSaveRow(newRow);
     } else {
-      // Let onSaveRow own persistence when provided; still update local rows
-      // once so KPIs / remaining boxes refresh immediately.
       setRows((prev) => [newRow, ...prev]);
-      if (onSaveRow) onSaveRow(newRow);
     }
 
     setToast({ message: t("ops.trip.shop_saved", { name: formData.shopName }), type: "success" });

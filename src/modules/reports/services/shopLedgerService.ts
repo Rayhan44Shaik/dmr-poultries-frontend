@@ -64,6 +64,7 @@ export interface ShopLedgerResponse {
 export interface ShopLedgerCumulativeQuantity {
   shopId: number;
   shopName: string;
+  subShopName: string;
   birds: number;
   weight: number;
   mortalityBirds: number;
@@ -81,6 +82,7 @@ export async function fetchShopLedgerCumulativeQuantities(filters: {
   );
   return (data ?? []).map((row) => ({
     shopId: Number(row.shopId), shopName: String(row.shopName ?? ""),
+    subShopName: String(row.subShopName ?? ""),
     birds: Number(row.birds ?? 0), weight: Number(row.weight ?? 0),
     mortalityBirds: Number(row.mortalityBirds ?? 0),
     mortalityWeight: Number(row.mortalityWeight ?? 0),

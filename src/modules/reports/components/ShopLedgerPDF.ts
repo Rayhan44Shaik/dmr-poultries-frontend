@@ -48,6 +48,7 @@ export interface ShopLedgerPdfEntry {
 
 export interface ShopLedgerCumulativeRow {
   shop: string;
+  subShopName?: string;
   birds: number;
   weight: number;
   farmBirds: number;
@@ -108,6 +109,15 @@ const normalizePaymentMode = (value?: string): string => {
   if (/credit/i.test(raw)) return "Credit";
   if (/cash/i.test(raw)) return "Cash";
   return raw;
+};
+
+const saleParticulars = (transaction: LedgerTransaction): string => {
+  const subShops = String(transaction.subShopName ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (subShops.length) return subShops.map((name) => `${name} Sale`).join(" / ");
+  return `${transaction.particulars.trim()} Sale`.trim();
 };
 
 const formatAmount = (value: number): string =>
@@ -303,7 +313,7 @@ export const generateShopLedgerPDF = async (
     );
     const summaryRows: (string | number)[][] = cumulative.map((row, index) => [
       index + 1,
-      row.shop,
+      row.subShopName ? `${row.shop} — ${row.subShopName}` : row.shop,
       String(row.birds),
       String(row.mortalityBirds),
       row.weight.toFixed(2),
@@ -403,10 +413,7 @@ export const generateShopLedgerPDF = async (
       let label = t.particulars;
       if (t.particulars !== "Opening Balance") {
         if (t.type === "sale") {
-          label = [t.particulars, t.subShopName, "Sale"]
-            .map((value) => value?.trim())
-            .filter(Boolean)
-            .join(", ");
+          label = saleParticulars(t);
           if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
         } else if (t.type === "collection") {
           const paymentMode = normalizePaymentMode(t.paymentMode);

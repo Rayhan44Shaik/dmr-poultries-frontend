@@ -942,9 +942,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       const quantities = await quantitiesPromise;
       if (appliedReportType === "collection") return rows;
-      const byShop = new Map(quantities.map((item) => [item.shopName, item]));
+      const quantityKey = (shop: string, subShop = "") =>
+        `${shop.trim().toLocaleUpperCase("en-IN")}\u0000${subShop.trim().toLocaleUpperCase("en-IN")}`;
+      const byShop = new Map(quantities.map((item) => [quantityKey(item.shopName, item.subShopName), item]));
       const merged = rows.map((row) => {
-        const quantity = byShop.get(row.shop);
+        const quantity = byShop.get(quantityKey(row.shop, row.subShopName));
         return quantity ? {
           ...row,
           birds: quantity.birds,
@@ -954,11 +956,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           weightLoss: quantity.weightLoss,
         } : row;
       });
-      const existing = new Set(merged.map((row) => row.shop));
+      const existing = new Set(merged.map((row) => quantityKey(row.shop, row.subShopName)));
       for (const quantity of quantities) {
-        if (existing.has(quantity.shopName)) continue;
+        const key = quantityKey(quantity.shopName, quantity.subShopName);
+        if (existing.has(key)) continue;
         merged.push({
           shop: quantity.shopName,
+          subShopName: quantity.subShopName || undefined,
           birds: quantity.birds,
           weight: quantity.weight,
           farmBirds: quantity.birds + quantity.mortalityBirds,
@@ -972,7 +976,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           closingBalance: 0,
         });
       }
-      return merged.sort((a, b) => a.shop.localeCompare(b.shop, "en", { sensitivity: "base" }));
+      return merged.sort((a, b) =>
+        a.shop.localeCompare(b.shop, "en", { sensitivity: "base" }) ||
+        String(a.subShopName ?? "").localeCompare(String(b.subShopName ?? ""), "en", { sensitivity: "base" })
+      );
     };
     setCumulativeLoading(true);
     setCumulativeError(null);
@@ -2968,15 +2975,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 ) : (
                   <>
                     {pagedCumulativeRows.map((row, index) => {
-                      const selected = selectedCumulativeShop === row.shop;
+                      const rowLabel = row.subShopName ? `${row.shop} — ${row.subShopName}` : row.shop;
+                      const selected = selectedCumulativeShop === rowLabel;
                       return (
                       <tr
-                        key={row.shop}
-                        onClick={() => setSelectedCumulativeShop(selected ? null : row.shop)}
+                        key={rowLabel}
+                        onClick={() => setSelectedCumulativeShop(selected ? null : rowLabel)}
                         className={`cursor-pointer transition-colors ${selected ? "bg-emerald-100/80 shadow-[inset_4px_0_0_#10b981]" : "hover:bg-emerald-50/80"}`}
                       >
                         <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{(cumulativeSafePage - 1) * pageSize + index + 1}</td>
-                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={row.shop}>{row.shop}</td>
+                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={rowLabel}>{rowLabel}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.birds.toLocaleString()}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.mortalityBirds.toLocaleString()}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.weight.toFixed(2)}</td>

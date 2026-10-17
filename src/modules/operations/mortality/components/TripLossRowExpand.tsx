@@ -139,7 +139,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
       { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
     ],
     [
-      { label: t("common.vehicle"), value: view(record.vehicleNo) || "—" },
+      { label: t("common.vehicle"), value: <span>{view(record.vehicleNo) || "—"}{record.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}</span> },
       { label: t("common.supervisor"), value: view(record.supervisorName) || "—" },
     ],
     [

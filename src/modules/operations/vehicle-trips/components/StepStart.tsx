@@ -1175,15 +1175,15 @@ function StepStart({
           />
           <StepKpiCard
             icon={Users}
-            tone="bg-teal-50/70 text-teal-500"
-            label={t("ops.trip.field.helpers")}
-            value={localizeTripViewText(loadSnapshot.helpers?.join(", "), language) || "--"}
-          />
-          <StepKpiCard
-            icon={Users}
             tone="bg-amber-50/70 text-amber-500"
             label={t("ops.trip.field.loaders")}
             value={localizeTripViewText(loadSnapshot.loaders?.join(", "), language) || "--"}
+          />
+          <StepKpiCard
+            icon={Users}
+            tone="bg-teal-50/70 text-teal-500"
+            label={t("ops.trip.field.helpers")}
+            value={localizeTripViewText(loadSnapshot.helpers?.join(", "), language) || "--"}
           />
           <StepKpiCard
             icon={Gauge}
@@ -1258,7 +1258,7 @@ function StepStart({
         </div>
 
         {/* Field order: Trip Date, Start Time, Vehicle No., Supervisor, Driver,
-            Helpers, Loaders, Advance — Opening Meter LAST. */}
+            Loaders, Helpers, Advance — Opening Meter LAST. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
           <TripDateField
             tripDate={form.tripDate || loadSnapshot.tripDate}
@@ -1289,13 +1289,6 @@ function StepStart({
             invalid={fieldInvalid.driver}
             onSelect={handleDriverSelect}
           />
-          <HelpersField
-            helpers={form.helpers}
-            options={helperOptions}
-            disabled={inputsLocked}
-            invalid={fieldInvalid.helpers}
-            onChange={handleHelpersChange}
-          />
           <LoadersField
             loaders={form.loaders}
             options={loaderOptions}
@@ -1303,13 +1296,20 @@ function StepStart({
             invalid={fieldInvalid.loaders}
             onChange={handleLoadersChange}
           />
+          <HelpersField
+            helpers={form.helpers}
+            options={helperOptions}
+            disabled={inputsLocked}
+            invalid={fieldInvalid.helpers}
+            onChange={handleHelpersChange}
+          />
           <AdvanceField
             value={form.advanceText}
             disabled={inputsLocked}
             invalid={fieldInvalid.advance}
             onChange={handleAdvanceChange}
           />
-          {/* Opening Meter stays LAST in Step 1 (after Loaders and Advance). */}
+          {/* Opening Meter stays LAST in Step 1 (after Helpers and Advance). */}
           {loadSnapshot.isRentedVehicle ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
               <div className="font-semibold">Rental vehicle</div>

@@ -30,6 +30,7 @@ export interface TripFarmPayment {
   paymentMode?: string | null;
   referenceNo?: string | null;
   vehicleNo?: string;
+  isRentedVehicle?: boolean;
   supervisorName?: string;
   loads?: FarmPaymentLoad[];
 }
@@ -56,6 +57,7 @@ export interface FarmPaymentTotals {
 
 export interface FarmPayment {
   id?: string;
+  isRentedVehicle?: boolean;
   tripId: string;
   farmName?: string;
   birdType?: string;

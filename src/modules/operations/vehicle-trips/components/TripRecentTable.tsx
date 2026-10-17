@@ -555,8 +555,8 @@ function TripRecentTable({
                         {localizeTripViewText(trip.tripNo, language)}
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">
-                        <div>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
+                      <td className={`px-4 py-3 text-xs font-medium whitespace-nowrap ${trip.isRentedVehicle ? "text-orange-600" : "text-slate-700"}`}>
+                        <div className={trip.isRentedVehicle ? "font-bold" : undefined}>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.driverName, language)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.supervisorName, language)}</td>

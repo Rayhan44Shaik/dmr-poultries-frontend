@@ -187,6 +187,8 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
   const rawLoadSummaries = Array.isArray(raw.loadSummaries ?? raw.load_summaries)
     ? (raw.loadSummaries ?? raw.load_summaries) as Array<Record<string, unknown>>
     : defaults.loadSummaries ?? [];
+  const rawDeliveryShopIds = raw.deliveryShopIds ?? raw.delivery_shop_ids;
+  const rawDeliveryShopNames = raw.deliveryShopNames ?? raw.delivery_shop_names;
 
   return {
     ...defaults,
@@ -254,6 +256,14 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     pickupLoadTime: formatStartTimeForDisplay(raw.pickupLoadTime ?? raw.pickup_load_time) || defaults.pickupLoadTime,
     boxDetails: Array.isArray(raw.boxDetails) ? (raw.boxDetails as Trip["boxDetails"]) : defaults.boxDetails,
     deliveries: mapDeliveriesForDisplay(raw.deliveries, defaults.deliveries),
+    deliveryShopIds: Array.isArray(rawDeliveryShopIds)
+      ? rawDeliveryShopIds.map((value: unknown) => num(value)).filter((value: number) => value > 0)
+      : defaults.deliveryShopIds ?? [],
+    deliveryShopNames: Array.isArray(rawDeliveryShopNames)
+      ? rawDeliveryShopNames
+          .map((value: unknown) => str(value).trim())
+          .filter(Boolean)
+      : defaults.deliveryShopNames ?? [],
     closingMeter: numOrZero(raw.closingMeter ?? raw.closing_meter ?? defaults.closingMeter),
     endTime: formatStartTimeForDisplay(raw.endTime ?? raw.end_time) || defaults.endTime,
     deliveryTolls: num(raw.deliveryTolls ?? raw.delivery_tolls, defaults.deliveryTolls),
@@ -473,6 +483,7 @@ export type DieselSubmitPayload = {
   clientKey: string;
   litres: number;
   rate: number;
+  amount: number;
   meter: number;
   bunkName: string;
   bunkSource: "MASTER" | "OTHER";
@@ -621,6 +632,7 @@ export interface TripListFilters {
   supervisorId?: number;
   driverId?: number;
   farmId?: number;
+  shopId?: number;
   search?: string;
   page?: number;
   limit?: number;
@@ -653,6 +665,7 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
         supervisorId: filters.supervisorId,
         driverId: filters.driverId,
         farmId: filters.farmId,
+        shopId: filters.shopId,
         search: filters.search,
         page: filters.page,
         limit: filters.limit,

@@ -23,8 +23,8 @@ interface Props {
   submitDeliveriesStep: () => boolean | string | Promise<boolean | string>;
   saveDeliveriesProgress?: (
     rows: ShopDelivery[],
-    opts?: { silent?: boolean }
-  ) => Promise<boolean>;
+    opts?: { silent?: boolean; changedRow?: ShopDelivery }
+  ) => Promise<boolean | ShopDelivery[] | null>;
   clearForm: () => void;
   readOnly?: boolean;
   editable?: boolean;
@@ -99,18 +99,34 @@ export default function StepDeliveries({
   const isLocked = trip.deliveryStepSubmitted && !editable && !isStepEditing;
 
   // Save individual shop row & trigger persist sync
-  const handleSaveRow = (updatedRow: ShopDelivery) => {
+  const handleSaveRow = async (updatedRow: ShopDelivery): Promise<boolean> => {
+    const previousRows = rows;
     const rowIndex = rows.findIndex((r) => r.id === updatedRow.id);
-    let updatedRows: ShopDelivery[] = [];
-    if (rowIndex === -1) {
-      updatedRows = [updatedRow, ...rows];
-    } else {
-      updatedRows = [...rows];
-      updatedRows[rowIndex] = updatedRow;
-    }
+    const updatedRows: ShopDelivery[] = rowIndex === -1
+      ? [updatedRow, ...rows]
+      : rows.map((row, index) => (index === rowIndex ? updatedRow : row));
     setRows(updatedRows);
     updateDeliveries(updatedRows, true, false);
-    setEditingShopId(null);
+    const saveResult = saveDeliveriesProgress
+      ? await saveDeliveriesProgress(updatedRows, { silent: false, changedRow: updatedRow })
+      : true;
+    const saved = Boolean(saveResult);
+    if (saved) {
+      // A successful API save is authoritative. Replacing the optimistic
+      // imported rows here prevents final Step 4 submit from resending stale
+      // weights and preserves the persisted identity for later shop updates.
+      if (Array.isArray(saveResult)) {
+        setRows(saveResult);
+        updateDeliveries(saveResult, false, true);
+      }
+      setEditingShopId(null);
+    } else {
+      // A rejected row must not remain in the live draft: otherwise the
+      // background saver repeatedly resends the same invalid snapshot.
+      setRows(previousRows);
+      updateDeliveries(previousRows, false, true);
+    }
+    return saved;
   };
 
   const handleStartEditShop = (shopId: string | number) => {
@@ -247,7 +263,8 @@ export default function StepDeliveries({
         updateDeliveries={updateDeliveries}
         saveDeliveries={
           saveDeliveriesProgress
-            ? async (opts, rowsOverride) => saveDeliveriesProgress(rowsOverride ?? rows, opts)
+            ? async (opts, rowsOverride) =>
+                Boolean(await saveDeliveriesProgress(rowsOverride ?? rows, opts))
             : undefined
         }
         submitDeliveries={handleLockDeliveries}

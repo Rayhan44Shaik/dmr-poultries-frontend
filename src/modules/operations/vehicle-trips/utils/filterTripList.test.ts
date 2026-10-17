@@ -96,6 +96,18 @@ test("Trip List global search matches vehicle plates with or without spaces", ()
   assert.deepEqual(filterTripListTrips(rows, { search: "ts07ub1222" }).map(({ id }) => id), [2]);
 });
 
+test("Trip List shop filter and global search match delivery shops, including a single-shop trip", () => {
+  const withShops = [
+    trip(10, { deliveryShopIds: [22], deliveryShopNames: ["HARI CHICKEN CENTER"], totalShops: 1 }),
+    trip(11, { deliveryShopIds: [18, 22], deliveryShopNames: ["GENERAL ACCOUNT", "HARI CHICKEN CENTER"], totalShops: 2 }),
+    trip(12, { deliveryShopIds: [18], deliveryShopNames: ["GENERAL ACCOUNT"], totalShops: 1 }),
+  ];
+
+  assert.deepEqual(filterTripListTrips(withShops, { shopId: 22 }).map(({ id }) => id), [10, 11]);
+  assert.deepEqual(filterTripListTrips(withShops, { search: "hari chicken" }).map(({ id }) => id), [10, 11]);
+  assert.deepEqual(filterTripListTrips(withShops, { search: "general account" }).map(({ id }) => id), [11, 12]);
+});
+
 test("Trip List Sort By orders each supported column and direction", () => {
   assert.deepEqual(sortTripListTrips(rows, "tripNo", "desc").map(({ id }) => id), [3, 2, 1]);
   assert.deepEqual(sortTripListTrips(rows, "tripDate", "desc").map(({ id }) => id), [3, 2, 1]);

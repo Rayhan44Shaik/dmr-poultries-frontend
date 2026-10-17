@@ -5,6 +5,7 @@ const BASE = "/operations/mortality-analysis";
 export interface MortalityRow {
   tripId: number; tripNo: string; tripDate: string; sourceFarm: string;
   supervisorName: string; vehicleNo: string; driverName: string;
+  isRentedVehicle: boolean;
   loaders: string[]; helpers: string[]; status: string;
   farmBirds: number; farmWeight: number; deliveryShops: number;
   deliveredBirds: number; deliveredWeight: number; mortalityCount: number;

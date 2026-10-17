@@ -61,6 +61,7 @@ export interface RateEntryTripDto {
   tripDate: string;
   status: string;
   vehicleNo: string | null;
+  isRentedVehicle?: boolean;
   driverName: string | null;
   supervisorName: string | null;
   sourceFarm: string | null;
@@ -73,6 +74,10 @@ export interface RateEntryTripDto {
   ratesEntered: number;
   deliveriesCount: number;
   totalAmount: number;
+  loadAmounts: Array<{
+    load: number;
+    amount: number;
+  }>;
   deliveries: RateEntryDeliveryDto[];
   marketRatesWindow?: Array<{
     businessDate: string;
@@ -110,6 +115,7 @@ export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Tr
     startTime: "",
     vehicleId: 0,
     vehicleNo: row.vehicleNo ?? "",
+    isRentedVehicle: Boolean(row.isRentedVehicle),
     driverId: 0,
     driverName: row.driverName ?? "",
     supervisorId: 0,
@@ -149,6 +155,7 @@ export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Tr
           birds: num(d.birds),
           weight: num(d.weight),
           mortality: num(d.mortality),
+          mortKg: num(d.mortKg),
           rate: d.rate,
           amount: num(d.amount),
           remarks: d.remarks, deliveryMode: d.deliveryMode ?? "box",
@@ -180,6 +187,8 @@ export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Tr
     rateLockedAt: row.rateLockedAt,
     rateLockedBy: row.rateLockedBy,
     ratesEntered: row.ratesEntered,
+    rateEntryTotalAmount: row.totalAmount,
+    rateEntryLoadAmounts: row.loadAmounts ?? [],
     createdAt: now,
     updatedAt: now,
     marketRatesWindow: row.marketRatesWindow ?? [],

@@ -176,6 +176,9 @@ export interface Trip {
   boxDetails: BoxDetail[];
 
   deliveries: ShopDelivery[];
+  /** Compact Trip List facets returned with summary rows. */
+  deliveryShopIds?: number[];
+  deliveryShopNames?: string[];
   deliveryStepSubmitted: boolean;
 
   closingMeter: number;
@@ -243,6 +246,13 @@ export interface Trip {
   rateLockedAt?: string | null;
   rateLockedBy?: string | null;
   ratesEntered?: number;
+  /** Rate Entry queue: saved cumulative amount. */
+  rateEntryTotalAmount?: number;
+  /** Rate Entry queue: saved amount split by trip load. */
+  rateEntryLoadAmounts?: Array<{
+    load: number;
+    amount: number;
+  }>;
   version?: number;
   createdAt?: string;
   updatedAt?: string;

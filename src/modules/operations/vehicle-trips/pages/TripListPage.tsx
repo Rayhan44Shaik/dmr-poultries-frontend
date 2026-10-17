@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
 import { History } from "lucide-react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
@@ -33,6 +33,7 @@ type FilterOption = { value: string; label: string; searchText?: string };
 const ALL_VEHICLES = "All Vehicles";
 const ALL_SUPERVISORS = "All Supervisors";
 const ALL_SOURCES = "All Sources";
+const ALL_SHOPS = "All Shops";
 const TRIP_LIST_FETCH_PAGE_SIZE = 200;
 
 function numericFilter(value: string, sentinel: string): number | undefined {
@@ -77,6 +78,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
   const [farm, setFarm] = useState(ALL_SOURCES);
+  const [shop, setShop] = useState(ALL_SHOPS);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -85,6 +87,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const deferredSearch = useDeferredValue(search.trim());
   const listRequestSeqRef = useRef(0);
   const listAbortRef = useRef<AbortController | null>(null);
   const viewRequestSeqRef = useRef(0);
@@ -108,6 +111,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicleId: numericFilter(vehicle, ALL_VEHICLES),
         supervisorId: numericFilter(supervisor, ALL_SUPERVISORS),
         farmId: numericFilter(farm, ALL_SOURCES),
+        shopId: numericFilter(shop, ALL_SHOPS),
+        search: deferredSearch || undefined,
         sortBy: sortBy ?? undefined,
         sortDir: sortBy ? sortDir : undefined,
         signal: controller.signal,
@@ -153,7 +158,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         setIsLoading(false);
       }
     }
-  }, [showNotification, t, fromDate, toDate, vehicle, supervisor, farm, sortBy, sortDir]);
+  }, [showNotification, t, fromDate, toDate, vehicle, supervisor, farm, shop, deferredSearch, sortBy, sortDir]);
 
   useEffect(() => {
     let cancelled = false;
@@ -172,6 +177,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setVehicle(ALL_VEHICLES);
     setSupervisor(ALL_SUPERVISORS);
     setFarm(ALL_SOURCES);
+    setShop(ALL_SHOPS);
     setFromDate("");
     setToDate("");
     setSortBy(null);
@@ -212,6 +218,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setFarm(value || ALL_SOURCES);
     setCurrentPage(1);
   }, []);
+  const setFilterShop = useCallback((value: string) => {
+    setFilterResultsReady(false);
+    setShop(value || ALL_SHOPS);
+    setCurrentPage(1);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -235,6 +246,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const { vehicles: masterVehicles } = useVehicles();
   const { employees: masterEmployees } = useEmployees();
   const { farms: masterFarms } = useFarms();
+  const { shops: masterShops } = useShops();
 
   const vehicleOptions = useMemo<FilterOption[]>(() => {
     const seen = new Set<string>();
@@ -274,15 +286,30 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     });
   }, [masterFarms]);
 
+  const shopOptions = useMemo<FilterOption[]>(() => {
+    const seen = new Set<string>();
+    return masterShops.flatMap((shopRecord) => {
+      const value = String(shopRecord.id || "");
+      const label = String(shopRecord.shopName || "").trim();
+      if (!value || !label || seen.has(value)) return [];
+      seen.add(value);
+      return [{ value, label }];
+    });
+  }, [masterShops]);
+
   const selectedVehicleLabel = selectedOptionLabel(vehicleOptions, vehicle, vehicle);
   const selectedSupervisorLabel = selectedOptionLabel(supervisorOptions, supervisor, supervisor);
   const selectedFarmLabel = selectedOptionLabel(farmOptions, farm, farm);
+  const selectedShopLabel = selectedOptionLabel(shopOptions, shop, shop);
 
   // The full matching result is held locally so visible filters stay reliable
   // even against API versions that ignore a filter query parameter.
   const completedTrips = useMemo(
-    () => filterTripListTrips(uniqueTripsById(Array.isArray(trips) ? trips : []), { search }),
-    [trips, search],
+    () => filterTripListTrips(uniqueTripsById(Array.isArray(trips) ? trips : []), {
+      shopId: numericFilter(shop, ALL_SHOPS),
+      search,
+    }),
+    [trips, shop, search],
   );
 
   const hasFilters =
@@ -290,6 +317,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     vehicle !== ALL_VEHICLES ||
     supervisor !== ALL_SUPERVISORS ||
     farm !== ALL_SOURCES ||
+    shop !== ALL_SHOPS ||
     fromDate !== "" ||
     toDate !== "";
 
@@ -434,6 +462,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicle !== ALL_VEHICLES ? { label: t("common.vehicle"), value: selectedVehicleLabel } : null,
         supervisor !== ALL_SUPERVISORS ? { label: t("common.supervisor"), value: selectedSupervisorLabel } : null,
         farm !== ALL_SOURCES ? { label: t("ops.trip.source_farm"), value: selectedFarmLabel } : null,
+        shop !== ALL_SHOPS ? { label: t("common.shop"), value: selectedShopLabel } : null,
       ].filter((filter): filter is { label: string; value: string } => filter !== null);
 
       exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
@@ -520,6 +549,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicle={vehicle}
         supervisor={supervisor}
         farm={farm}
+        shop={shop}
         sortBy={sortBy}
         sortDir={sortDir}
         search={search}
@@ -528,12 +558,14 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         setVehicle={setFilterVehicle}
         setSupervisor={setFilterSupervisor}
         setFarm={setFilterFarm}
+        setShop={setFilterShop}
         setSort={setFilterSort}
         setSearch={setFilterSearch}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
         supervisors={supervisorOptions}
         farms={farmOptions}
+        shops={shopOptions}
         onExportPDF={() => void handleExportPDF()}
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}

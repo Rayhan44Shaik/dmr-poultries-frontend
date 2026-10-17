@@ -1041,6 +1041,7 @@ const DriverPerformancePage = () => {
                         <tr key={vehicle.vehicleNo} className="transition-colors hover:bg-slate-50/70">
                           <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-bold tabular-nums text-slate-800`}>
                             {formatVehicleNumber(vehicle.vehicleNo)}
+                            {vehicle.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                           </td>
                           <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatCount(vehicle.trips)}

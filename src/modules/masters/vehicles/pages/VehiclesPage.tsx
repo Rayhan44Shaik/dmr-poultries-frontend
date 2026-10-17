@@ -153,23 +153,24 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     const vehicleType = vehicle.vehicleType?.trim() ?? "";
     const engineNumber = vehicle.engineNumber?.trim() ?? "";
     const chassisNumber = vehicle.chassisNumber?.trim() ?? "";
+    const isRented = vehicle.isRented === true;
     const noOfBoxes = Number(vehicle.noOfBoxes);
     const birdCapacity = Number(vehicle.birdCapacity);
     const capacityKg = Number(vehicle.capacityKg);
 
     if (
       !vehicleNumber ||
-      !vehicleType ||
+      (!isRented && !vehicleType) ||
       Number.isNaN(noOfBoxes) ||
       Number.isNaN(birdCapacity) ||
       Number.isNaN(capacityKg)
     ) {
       return "Please fill all required fields.";
     }
-    if (!engineNumber) {
+    if (!isRented && !engineNumber) {
       return "Engine Number is required.";
     }
-    if (!chassisNumber) {
+    if (!isRented && !chassisNumber) {
       return "Chassis Number is required.";
     }
     if (noOfBoxes <= 0 || birdCapacity <= 0 || capacityKg <= 0) {
@@ -199,14 +200,15 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
 
     const payload = {
       vehicleNumber: vehicle.vehicleNumber!.trim(),
-      vehicleType: vehicle.vehicleType!.trim(),
+      vehicleType: vehicle.vehicleType?.trim() ?? "",
+      isRented: vehicle.isRented === true,
       trackingId: vehicle.trackingId?.trim() ?? "",
       noOfBoxes: Number(vehicle.noOfBoxes),
       birdCapacity: Number(vehicle.birdCapacity),
       capacityKg: Number(vehicle.capacityKg),
       fastagBank: vehicle.fastagBank?.trim() ?? "",
-      engineNumber: vehicle.engineNumber!.trim(),
-      chassisNumber: vehicle.chassisNumber!.trim(),
+      engineNumber: vehicle.engineNumber?.trim() ?? "",
+      chassisNumber: vehicle.chassisNumber?.trim() ?? "",
       insuranceExpiry: editingVehicle?.insuranceExpiry ?? "",
       permitExpiry: editingVehicle?.permitExpiry ?? "",
       fitnessExpiry: editingVehicle?.fitnessExpiry ?? "",
