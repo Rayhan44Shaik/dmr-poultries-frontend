@@ -237,6 +237,9 @@ export interface CollectionWeeklySummary {
   shopName: string;
   weekStart: string;
   weekEnd: string;
+  /** Selected/current week used only for approved and pending collections. */
+  collectionWeekStart: string;
+  collectionWeekEnd: string;
   /** Last day of the previous week — labels the carried-forward opening balance. */
   previousWeekEnd: string;
   /** Closing balance carried forward from the previous week (settled before weekStart). */

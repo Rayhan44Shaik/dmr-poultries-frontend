@@ -412,15 +412,16 @@ export function toStep2Payload(trip: Partial<Trip>): Record<string, unknown> {
   return payload;
 }
 
-export function toStep3Payload(trip: Partial<Trip> & { removedBoxNos?: number[]; syncPickupPhotos?: boolean }): Record<string, unknown> {
+export function toStep3Payload(trip: Partial<Trip> & { removedBoxNos?: number[]; syncPickupPhotos?: boolean; clearBoxDetails?: boolean; importFingerprint?: Record<string, unknown> }): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
-  if (Array.isArray(trip.boxDetails) && trip.boxDetails.length) {
+  if (Array.isArray(trip.boxDetails) && (trip.boxDetails.length || trip.clearBoxDetails)) {
     payload.boxDetails = trip.boxDetails.map((b) => ({
       boxNo: b.boxNo,
       birds: b.birds ?? 0,
       weight: b.weight ?? 0,
     }));
   }
+  if (trip.clearBoxDetails) payload.clearBoxDetails = true;
   if (Array.isArray(trip.removedBoxNos) && trip.removedBoxNos.length) {
     payload.removedBoxNos = trip.removedBoxNos;
   }
@@ -432,6 +433,7 @@ export function toStep3Payload(trip: Partial<Trip> & { removedBoxNos?: number[];
   if (trip.dcPhotoData2) payload.dcPhotoData2 = trip.dcPhotoData2;
   if (Array.isArray(trip.pickupPhotos)) payload.pickupPhotos = trip.pickupPhotos;
   if (trip.syncPickupPhotos) payload.syncPickupPhotos = true;
+  if (trip.importFingerprint) payload.importFingerprint = trip.importFingerprint;
   return payload;
 }
 
@@ -464,6 +466,7 @@ export function toStep5Payload(trip: Partial<Trip> & Record<string, unknown>): R
   for (const key of ["others2Name", "others3Name", "others4Name", "others5Name"] as const) {
     payload[key] = String(trip[key] ?? "").trim().slice(0, 120);
   }
+  payload.vehicleMaintenanceNote = String(trip.vehicleMaintenanceNote ?? "").trim().slice(0, 120);
   payload.others2Name = "SUPERVISOR (PC)";
   const raw = trip as Record<string, unknown>;
   const endRaw = raw.endMeter ?? trip.closingMeter;

@@ -17,12 +17,20 @@ import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { translate } from "../../../../i18n";
 import { confirmDialog } from "../../../../ui/confirm/confirmStore";
 import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
+import {
+  DEFAULT_COLLECTION_DATE,
+  DEFAULT_COLLECTION_PAYMENT_MODE,
+  defaultCollectionCollector,
+  orderCollectionCollectors,
+} from "../utils/collectionEntryDefaults";
 
 const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopId: 0,
   shopName: "",
   weekStart: "",
   weekEnd: "",
+  collectionWeekStart: "",
+  collectionWeekEnd: "",
   previousWeekEnd: "",
   openingBalance: 0,
   balance: 0,
@@ -64,10 +72,10 @@ export default function useCollectionEntry() {
   const [entry, setEntry] = useState<CollectionEntry>({
     collectionId: "",
     collectionNo: "",
-    collectionDate: "",
+    collectionDate: DEFAULT_COLLECTION_DATE,
     shopName: "",
     collectorName: "",
-    paymentModeName: "Cash",
+    paymentModeName: DEFAULT_COLLECTION_PAYMENT_MODE,
     referenceNo: "",
     amount: 0,
     remarks: ""
@@ -97,11 +105,13 @@ export default function useCollectionEntry() {
         // master. There is deliberately NO fallback to the full employee list:
         // offering drivers/loaders here would let a collection be booked
         // against someone who never collects money.
-        const collectorNames = getEmployees()
+        const collectorNames = orderCollectionCollectors(getEmployees()
           .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
-          .map((emp) => emp.employeeName)
-          .sort();
+          .map((emp) => emp.employeeName));
         setCollectors(collectorNames);
+        setEntry((prev) => prev.collectorName || isEditing
+          ? prev
+          : { ...prev, collectorName: defaultCollectionCollector(collectorNames) });
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
         getBanks()
           .slice()
@@ -131,7 +141,7 @@ export default function useCollectionEntry() {
   useEffect(() => {
     let cancelled = false;
     collectionService
-      .fetchWeekBounds(entry.collectionDate || undefined)
+      .fetchWeekBounds(entry.collectionDate || undefined, "previous-completed")
       .then((bounds) => {
         if (cancelled) return;
         setWeekBounds(bounds);
@@ -178,17 +188,17 @@ export default function useCollectionEntry() {
 
   function resetEntry() {
     setPendingShop(null);
-    setEntry((prev) => ({
+    setEntry({
       collectionId: "",
       collectionNo: "",
-      collectionDate: prev.collectionDate,
+      collectionDate: DEFAULT_COLLECTION_DATE,
       shopName: "",
-      collectorName: "",
-      paymentModeName: "Cash",
+      collectorName: defaultCollectionCollector(collectors),
+      paymentModeName: DEFAULT_COLLECTION_PAYMENT_MODE,
       referenceNo: "",
       amount: 0,
       remarks: ""
-    }));
+    });
     setErrors({});
     setIsEditing(false);
     setShowSummary(false);
@@ -341,6 +351,8 @@ export default function useCollectionEntry() {
   const pendingCollectionsCount = ledgerLoaded ? weeklySummary.pendingCollectionsCount : 0;
   const weekStart = ledgerLoaded ? weeklySummary.weekStart : "";
   const weekEnd = ledgerLoaded ? weeklySummary.weekEnd : "";
+  const collectionWeekStart = ledgerLoaded ? weeklySummary.collectionWeekStart : "";
+  const collectionWeekEnd = ledgerLoaded ? weeklySummary.collectionWeekEnd : "";
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
 
@@ -734,6 +746,8 @@ export default function useCollectionEntry() {
     pendingCollectionsCount,
     weekStart,
     weekEnd,
+    collectionWeekStart,
+    collectionWeekEnd,
     approvedSales,
     approvedCollections,
     pendingApproval,

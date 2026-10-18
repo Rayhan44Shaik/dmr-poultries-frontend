@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dieselExpenseBreakdown } from "./dieselExpenseBreakdown";
+import { calculateTripExpenseTotals, dieselExpenseBreakdown } from "./dieselExpenseBreakdown";
 
 test("other diesel includes only non-master bunk rows and derives amount", () => {
   const result = dieselExpenseBreakdown([
@@ -13,4 +13,10 @@ test("other diesel includes only non-master bunk rows and derives amount", () =>
   assert.equal(result.otherAmount, 1020);
   assert.match(result.tooltip, /Shiva: ₹5,000\.00/);
   assert.match(result.tooltip, /Other: ₹1,020\.00/);
+});
+
+test("other diesel increases the expense subtotal without being doubled in the grand total", () => {
+  const result = calculateTripExpenseTotals(500, 4_000, 1_000);
+  assert.equal(result.expenseTotal, 1_500);
+  assert.equal(result.grandTotal, 4_500);
 });

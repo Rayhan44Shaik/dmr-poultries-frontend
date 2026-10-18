@@ -107,7 +107,10 @@ export async function parsePickupImport(file: File): Promise<PickupImportResult>
   }
   if (lower.endsWith(".pdf")) {
     const [pdfjs, worker] = await loadPdfJs();
-    pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
+    // Vite resolves `?url` to a string in production. Node's deterministic
+    // binary-fixture harness loads pdfjs directly and uses its built-in fake
+    // worker, so do not assign the module object as an invalid worker URL.
+    if (typeof worker.default === "string") pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
     const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
     const lines: unknown[][] = [];
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {

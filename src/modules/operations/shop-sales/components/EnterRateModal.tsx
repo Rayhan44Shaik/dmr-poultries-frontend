@@ -30,6 +30,7 @@ import {
 } from "../utils/rateEntryDisplay";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import { addCalendarDays, sizeCategoryHeaders } from "../utils/rateEntryMarketMaster";
+import { rateEntryRowAmount, rateEntryTotalAmount } from "../utils/rateEntryCalculation";
 
 const SHOPS_PAGE_SIZE = 10;
 
@@ -65,6 +66,11 @@ function roundRupees(n: number): number {
 
 function formatInr(n: number): string {
   return roundRupees(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+}
+
+function formatWeight(n: number): string {
+  const value = Number(n || 0);
+  return value === 0 ? "0" : value.toFixed(2);
 }
 
 function formatDdMmYy(iso: string): string {
@@ -212,19 +218,37 @@ export default function EnterRateModal({
   const totals = useMemo(() => {
     let ratedCount = 0;
     let totalWeight = 0;
-    let totalAmount = 0;
     let totalBirds = 0;
+    let mortalityBirds = 0;
+    let mortalityWeight = 0;
+    let boxModeCount = 0;
+    let weightModeCount = 0;
     for (const d of deliveries) {
       const rate = normalizeRate(d.rate);
       totalWeight += d.weight ?? 0;
       totalBirds += d.birds ?? 0;
+      mortalityBirds += Number(d.mortality || 0);
+      mortalityWeight += Number(d.mortKg || 0);
+      if (d.deliveryMode === "weight") weightModeCount += 1;
+      else boxModeCount += 1;
       if (isValidSellingRate(rate)) {
         ratedCount += 1;
-        totalAmount += roundRupees((d.weight ?? 0) * (rate as number));
       }
     }
     const progressPct = deliveries.length ? Math.round((ratedCount / deliveries.length) * 100) : 0;
-    return { ratedCount, totalWeight, totalAmount, totalBirds, progressPct };
+    return {
+      ratedCount,
+      totalWeight,
+      totalAmount: rateEntryTotalAmount(
+        deliveries.filter((row) => isValidSellingRate(normalizeRate(row.rate))),
+      ),
+      totalBirds,
+      mortalityBirds,
+      mortalityWeight,
+      boxModeCount,
+      weightModeCount,
+      progressPct,
+    };
   }, [deliveries]);
 
   const loadTotals = useMemo(() => {
@@ -236,12 +260,71 @@ export default function EnterRateModal({
       current.birds += Number(delivery.birds || 0);
       current.weight += Number(delivery.weight || 0);
       if (isValidSellingRate(rate)) {
-        current.amount += roundRupees(Number(delivery.weight || 0) * (rate as number));
+        current.amount += rateEntryRowAmount({ weight: Number(delivery.weight || 0), rate });
       }
       byLoad.set(load, current);
     }
-    return [...byLoad.entries()].sort(([a], [b]) => a - b);
+    return [...byLoad.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([load, values]) => [load, { ...values, amount: Number(values.amount.toFixed(2)) }] as const);
   }, [deliveries]);
+
+  const tripDetailLoadRows = useMemo(() => {
+    const byLoad = new Map<number, {
+      shopKeys: Set<string>;
+      deliveredBirds: number;
+      totalWeight: number;
+      weightMortality: number;
+      boxMortality: number;
+      boxMortalityWeight: number;
+    }>();
+    for (const delivery of deliveries) {
+      const load = Math.max(1, Number(delivery.legIndex || 1));
+      const current = byLoad.get(load) ?? {
+        shopKeys: new Set<string>(),
+        deliveredBirds: 0,
+        totalWeight: 0,
+        weightMortality: 0,
+        boxMortality: 0,
+        boxMortalityWeight: 0,
+      };
+      current.shopKeys.add(delivery.shopId > 0 ? `id:${delivery.shopId}` : `name:${shopLookupKey(delivery.shopName)}`);
+      current.deliveredBirds += Number(delivery.birds || 0);
+      current.totalWeight += Number(delivery.weight || 0);
+      if (delivery.deliveryMode === "weight") {
+        current.weightMortality += Number(delivery.mortKg || 0);
+      } else {
+        current.boxMortality += Number(delivery.mortality || 0);
+        current.boxMortalityWeight += Number(delivery.mortKg || 0);
+      }
+      byLoad.set(load, current);
+    }
+    return [...byLoad.entries()].sort(([a], [b]) => a - b).map(([load, values]) => ({
+      load,
+      totalShops: values.shopKeys.size,
+      deliveredBirds: values.deliveredBirds,
+      totalWeight: values.totalWeight,
+      weightMortality: values.weightMortality,
+      boxMortality: values.boxMortality,
+      boxMortalityWeight: values.boxMortalityWeight,
+    }));
+  }, [deliveries]);
+
+  const tripDetailGrandTotal = useMemo(() => tripDetailLoadRows.reduce((total, row) => ({
+    totalShops: total.totalShops + row.totalShops,
+    deliveredBirds: total.deliveredBirds + row.deliveredBirds,
+    totalWeight: total.totalWeight + row.totalWeight,
+    weightMortality: total.weightMortality + row.weightMortality,
+    boxMortality: total.boxMortality + row.boxMortality,
+    boxMortalityWeight: total.boxMortalityWeight + row.boxMortalityWeight,
+  }), {
+    totalShops: 0,
+    deliveredBirds: 0,
+    totalWeight: 0,
+    weightMortality: 0,
+    boxMortality: 0,
+    boxMortalityWeight: 0,
+  }), [tripDetailLoadRows]);
 
   const filteredSortedDeliveries = useMemo(() => {
     let list = deliveries.map((row, idx) => ({ row, originalIndex: idx }));
@@ -643,8 +726,8 @@ export default function EnterRateModal({
           )}
 
           {/* Shop table - increased size by way, bigger table, perfect middle with gaps */}
-          <div className="px-5 py-3 flex-[1.6] min-h-[380px] flex flex-col overflow-hidden bg-white">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
+          <div className="px-5 py-3 flex-[1.6] min-h-[380px] flex flex-col overflow-y-auto bg-white">
+            <div className="min-h-[380px] flex-none overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
               <div className="flex-1 min-h-0 overflow-auto scroll-perf">
                 <table className="w-full table-fixed text-[13.5px]">
                   <thead className="bg-slate-50 sticky top-0 z-[1]">
@@ -672,7 +755,7 @@ export default function EnterRateModal({
                       const serialNo = (shopPage - 1) * SHOPS_PAGE_SIZE + idx + 1;
                       const rate = normalizeRate(delivery.rate);
                       const isValid = isValidSellingRate(rate);
-                      const amount = isValid ? roundRupees(delivery.weight * (rate as number)) : 0;
+                      const amount = isValid ? rateEntryRowAmount({ weight: delivery.weight, rate }) : 0;
                       const masterShop = resolveShopMaster(delivery, shopMasterLookup);
                       const association = masterShop?.associationType?.trim() ?? "";
                       const paperRate = Number(masterShop?.paperRate ?? 0);
@@ -680,11 +763,9 @@ export default function EnterRateModal({
                       const belowMin = rate != null && rate < 50;
                       const aboveMax = rate != null && rate > 300;
                       const missingForLock = lockAttempted && !isValid;
-                      const isBoxMode = delivery.deliveryMode !== "weight";
                       const mortalityBirds = Number(delivery.mortality || 0);
                       const mortalityWeight = Number(delivery.mortKg || 0);
-                      const hasBoxMortality =
-                        isBoxMode && (mortalityBirds > 0 || mortalityWeight > 0);
+                      const hasMortality = mortalityBirds > 0 || mortalityWeight > 0;
                       const load = Math.max(1, Number(delivery.legIndex || 1));
                       const previousLoad = idx > 0 ? Math.max(1, Number(pagedDeliveries[idx - 1]?.row.legIndex || 1)) : load;
                       const startsLoad = idx === 0 || load !== previousLoad;
@@ -702,25 +783,11 @@ export default function EnterRateModal({
                           <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center tabular-nums">
                             <div className="text-[13px] font-normal leading-none text-slate-700">{delivery.birds.toLocaleString()}</div>
-                            {hasBoxMortality ? (
-                              <div
-                                className="mt-0.5 text-[11px] font-semibold leading-none text-red-600"
-                                title={`${t("ops.trip.mortality")}: ${mortalityBirds.toLocaleString()} ${t("common.birds")} • ${mortalityWeight.toFixed(2)} ${t("common.kg")}`}
-                              >
-                                {mortalityBirds.toLocaleString()}
-                              </div>
-                            ) : null}
+                            {hasMortality ? <div className="mt-0.5 text-[11px] font-semibold leading-none text-red-600">{mortalityBirds.toLocaleString()}</div> : null}
                           </td>
                           <td className="px-2 py-3.5 text-center tabular-nums">
                             <div className="text-[13px] font-normal leading-none text-slate-700">{delivery.weight.toFixed(2)}</div>
-                            {hasBoxMortality ? (
-                              <div
-                                className="mt-0.5 text-[11px] font-semibold leading-none text-red-600"
-                                title={`${t("ops.trip.mortality")}: ${mortalityWeight.toFixed(2)} ${t("common.kg")}`}
-                              >
-                                {mortalityWeight.toFixed(2)}
-                              </div>
-                            ) : null}
+                            {hasMortality ? <div className="mt-0.5 text-[11px] font-semibold leading-none text-red-600">{formatWeight(mortalityWeight)}</div> : null}
                           </td>
                           <td className="px-2 py-3.5">
                             {rateLocked ? (
@@ -747,7 +814,7 @@ export default function EnterRateModal({
                             )}
                           </td>
                           <td className="px-2 py-3.5 text-center">
-                            <span className="inline-flex items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">
+                            <span className="text-[13px] font-normal text-slate-700 tabular-nums">
                               ₹ {formatInr(amount)}
                             </span>
                           </td>
@@ -773,6 +840,49 @@ export default function EnterRateModal({
                 </table>
               </div>
             </div>
+
+            <section className="mt-3 shrink-0 overflow-hidden rounded-xl border border-indigo-200 bg-white shadow-sm" aria-label="Trip load summary">
+              <div className="border-b border-indigo-100 bg-gradient-to-r from-indigo-50 to-white px-3 py-2">
+                <h3 className="text-[12px] font-bold uppercase tracking-wider text-indigo-800">Trip Details — Read only</h3>
+              </div>
+              <table className="w-full table-fixed text-[11px]">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr className="border-b border-slate-200 uppercase tracking-wide">
+                    <th className="w-[9%] px-2 py-2 text-center">Load</th>
+                    <th className="w-[14%] px-2 py-2 text-center">Total shops</th>
+                    <th className="w-[16%] px-2 py-2 text-center">Delivered birds</th>
+                    <th className="w-[15%] px-2 py-2 text-center">Total wt</th>
+                    <th className="w-[16%] px-2 py-2 text-center">Wt mortality</th>
+                    <th className="w-[14%] px-2 py-2 text-center">Box mortality</th>
+                    <th className="w-[16%] px-2 py-2 text-center">Box mortality wt</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tripDetailLoadRows.map((row) => (
+                    <tr key={`load-summary-${row.load}`} className="border-b border-slate-100 even:bg-slate-50/60">
+                      <td className="px-2 py-2 text-center text-[12px] font-bold text-indigo-700">{row.load}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-slate-700">{row.totalShops}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-slate-700">{row.deliveredBirds.toLocaleString()}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-slate-700">{formatWeight(row.totalWeight)}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-purple-700">{formatWeight(row.weightMortality)}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-red-700">{row.boxMortality.toLocaleString()}</td>
+                      <td className="px-2 py-2 text-center font-semibold tabular-nums text-red-700">{formatWeight(row.boxMortalityWeight)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="border-t-2 border-indigo-200 bg-indigo-50 font-bold text-slate-800">
+                  <tr>
+                    <td className="px-2 py-2 text-center">Total</td>
+                    <td className="px-2 py-2 text-center tabular-nums">{tripDetailGrandTotal.totalShops}</td>
+                    <td className="px-2 py-2 text-center tabular-nums">{tripDetailGrandTotal.deliveredBirds.toLocaleString()}</td>
+                    <td className="px-2 py-2 text-center tabular-nums">{formatWeight(tripDetailGrandTotal.totalWeight)}</td>
+                    <td className="px-2 py-2 text-center tabular-nums text-purple-700">{formatWeight(tripDetailGrandTotal.weightMortality)}</td>
+                    <td className="px-2 py-2 text-center tabular-nums text-red-700">{tripDetailGrandTotal.boxMortality.toLocaleString()}</td>
+                    <td className="px-2 py-2 text-center tabular-nums text-red-700">{formatWeight(tripDetailGrandTotal.boxMortalityWeight)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </section>
 
             {filteredSortedDeliveries.length > 0 && (
               <div className="mt-3 flex items-center justify-end">

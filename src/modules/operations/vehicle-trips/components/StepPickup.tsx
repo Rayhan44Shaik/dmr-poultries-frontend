@@ -29,6 +29,8 @@ import {
   type PickupImportMetadata,
 } from "../utils/pickupImport";
 import { formatVehicleNumber } from "../../../../utils/format";
+import { usePendingDelete } from "../../../../hooks/usePendingDelete";
+import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
 interface Props {
   trip: Trip;
@@ -275,10 +277,12 @@ export default function StepPickup({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<"replace" | "append">("replace");
   const [importRows, setImportRows] = useState<BoxDetail[]>([]);
   const [importBaseRows, setImportBaseRows] = useState<BoxDetail[]>([]);
   const [importMetadata, setImportMetadata] = useState<PickupImportMetadata>({});
   const [importFileName, setImportFileName] = useState("");
+  const [importFingerprint, setImportFingerprint] = useState<Record<string, unknown> | null>(null);
   const [importError, setImportError] = useState("");
   const [importBusy, setImportBusy] = useState(false);
   const [selectedImportIndex, setSelectedImportIndex] = useState(0);
@@ -598,16 +602,72 @@ export default function StepPickup({
     return Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail;
   });
 
+  const eraseRequestKey = `pickup-boxes:${trip.id}:${Number(trip.activeLegIndex ?? 1)}`;
+  const {
+    requestDelete: requestBoxErase,
+    cancel: cancelBoxErase,
+    isPending: isBoxErasePending,
+    pendingItems: pendingBoxErases,
+  } = usePendingDelete<string>(async () => {
+    setIsSaving(true);
+    try {
+      const saved = savePickupProgress
+        ? await savePickupProgress({
+            boxDetails: [],
+            clearBoxDetails: true,
+            dcPhotoKey: photos[0]?.key,
+            dcPhotoMime: photos[0]?.mime,
+            dcPhotoData: photos[0]?.data,
+            dcPhotoKey2: photos[1]?.key,
+            dcPhotoMime2: photos[1]?.mime,
+            dcPhotoData2: photos[1]?.data,
+            pickupPhotos: photos,
+            syncPickupPhotos: true,
+          } as Partial<Trip> & { clearBoxDetails: boolean })
+        : true;
+      if (!saved) {
+        setToast({ message: "Pickup boxes could not be erased. Existing data was kept.", type: "error" });
+        return;
+      }
+      setRows([]);
+      setRemovedBoxNos([]);
+      setSelectedBoxNo("");
+      setLastSavedFingerprint(
+        JSON.stringify({
+          legIndex: Number(trip.activeLegIndex ?? 1),
+          boxes: [] as BoxDetail[],
+          removedBoxNos: [] as number[],
+          photoKeys: photos.map((p) => p.key),
+        })
+      );
+      setToast({ message: "All pickup boxes erased. The next import will start from box 1.", type: "success" });
+    } finally {
+      setIsSaving(false);
+    }
+  }, 10);
+
   const handleImportFile = async (file?: File) => {
     if (!file) return;
     setImportBusy(true);
     setImportError("");
     try {
+      const originalBytes = await file.arrayBuffer();
+      const digest = await crypto.subtle.digest("SHA-256", originalBytes);
+      const contentHash = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
       const parsed = await parsePickupImport(file);
-      const existing = getBoxDetails().filter((row) => row.birds > 0 && row.weight > 0);
+      const existing = importMode === "append"
+        ? getBoxDetails().filter((row) => row.birds > 0 && row.weight > 0)
+        : [];
       const continued = continuePickupBoxNumbers(parsed.boxes, existing.length);
       const errors = validatePickupAppend(existing, continued, maxBoxes);
       setImportFileName(file.name);
+      setImportFingerprint({
+        algorithm: "SHA-256",
+        version: 1,
+        contentHash,
+        originalFilename: file.name,
+        byteLength: file.size,
+      });
       setImportMetadata(parsed.metadata);
       setImportBaseRows(existing);
       if (errors.length) {
@@ -624,6 +684,7 @@ export default function StepPickup({
       setImportBaseRows([]);
       setImportMetadata({});
       setImportFileName("");
+      setImportFingerprint(null);
       setImportError(error instanceof Error ? error.message : "Unable to read this file.");
     } finally {
       setImportBusy(false);
@@ -631,14 +692,62 @@ export default function StepPickup({
     }
   };
 
-  const applyImportedRows = () => {
+  const applyImportedRows = async () => {
     const errors = validatePickupAppend(importBaseRows, importRows, maxBoxes);
     if (errors.length) return setImportError(errors.join(" "));
     const combined = [...importBaseRows, ...importRows];
+    setImportBusy(true);
+    if (savePickupProgress) {
+      const saved = await savePickupProgress({
+        boxDetails: combined,
+        importFingerprint,
+        ...photoFields(),
+      } as Partial<Trip> & { importFingerprint: Record<string, unknown> | null });
+      if (!saved) {
+        setImportBusy(false);
+        setImportError("The imported boxes could not be saved. Existing pickup boxes were not changed.");
+        return;
+      }
+    }
     setRows(combined.map((row) => ({ ...row, uid: generateUid() })));
     setRemovedBoxNos([]);
+    setLastSavedFingerprint(
+      JSON.stringify({
+        legIndex: Number(trip.activeLegIndex ?? 1),
+        boxes: combined,
+        removedBoxNos: [] as number[],
+        photoKeys: photos.map((p) => p.key),
+      })
+    );
+    setImportBusy(false);
     setImportOpen(false);
-    setToast({ message: `Added ${importRows.length} boxes. ${combined.length} / ${maxBoxes || "—"} boxes loaded.`, type: "success" });
+    setToast({
+      message: importMode === "replace"
+        ? `Replaced pickup data with ${importRows.length} imported boxes. Numbering restarted from box 1.`
+        : `Added ${importRows.length} boxes. ${combined.length} / ${maxBoxes || "—"} boxes loaded.`,
+      type: "success",
+    });
+  };
+
+  const confirmClearAllBoxes = () => {
+    const savedCount = getBoxDetails().filter((row) => row.birds > 0 || row.weight > 0).length;
+    if (!savedCount) {
+      setRows([]);
+      return;
+    }
+    setConfirmation({
+      isOpen: true,
+      title: "Erase all pickup boxes?",
+      message: `This will permanently remove all ${savedCount} pickup boxes for this load. You can then import a corrected Excel or PDF and numbering will restart from box 1.`,
+      confirmLabel: "Yes, erase all",
+      cancelLabel: t("common.cancel"),
+      type: "warning",
+      onConfirm: () => {
+        setConfirmation((prev) => ({ ...prev, isOpen: false }));
+        requestBoxErase(eraseRequestKey, { label: "Erase all pickup boxes" });
+      },
+      onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
+    });
   };
 
   const updateImportedRow = (index: number, field: "boxNo" | "birds" | "weight", value: string) => {
@@ -1337,10 +1446,18 @@ export default function StepPickup({
             <div className="inline-flex items-end gap-2 shrink-0">
             <button
               type="button"
-              onClick={() => { setImportOpen(true); setImportRows([]); setImportBaseRows([]); setImportMetadata({}); setImportFileName(""); setImportError(""); }}
+              onClick={() => { setImportOpen(true); setImportMode("replace"); setImportRows([]); setImportBaseRows([]); setImportMetadata({}); setImportFileName(""); setImportError(""); }}
               className="inline-flex h-[42px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
             >
               <Upload size={14} /> Import Excel / PDF
+            </button>
+            <button
+              type="button"
+              onClick={confirmClearAllBoxes}
+              disabled={isSaving || isBoxErasePending(eraseRequestKey) || !rows.some((row) => row.birds > 0 || row.weight > 0)}
+              className="inline-flex h-[42px] items-center gap-2 rounded-xl border border-red-200 bg-red-50/70 px-3 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Trash2 size={14} /> Erase all boxes
             </button>
             <SearchableSelect
               label=""
@@ -1575,10 +1692,31 @@ export default function StepPickup({
         >
           <div role="dialog" aria-modal="true" className="pointer-events-auto flex max-h-[calc(100vh-5rem)] w-full max-w-4xl touch-pan-y flex-col overflow-hidden overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-2xl">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
-              <div><h3 className="font-bold text-slate-800">Import pickup boxes</h3><p className="text-xs text-slate-500">Choose one or more files. Every import continues from the last loaded box, up to vehicle capacity.</p></div>
+              <div><h3 className="font-bold text-slate-800">Import pickup boxes</h3><p className="text-xs text-slate-500">Replace is selected by default so a corrected file starts again from box 1 without duplicates.</p></div>
               <button type="button" onClick={() => setImportOpen(false)} className="group grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500"><X size={16} className={uiActionIconMotionClass.close} /></button>
             </div>
             <div className="min-h-0 flex-1 touch-pan-y space-y-4 overflow-y-auto overscroll-contain p-5">
+              <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5">
+                <button
+                  type="button"
+                  onClick={() => { setImportMode("replace"); setImportRows([]); setImportBaseRows([]); setImportError(""); setImportFileName(""); }}
+                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${importMode === "replace" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Replace all boxes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setImportMode("append"); setImportRows([]); setImportBaseRows([]); setImportError(""); setImportFileName(""); }}
+                  className={`rounded-lg px-3 py-2 text-xs font-bold transition ${importMode === "append" ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 hover:bg-slate-100"}`}
+                >
+                  Append after box {getBoxDetails().filter((row) => row.birds > 0 && row.weight > 0).length}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">
+                {importMode === "replace"
+                  ? "The validated import will erase the current pickup-box data and save the new file as boxes 1 onward."
+                  : "The validated import will keep current boxes and continue numbering after the last loaded box."}
+              </p>
               <input ref={importInputRef} type="file" accept=".xlsx,.xls,.pdf" className="hidden" onChange={(event) => void handleImportFile(event.target.files?.[0])} />
               <button type="button" disabled={importBusy} onClick={() => importInputRef.current?.click()} className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-600 hover:border-emerald-400 hover:bg-emerald-50/40"><Upload size={18} />{importBusy ? "Reading and validating…" : "Choose Excel or PDF"}</button>
               {importError && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">{importError}</div>}
@@ -1649,7 +1787,7 @@ export default function StepPickup({
                 </div>
               )}
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4"><button type="button" onClick={() => setImportOpen(false)} className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold"><X size={14} className="transition-transform group-hover:rotate-90" />Cancel</button><button type="button" disabled={!importRows.length || Boolean(importError) || editingImportIndex !== null} onClick={applyImportedRows} className="group inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><CheckCircle2 size={15} className="transition-transform group-hover:scale-110" />Import validated rows</button></div>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-4"><button type="button" onClick={() => setImportOpen(false)} className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold"><X size={14} className="transition-transform group-hover:rotate-90" />Cancel</button><button type="button" disabled={importBusy || !importRows.length || Boolean(importError) || editingImportIndex !== null} onClick={() => void applyImportedRows()} className="group inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><CheckCircle2 size={15} className="transition-transform group-hover:scale-110" />{importBusy ? "Saving…" : importMode === "replace" ? "Replace and save" : "Import and save"}</button></div>
           </div>
         </div>
       )}
@@ -1663,6 +1801,21 @@ export default function StepPickup({
         type={confirmation.type}
         onConfirm={confirmation.onConfirm}
         onCancel={confirmation.onCancel || (() => setConfirmation((prev) => ({ ...prev, isOpen: false })))}
+      />
+
+      <PendingDeleteNotification
+        items={pendingBoxErases.map((item) => ({
+          ...item,
+          description: "All pickup boxes for this load will be erased automatically after 10 seconds. Cancel now to keep the data.",
+          busyLabel: "Erasing pickup boxes…",
+        }))}
+        onCancel={(id) => {
+          cancelBoxErase(id);
+          setToast({ message: "Pickup-box erase cancelled. All box data was kept.", type: "success" });
+        }}
+        totalSeconds={10}
+        ariaLabel="Pending pickup-box erase"
+        countdownLabel={(secondsLeft) => `Erasing in ${Math.max(secondsLeft, 1)} second${secondsLeft === 1 ? "" : "s"}…`}
       />
     </>
   );

@@ -37,6 +37,7 @@ interface DieselExpensesTableProps {
   destMeter: number;
   readOnly?: boolean;
   onTripSynced?: (trip: Trip) => void;
+  isRentedVehicle?: boolean;
 }
 
 const OTHER_BUNK_VALUE = "__other__";
@@ -102,6 +103,7 @@ export default function DieselExpensesTable({
   destMeter,
   showNotification,
   readOnly = false,
+  isRentedVehicle = false,
 }: DieselExpensesTableProps) {
   const gpsRequestRef = useRef<Record<number, number>>({});
   const { t } = useI18n();
@@ -657,12 +659,12 @@ export default function DieselExpensesTable({
     const image = data[`dieselImage${num}`];
     const lat = data[`dieselGpsLat${num}`];
     const lon = data[`dieselGpsLon${num}`];
-    const meterErr = meterErrors[num] || meterViolation(num, reading, useDraft ? data : undefined);
-    const laterBlock = laterBillsBlocking(num, useDraft).length > 0;
+    const meterErr = isRentedVehicle ? null : meterErrors[num] || meterViolation(num, reading, useDraft ? data : undefined);
+    const laterBlock = !isRentedVehicle && laterBillsBlocking(num, useDraft).length > 0;
     return (
       isPositive(ltr) &&
       isPositive(amount) &&
-      isPositive(reading) &&
+      (isRentedVehicle || isPositive(reading)) &&
       bunkName.length > 0 &&
       hasRealBill(image) &&
       isValidGps(lat, lon) &&
@@ -679,13 +681,13 @@ export default function DieselExpensesTable({
     if (!isPositive(data[`dieselAmount${num}`])) {
       reasons.push(t("ops.trip.amount_greater_zero"));
     }
-    if (!isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
+    if (!isRentedVehicle && !isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
     const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
     const bunkName = selectedBunk === OTHER_BUNK_VALUE
       ? String(data[`dieselOtherBunk${num}`] || "").trim()
       : selectedBunk;
     if (!bunkName) reasons.push(t("ops.trip.bunk_required"));
-    const meterErr = meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
+    const meterErr = isRentedVehicle ? null : meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
     if (meterErr && !reasons.includes(meterErr)) reasons.push(meterErr);
     const later = laterBillsBlocking(num, useDraft);
     if (later.length > 0) {
@@ -1048,7 +1050,7 @@ export default function DieselExpensesTable({
               <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_ltr")} <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_rate")}</th>
               <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_amount")} <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_reading")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_reading")} {!isRentedVehicle && <span className="text-red-500">*</span>}</th>
               <th className="py-2.5 px-1.5 text-left">{t("ops.trip.bunk_address")}</th>
               <th className="py-2.5 px-2 text-left">GPS <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-1.5 text-center">{t("ops.trip.bill_image_slip")} <span className="text-red-500">*</span></th>
@@ -1173,7 +1175,7 @@ export default function DieselExpensesTable({
                         onChange={(e) => handleMeterChange(num, e.target.value)}
                         onBlur={() => {
                           const v = getFieldValue(`dieselMeter${num}`, num);
-                          const err = meterViolation(num, v, editingRow === num ? draftData : undefined);
+                          const err = isRentedVehicle ? null : meterViolation(num, v, editingRow === num ? draftData : undefined);
                           if (err) {
                             setMeterErrors((prev) => ({ ...prev, [num]: err }));
                             // Message shows once at top beside Last Entered Meter — no toast duplicate.

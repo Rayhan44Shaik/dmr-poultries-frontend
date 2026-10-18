@@ -31,7 +31,7 @@ export default defineConfig({
   projects: [
     {
       name: 'trip-workflow',
-      testMatch: /(?:trip-workflow\.e2e|orders-live-workflow)\.spec\.ts/,
+      testMatch: /(?:trip-workflow\.e2e|orders-live-workflow|batch-c2-step4-persistence)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {

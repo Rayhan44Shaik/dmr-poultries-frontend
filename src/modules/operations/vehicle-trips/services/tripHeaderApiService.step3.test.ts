@@ -26,6 +26,26 @@ test("toStep3Payload omits empty boxes so a partial save cannot wipe rows", () =
   assert.equal("boxDetails" in payload, false);
 });
 
+test("toStep3Payload sends an explicit empty box list for erase-all", () => {
+  const payload = toStep3Payload({ boxDetails: [], clearBoxDetails: true });
+  assert.deepEqual(payload.boxDetails, []);
+});
+
+test("toStep3Payload forwards original-byte SHA-256 import metadata", () => {
+  const fingerprint = {
+    algorithm: "SHA-256",
+    version: 1,
+    contentHash: "a".repeat(64),
+    originalFilename: "pickup.xlsx",
+    byteLength: 512,
+  };
+  const payload = toStep3Payload({
+    boxDetails: [{ boxNo: 1, birds: 20, weight: 40 }],
+    importFingerprint: fingerprint,
+  } as Parameters<typeof toStep3Payload>[0]);
+  assert.deepEqual(payload.importFingerprint, fingerprint);
+});
+
 test("mapApiTripToTrip hydrates Step 3 boxes, photos, KPI, and capacity", () => {
   const mapped = mapApiTripToTrip({
     id: 9,

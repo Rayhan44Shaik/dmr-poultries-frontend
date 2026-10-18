@@ -108,6 +108,8 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
             pendingCollectionsCount={vm.pendingCollectionsCount}
             weekStart={vm.weekStart}
             weekEnd={vm.weekEnd}
+            collectionWeekStart={vm.collectionWeekStart}
+            collectionWeekEnd={vm.collectionWeekEnd}
           />
         </div>
         <div className="lg:col-span-5 min-w-0">

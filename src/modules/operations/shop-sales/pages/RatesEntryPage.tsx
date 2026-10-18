@@ -1,5 +1,5 @@
 import { useRef, useState, type ComponentProps } from "react";
-import { IndianRupee, LoaderCircle, Store } from "lucide-react";
+import { IndianRupee, LoaderCircle } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";

@@ -23,6 +23,9 @@ interface OutstandingSummaryProps {
   /** This week's own boundaries, used to label the in-week rows. */
   weekStart?: string;
   weekEnd?: string;
+  /** Current selected week used for collection rows (sales use weekStart/weekEnd). */
+  collectionWeekStart?: string;
+  collectionWeekEnd?: string;
 }
 
 /** YYYY-MM-DD → DD-MM-YYYY, matching the date format used across Operations. */
@@ -96,6 +99,8 @@ export default function OutstandingSummary({
   pendingCollectionsCount = 0,
   weekStart,
   weekEnd,
+  collectionWeekStart,
+  collectionWeekEnd,
 }: OutstandingSummaryProps) {
   const { t } = useI18n();
 
@@ -113,6 +118,9 @@ export default function OutstandingSummary({
   // dash matches every other range in the app and needs no translation.
   const weekRange = ledgerLoaded && weekStart && weekEnd ? `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}` : "";
   const inWeekSubtitle = weekRange || periodSubtitle;
+  const collectionWeekRange = ledgerLoaded && collectionWeekStart && collectionWeekEnd
+    ? `${fmtDate(collectionWeekStart)} – ${fmtDate(collectionWeekEnd)}`
+    : inWeekSubtitle;
   // "… – 3 entries" — the count line is translated too, so a Telugu session
   // never ends a sentence in English.
   const countLabel = (count: number, subtitle: string) =>
@@ -192,7 +200,7 @@ export default function OutstandingSummary({
           iconBg="bg-green-100"
           iconColor="text-green-600"
           icon={<Download size={18} />}
-          subtitle={countLabel(approvedCollectionsCount, inWeekSubtitle)}
+          subtitle={countLabel(approvedCollectionsCount, collectionWeekRange)}
           isNegative
         />
 
@@ -204,7 +212,7 @@ export default function OutstandingSummary({
           iconBg="bg-amber-100"
           iconColor="text-amber-700"
           icon={<AlertTriangle size={18} />}
-          subtitle={countLabel(pendingCollectionsCount, t("ops.collection.informational_only"))}
+          subtitle={countLabel(pendingCollectionsCount, collectionWeekRange)}
           isInfo
         />
 

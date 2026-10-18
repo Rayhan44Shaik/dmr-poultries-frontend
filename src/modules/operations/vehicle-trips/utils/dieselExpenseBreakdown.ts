@@ -13,6 +13,28 @@ export interface DieselExpenseBreakdown {
   tooltip: string;
 }
 
+export interface TripExpenseTotals {
+  expenseTotal: number;
+  grandTotal: number;
+}
+
+/**
+ * Other-diesel is displayed as an expense-table line, while also remaining
+ * part of the consolidated diesel bill. Include it in the expense subtotal,
+ * then remove that overlap once from the all-in total.
+ */
+export function calculateTripExpenseTotals(
+  expenseTotalWithoutOtherDiesel: number,
+  totalDieselAmount: number,
+  otherDieselAmount: number,
+): TripExpenseTotals {
+  const expenseTotal = expenseTotalWithoutOtherDiesel + otherDieselAmount;
+  return {
+    expenseTotal,
+    grandTotal: expenseTotal + totalDieselAmount - otherDieselAmount,
+  };
+}
+
 const money = (value: number) => `₹${value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export function dieselExpenseBreakdown(rows: DieselExpenseRow[]): DieselExpenseBreakdown {

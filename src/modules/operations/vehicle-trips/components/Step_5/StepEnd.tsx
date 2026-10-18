@@ -20,7 +20,7 @@ import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
 import { withMinSaveDuration } from "../../utils/withMinSaveDuration";
-import { dieselExpenseBreakdown } from "../../utils/dieselExpenseBreakdown";
+import { calculateTripExpenseTotals, dieselExpenseBreakdown } from "../../utils/dieselExpenseBreakdown";
 import { formatVehicleNumber } from "../../../../../utils/format";
 import { tripMealEmployeeCount } from "../../utils/tripCrewCount";
 
@@ -53,6 +53,7 @@ interface SheetData extends Record<string, any> {
   loading: number | string;
   mealsTiffin: number | string;
   vehicleMaintenance: number | string;
+  vehicleMaintenanceNote: string;
   othersRC: number | string;
   others1Amt: number | string;
   others2Amt: number | string;
@@ -146,6 +147,7 @@ export default function StepEnd({
       loading: (tripData as any).loading ?? "",
       mealsTiffin: (tripData as any).mealsTiffin ?? "",
       vehicleMaintenance: (tripData as any).vehicleMaintenance ?? "",
+      vehicleMaintenanceNote: (tripData as any).vehicleMaintenanceNote ?? "",
       othersRC: (tripData as any).othersRC ?? "",
       others1Amt: (tripData as any).others1Amt ?? "",
       others2Amt: (tripData as any).others2Amt ?? "",
@@ -419,17 +421,23 @@ export default function StepEnd({
     Number(sheetData.vehicleMaintenance || 0) +
     Number(sheetData.othersRC || 0);
 
-  const totalExpenses2 =
+  const totalExpenses2WithoutOtherDiesel =
     Number(sheetData.others1Amt || 0) +
     Number(sheetData.others2Amt || 0) +
     Number(sheetData.others3Amt || 0) +
     Number(sheetData.others4Amt || 0) +
     Number(sheetData.others5Amt || 0);
 
+  const { expenseTotal: totalExpenses2, grandTotal: expenseAndDieselSubtotal } = calculateTripExpenseTotals(
+    totalExpenses2WithoutOtherDiesel,
+    totalDieselAmount,
+    dieselBreakdown.otherAmount,
+  );
   const totalAllExpenses = totalExpenses1 + totalExpenses2;
+  const grandTotal = totalExpenses1 + expenseAndDieselSubtotal;
 
   const remainingBalance =
-    Number(trip.advanceAmount || 0) - totalAllExpenses - totalDieselAmount;
+    Number(trip.advanceAmount || 0) - grandTotal;
 
   /** Indian grouping: ₹1,000.00 / ₹1,00,000.00 */
   const formatInr = (n: number) =>
@@ -610,6 +618,10 @@ export default function StepEnd({
         setErrorMsg(t("ops.trip.other_expense_description_required"));
         return;
       }
+    }
+    if (Number(sheetData.vehicleMaintenance || 0) > 0 && !sheetData.vehicleMaintenanceNote.trim()) {
+      setErrorMsg("Enter short vehicle-maintenance details, for example Grease or Bolt rotation.");
+      return;
     }
 
     const actualDestMeter = destMeter || 0;
@@ -840,7 +852,7 @@ export default function StepEnd({
               },
               {
                 label: t("ops.trip.field_total_all"),
-                value: formatInr(totalAllExpenses + totalDieselAmount),
+                value: formatInr(grandTotal),
                 tone: "border-slate-200 bg-slate-50/60 text-slate-700",
               },
             ].map((f) => (
@@ -872,7 +884,7 @@ export default function StepEnd({
             hideMeters={isRentedVehicle}
             mealEmployeeCount={mealEmployeeCount}
           />
-          {!isRentedVehicle && <DieselExpensesTable
+          <DieselExpensesTable
             tripId={trip.id}
             sheetData={sheetData}
             handleChange={handleChange}
@@ -881,7 +893,8 @@ export default function StepEnd({
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
             readOnly
-          />}
+            isRentedVehicle={isRentedVehicle}
+          />
         </div>
       ) : (
         // ─── Editable View ────────────────────────────────────────────
@@ -939,7 +952,7 @@ export default function StepEnd({
               },
               {
                 label: t("ops.trip.field_total_all"),
-                value: formatInr(totalAllExpenses + totalDieselAmount),
+                value: formatInr(grandTotal),
                 tone: "border-slate-200 bg-slate-50/60 text-slate-700",
               },
             ].map((f) => (
@@ -974,7 +987,7 @@ export default function StepEnd({
             mealEmployeeCount={mealEmployeeCount}
           />
 
-          {!isRentedVehicle && <DieselExpensesTable
+          <DieselExpensesTable
             key={`diesel-${trip.id}`}
             readOnly={trip.meterLocked === true}
             tripId={trip.id}
@@ -984,7 +997,8 @@ export default function StepEnd({
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
-          />}
+            isRentedVehicle={isRentedVehicle}
+          />
 
           {trip.meterLocked ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">

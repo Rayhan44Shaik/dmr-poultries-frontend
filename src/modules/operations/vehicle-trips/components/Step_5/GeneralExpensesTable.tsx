@@ -204,7 +204,7 @@ export default function GeneralExpensesTable({
               derived?: boolean;
             }> = [
               { key: "others1Amt", label: "RTO", value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: Landmark, field: "others1Amt", rightBg: "bg-indigo-50/40" },
-              { key: "dieselOthers", label: "OTHER DIESEL BILL", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
+              { key: "dieselOthers", label: "OTHER DIESEL (OD)", value: dieselOtherAmount, tone: "bg-amber-50/70 text-amber-600", Icon: MoreHorizontal, derived: true, rightBg: "bg-amber-50/30" },
               { key: "others2Amt", label: "SUPERVISOR (PC)", value: sheetData.others2Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others2Amt", rightBg: "bg-slate-50/50" },
               { key: "others3Amt", label: sheetData.others3Name || t("common.other"), value: sheetData.others3Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others3Amt", nameField: "others3Name", rightBg: "bg-slate-50/50" },
               { key: "others4Amt", label: sheetData.others4Name || t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", nameField: "others4Name", rightBg: "bg-slate-50/50" },
@@ -231,7 +231,21 @@ export default function GeneralExpensesTable({
                     {left ? (
                       <span className="inline-flex items-center gap-2">
                         <CatIcon icon={left.Icon} tone={left.tone} />
-                        {left.label}
+                        <span className="min-w-0">
+                          <span className="block">{left.key === "vehicleMaintenance" && readOnly && sheetData.vehicleMaintenanceNote
+                            ? `${left.label} (${sheetData.vehicleMaintenanceNote})`
+                            : left.label}</span>
+                          {left.key === "vehicleMaintenance" && !readOnly ? (
+                            <input
+                              type="text"
+                              maxLength={120}
+                              value={sheetData.vehicleMaintenanceNote || ""}
+                              onChange={(event) => handleChange("vehicleMaintenanceNote", event.target.value)}
+                              placeholder="Grease, bolt rotation…"
+                              className="mt-0.5 w-full min-w-0 bg-transparent text-[11px] font-medium text-slate-500 outline-none placeholder:text-slate-400"
+                            />
+                          ) : null}
+                        </span>
                       </span>
                     ) : null}
                   </td>

@@ -610,9 +610,12 @@ async function fetchWeeklySummary(shopId: number, date: string): Promise<Collect
   return mapWeeklySummary(data);
 }
 
-async function fetchWeekBounds(date?: string): Promise<CollectionWeekBounds> {
+async function fetchWeekBounds(
+  date?: string,
+  period: "containing" | "previous-completed" = "containing",
+): Promise<CollectionWeekBounds> {
   const { data } = await apiGet<CollectionWeekBounds>(`${COLLECTION_PATH}/week-bounds`, {
-    params: date ? { date } : {},
+    params: { ...(date ? { date } : {}), period },
   });
   return {
     asOfDate: String(data.asOfDate),
@@ -724,6 +727,8 @@ function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummar
     shopName: String(data.shopName ?? ""),
     weekStart: String(data.weekStart),
     weekEnd: String(data.weekEnd),
+    collectionWeekStart: String(data.collectionWeekStart ?? data.weekStart),
+    collectionWeekEnd: String(data.collectionWeekEnd ?? data.weekEnd),
     previousWeekEnd: String(data.previousWeekEnd ?? ""),
     openingBalance: Number(data.openingBalance ?? 0),
     balance: Number(data.balance ?? 0),
