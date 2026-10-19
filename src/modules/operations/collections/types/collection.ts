@@ -252,13 +252,15 @@ export interface CollectionWeeklySummary {
    * differs by whatever was posted after that week ended.
    */
   closingBalance: number;
-  /** Approved, non-deleted sales dated inside the week. Drives the balance. */
+  /** Approved, non-deleted sales from the previous completed week (`weekStart`–`weekEnd`). */
   weeklySales: number;
   /** Sales awaiting approval — shown for context, never part of the balance. */
   pendingSales: number;
   /** Number of approved sale rows in the week. */
   salesCount: number;
+  /** Approved collections from the selected/current `collectionWeekStart`–`collectionWeekEnd`. */
   approvedCollections: number;
+  /** Pending collections from the selected/current `collectionWeekStart`–`collectionWeekEnd`. */
   pendingCollections: number;
   /** Row counts behind the two collection amounts. */
   approvedCollectionsCount: number;

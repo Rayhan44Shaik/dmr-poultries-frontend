@@ -54,7 +54,7 @@ function AccountsPage() {
 
   return (
     <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
-      <div key={activeTab} className="mx-auto w-full max-w-[1480px] animate-page-pop">
+      <div key={activeTab} className="w-full min-w-0 animate-page-pop">
         <ActiveComponent embedded={true} />
       </div>
     </div>

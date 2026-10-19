@@ -71,7 +71,7 @@ function CollectionInformation({
     entry.paymentModeName.trim().length > 0;
 
   return (
-    <div className={opsFilterCardClass}>
+    <div className={`${opsFilterCardClass} relative overflow-visible border-emerald-100 shadow-sm focus-within:z-20`}>
       {/* Row 1 — the four compact entry fields, in capture order. */}
       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <div>
@@ -80,10 +80,12 @@ function CollectionInformation({
             <span>{t("operations.collection_date")}</span>
           </label>
           <DatePicker
+            id="collection-entry-date"
             value={entry.collectionDate}
             onChange={onDateChange}
             placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
+            openOnFocus={false}
           />
           {errors.collectionDate && (
             <p className="mt-1 text-xs text-red-600">{errors.collectionDate}</p>
@@ -134,32 +136,6 @@ function CollectionInformation({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Hash size={17} className="text-slate-400 flex-shrink-0" />
-            <span>{t("operations.reference_no")}</span>
-          </label>
-          <input
-            id="referenceNo"
-            type="text"
-            value={entry.referenceNo}
-            onChange={(e) => onReferenceChange(e.target.value)}
-            placeholder={t("placeholder.enter_reference")}
-            disabled={entry.paymentModeName === "Cash"}
-            className={`${opsInputClass} disabled:bg-slate-100 disabled:text-slate-400`}
-            aria-describedby={errors.referenceNo ? "referenceNo-error" : undefined}
-          />
-          {errors.referenceNo && (
-            <p id="referenceNo-error" className="mt-1 text-xs text-red-600">
-              {errors.referenceNo}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Row 2 — Shop Name is searchable and holds long trading names, so it
-        * spans the width of the four fields above, with the actions alongside. */}
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 items-end pt-1">
-        <div className="lg:col-span-7">
-          <label className={opsFilterLabelClass}>
             <Store size={17} className="text-amber-500 flex-shrink-0" />
             <span>
               {t("operations.shop_name")} <span className="text-red-500">*</span>
@@ -178,8 +154,30 @@ function CollectionInformation({
             className="w-full"
           />
         </div>
+      </div>
 
-        <div className="lg:col-span-5 flex items-center justify-end gap-2 flex-wrap">
+      {/* Row 2 — Shop Name is searchable and holds long trading names, so it
+        * spans the width of the four fields above, with the actions alongside. */}
+      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 items-end pt-1">
+        <div className="lg:col-span-5">
+          <label className={opsFilterLabelClass}>
+            <Hash size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{t("operations.reference_no")}</span>
+          </label>
+          <input
+            id="referenceNo"
+            type="text"
+            value={entry.referenceNo}
+            onChange={(e) => onReferenceChange(e.target.value)}
+            placeholder={t("placeholder.enter_reference")}
+            disabled={entry.paymentModeName === "Cash"}
+            className={`${opsInputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+            aria-describedby={errors.referenceNo ? "referenceNo-error" : undefined}
+          />
+          {errors.referenceNo && <p id="referenceNo-error" className="mt-1 text-xs text-red-600">{errors.referenceNo}</p>}
+        </div>
+
+        <div className="lg:col-span-7 flex items-center justify-end gap-2 flex-wrap">
         <button
           type="button"
           onClick={onViewLedger}

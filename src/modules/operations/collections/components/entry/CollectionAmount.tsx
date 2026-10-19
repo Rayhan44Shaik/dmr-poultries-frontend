@@ -236,6 +236,7 @@ export default function CollectionAmount({
           type="text"
           value={remarks}
           onChange={(e) => onRemarksChange(e.target.value)}
+          maxLength={2000}
           placeholder={t("placeholder.enter_remarks")}
           className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         />
@@ -308,11 +309,11 @@ export default function CollectionAmount({
       {/* Actions. Icons animate on hover using the same vocabulary as the Trip
         * wizard: the X rotates a quarter turn, Save lifts slightly, and a
         * spinner replaces Save while the request is in flight. */}
-      <div className="mt-auto pt-4 flex justify-end gap-3">
+      <div className="mt-auto flex flex-col-reverse gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
         <button
           type="button"
           onClick={onCancel}
-          className="group inline-flex items-center gap-2 rounded-md border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+          className="group inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:ring-offset-2"
         >
           <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" aria-hidden />
           {t("common.cancel")}
@@ -322,10 +323,10 @@ export default function CollectionAmount({
           onClick={onSave}
           disabled={disableSave || isSaving}
           aria-busy={isSaving || undefined}
-          className={`group inline-flex items-center gap-2 rounded-md px-5 py-2 text-sm font-medium text-white transition ${
+          className={`group inline-flex h-11 min-w-44 items-center justify-center gap-2 rounded-xl px-6 text-sm font-semibold text-white shadow-sm transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 ${
             disableSave || isSaving
               ? "cursor-not-allowed bg-slate-400"
-              : "bg-emerald-700 hover:bg-emerald-800"
+              : "bg-gradient-to-r from-emerald-600 to-emerald-700 hover:-translate-y-0.5 hover:from-emerald-700 hover:to-emerald-800 hover:shadow-lg active:translate-y-0 active:scale-[0.98]"
           }`}
         >
           {isSaving ? (

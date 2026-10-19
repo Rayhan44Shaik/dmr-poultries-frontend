@@ -129,7 +129,7 @@ function FleetPages() {
 
   return (
     <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
-      <div className="mx-auto w-full max-w-[1600px]">
+      <div className="w-full min-w-0">
         {(Object.keys(tabComponents) as VisibleFleetTab[]).map((tab) => {
           if (!visitedTabs.has(tab) && tab !== activeTab) return null;
           return <FleetTabPane key={tab} tab={tab} active={tab === activeTab} />;

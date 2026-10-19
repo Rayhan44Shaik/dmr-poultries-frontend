@@ -26,6 +26,7 @@ const enMainDictSrc = read("../../../../i18n/en.ts");
 const entryHookSrc = read("../hooks/useCollectionEntry.ts");
 const summarySrc = read("../components/entry/OutstandingSummary.tsx");
 const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
+const collectionInformationSrc = read("../components/entry/CollectionInformation.tsx");
 const serviceSrc = read("./collectionService.ts");
 
 test("Opening Balance is correctly displayed as a carried-forward figure", () => {
@@ -76,6 +77,22 @@ test("Weekly cards (Approved Sales / Approved Collections / Pending Approval) ar
   assert.match(summarySrc, /periodLabel/);
 });
 
+test("Summary permanently keeps sales on the previous week and collections on the current week", () => {
+  // Backend contract: weekStart/weekEnd are the previous completed sales week;
+  // collectionWeekStart/collectionWeekEnd are the selected current collection week.
+  assert.match(summarySrc, /weekStart && weekEnd/);
+  assert.match(summarySrc, /collectionWeekStart && collectionWeekEnd/);
+  assert.match(summarySrc, /subtitle=\{countLabel\(salesCount, inWeekSubtitle\)\}/);
+  assert.match(summarySrc, /subtitle=\{countLabel\(approvedCollectionsCount, collectionWeekRange\)\}/);
+  assert.match(summarySrc, /subtitle=\{countLabel\(pendingCollectionsCount, collectionWeekRange\)\}/);
+});
+
+test("Collection date calendar is not clipped by the entry card", () => {
+  assert.match(collectionInformationSrc, /overflow-visible/);
+  assert.match(collectionInformationSrc, /focus-within:z-20/);
+  assert.doesNotMatch(collectionInformationSrc, /opsFilterCardClass\} overflow-hidden/);
+});
+
 test("Current Outstanding KPI is the primary summary figure (highlighted, bottom of summary)", () => {
   // Current Outstanding is the bottom-line figure in the summary card (highlighted in emerald)
   assert.match(summarySrc, /t\("ops\.collection\.current_outstanding"\)/);
@@ -93,14 +110,17 @@ test("Collection Entry renders the collection table with the required columns", 
   // Column headers are i18n-driven, so assert the keys the table actually
   // renders rather than English literals (those only ever matched incidental
   // comments, and silently stopped matching when the layout was reworked).
-  // en values: S.No · Collection No · Day · Shop · Collector · Amount · Status.
-  assert.match(tableSrc, /t\("table\.s_no"\)/);
+  // The compact row-number heading is #, followed by the collection details.
+  assert.match(tableSrc, />\s*#\s*</);
   assert.match(tableSrc, /t\("table\.collection_no"\)/);
   assert.match(tableSrc, /t\("common\.day"\)/);
   assert.match(tableSrc, /t\("table\.shop"\)/);
   assert.match(tableSrc, /t\("table\.collector"\)/);
+  assert.match(tableSrc, /t\("table\.mode"\)/);
   assert.match(tableSrc, /t\("table\.amount"\)/);
+  assert.match(tableSrc, /t\("table\.remarks"\)/);
   assert.match(tableSrc, /t\("table\.status"\)/);
+  assert.match(tableSrc, /col\.paymentModeName/);
 });
 
 test("Filtering happens before display (single global filter)", () => {
@@ -109,6 +129,27 @@ test("Filtering happens before display (single global filter)", () => {
   assert.ok(filterIdx !== -1 && displayIdx !== -1);
   assert.ok(filterIdx < displayIdx, "filter must run before display");
   // RecentCollectionsTable doesn't use pagination (it shows all filtered results)
+});
+
+test("Recent Collections clears the selected row when clicking outside the table rows", () => {
+  assert.match(tableSrc, /document\.addEventListener\("pointerdown", handleClickAway\)/);
+  assert.match(tableSrc, /target\.closest\("\[data-recent-collection-row\]"\)/);
+  assert.match(tableSrc, /data-recent-collection-row/);
+  assert.match(tableSrc, /onSelectionChange\?\.\(null\)/);
+});
+
+test("Recent Collections uses selected-row toolbar actions instead of an actions column", () => {
+  assert.match(tableSrc, /canEditSelected/);
+  assert.match(tableSrc, /canDeleteSelected/);
+  assert.match(tableSrc, /onDelete\?\.\(selectedCollection\.id\)/);
+  assert.doesNotMatch(tableSrc, /t\("table\.actions"\)/);
+});
+
+test("Pending collection status changes through the row dropdown, not a toolbar approve button", () => {
+  assert.match(tableSrc, /<select[\s\S]*value="Pending Approval"/);
+  assert.match(tableSrc, /event\.target\.value === "Approved"/);
+  assert.match(tableSrc, /onApprove\(col\.id\)/);
+  assert.doesNotMatch(tableSrc, /canApproveSelected/);
 });
 
 test("approveCollection() reads the backend-returned currentBalance", async () => {

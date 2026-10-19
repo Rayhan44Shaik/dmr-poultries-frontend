@@ -130,7 +130,7 @@ function ShellFrame({ children }: DashboardLayoutProps) {
       <div className="flex h-full min-w-0 flex-col">
         <Header onMenuClick={handleMenuClick} menuOpen={navOpen} onOpenCommand={() => setCommandOpen(true)} />
 
-        <main ref={mainRef} className="flex-1 overflow-y-auto" id="app-scroll">
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto" id="app-scroll">
           {children}
         </main>
       </div>

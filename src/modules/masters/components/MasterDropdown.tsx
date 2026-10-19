@@ -110,6 +110,7 @@ export default function MasterDropdown({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const typeaheadRef = useRef({ text: "", time: 0 });
   const isOpen = open && !disabled;
@@ -294,21 +295,18 @@ export default function MasterDropdown({
     };
   }, [isOpen, searchable]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isOpen || !activeId) return;
-    // Scroll only the option list; scrollIntoView would also move the form.
-    const option = document.getElementById(activeId);
-    const list = option?.parentElement;
-    if (option && list) {
-      if (option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
-      else if (
-        option.offsetTop + option.offsetHeight >
-        list.scrollTop + list.clientHeight
-      ) {
-        list.scrollTop =
-          option.offsetTop + option.offsetHeight - list.clientHeight;
-      }
-    }
+    // Portalled menus may finish layout one frame after `open`. Centre the
+    // selected/active option inside the list itself without moving the page.
+    const frame = window.requestAnimationFrame(() => {
+      const list = listRef.current;
+      const option = document.getElementById(activeId);
+      if (!list || !option) return;
+      const nextTop = option.offsetTop - (list.clientHeight - option.offsetHeight) / 2;
+      list.scrollTop = Math.max(0, nextTop);
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [activeId, isOpen]);
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -431,6 +429,7 @@ export default function MasterDropdown({
         </div>
       )}
       <div
+        ref={listRef}
         id={`${id}-list`}
         role={kind === "action" ? "menu" : "listbox"}
         aria-label={label}

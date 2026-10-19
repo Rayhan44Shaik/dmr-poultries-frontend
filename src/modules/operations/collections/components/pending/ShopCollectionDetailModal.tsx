@@ -54,16 +54,16 @@ const DEFAULT_PAGE_SIZE = 10;
  * Table geometry.
  *
  * S.No is the ONE column with a width of its own — a narrow rail sized for a
- * record number, so it never takes a data column's share. The other seven
+ * record number, so it never takes a data column's share. The other nine
  * columns are then computed from what is left, which keeps them EXACTLY equal
  * at every width instead of hand-rounded percentages that drift a pixel apart:
  *
- *   data column = (100% − S.No rail) ÷ 7
+ *   data column = (100% − S.No rail) ÷ 9
  *
  * `table-layout: fixed` makes the browser honour these outright, so the grid
  * reads evenly however long a collection number or a collector's name gets.
  */
-const DATA_COLUMN_COUNT = 7;
+const DATA_COLUMN_COUNT = 9;
 const SNO_COLUMN_WIDTH = "4.5rem";
 const DATA_COLUMN_WIDTH = "calc((100% - " + SNO_COLUMN_WIDTH + ") / " + DATA_COLUMN_COUNT + ")";
 
@@ -302,6 +302,8 @@ function ShopCollectionDetailView({
           col.collectionDate,
           col.collector,
           col.paymentMode,
+          col.referenceNo,
+          col.remarks,
           col.status,
           String(col.amount ?? ""),
         ].some((value) => String(value ?? "").toLowerCase().includes(searchTerm)),
@@ -583,9 +585,9 @@ function ShopCollectionDetailView({
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  {/* S.No keeps its narrow rail; the other seven columns are each
+                  {/* S.No keeps its narrow rail; the other nine columns are each
                     * exactly the same width (see DATA_COLUMN_WIDTH). */}
-                  <table className="min-w-[86rem] w-full table-fixed divide-y divide-slate-100">
+                  <table className="min-w-[104rem] w-full table-fixed divide-y divide-slate-100">
                     <colgroup>
                       <col style={{ width: SNO_COLUMN_WIDTH }} />
                       {Array.from({ length: DATA_COLUMN_COUNT }, (_, index) => (
@@ -636,6 +638,12 @@ function ShopCollectionDetailView({
                             </span>,
                             "center",
                           )}
+                        </th>
+                        <th className={`${CELL_PADDING_X} py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500`}>
+                          {t("operations.reference_no")}
+                        </th>
+                        <th className={`${CELL_PADDING_X} py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500`}>
+                          {t("common.remarks")}
                         </th>
                         <th className={`${CELL_PADDING_X} py-3 text-center`}>
                           {sortableHeader(
@@ -702,6 +710,12 @@ function ShopCollectionDetailView({
                               <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
                                 {localizeTripViewText(col.paymentMode || "Cash", language)}
                               </span>
+                            </td>
+                            <td className={`${CELL_PADDING_X} py-3 text-center text-xs text-slate-600`}>
+                              <span className="block truncate" title={col.referenceNo || undefined}>{col.referenceNo || "—"}</span>
+                            </td>
+                            <td className={`${CELL_PADDING_X} py-3 text-center text-xs text-slate-600`}>
+                              <span className="block truncate" title={col.remarks || undefined}>{col.remarks || "—"}</span>
                             </td>
                             <td className={`${CELL_PADDING_X} py-3 text-center text-xs font-medium text-slate-600`}>
                               <span className="block truncate">

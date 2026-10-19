@@ -5,10 +5,13 @@ function mapStatus(status: string): CollectionLegacyStatus {
   return "Pending";
 }
 
+const normalizeCollectionNumber = (value: unknown): string =>
+  String(value ?? "").replace(/^col-/i, "COL-");
+
 export function mapEntryToCollection(e: CollectionApiEntry): Collection {
   return {
     id: String(e.id),
-    collectionNo: e.collectionNo,
+    collectionNo: normalizeCollectionNumber(e.collectionNo),
     collectionDate: e.collectionDate,
     shopName: e.shopName,
     collectorName: e.collector,
@@ -32,7 +35,7 @@ export function mapRawEntry(raw: Record<string, unknown>): CollectionApiEntry {
 
   return {
     id: Number(raw.id),
-    collectionNo: String(raw.collectionNo ?? raw.collection_no ?? ""),
+    collectionNo: normalizeCollectionNumber(raw.collectionNo ?? raw.collection_no),
     collectionDate: String(raw.collectionDate ?? raw.collection_date ?? ""),
     shopId: raw.shopId == null ? null : Number(raw.shopId ?? raw.shop_id),
     shopName: String(raw.shopName ?? raw.shop_name ?? ""),

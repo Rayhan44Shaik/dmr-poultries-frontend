@@ -310,7 +310,7 @@ function saveCollections(): void {
   // No-op â€” data is backend-owned.
 }
 function getNextCollectionNumber(): string {
-  // Numbers are generated server-side (Col-YYYYMMDD-NNN); never fabricated here.
+  // Numbers are generated server-side (COL-YYYYMMDD-NNN); never fabricated here.
   return "";
 }
 function getPendingCollections(): PendingCollection[] {

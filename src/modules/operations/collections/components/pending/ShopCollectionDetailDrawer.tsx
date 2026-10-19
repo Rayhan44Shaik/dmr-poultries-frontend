@@ -274,13 +274,15 @@ export function ShopCollectionDetailDrawer({
               <div className="p-8 text-center text-slate-500">{t("ops.collection.no_collections_for_shop")}</div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-100">
+                <table className="min-w-[72rem] w-full divide-y divide-slate-100">
                   <thead className="bg-slate-50">
                     <tr>
                       <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("ops.collection.collection_id")}</th>
                       <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.date")}</th>
                       <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.amount")}</th>
                       <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.mode")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("operations.reference_no")}</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("common.remarks")}</th>
                       <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.collector")}</th>
                       <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.status")}</th>
                       <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t("table.actions")}</th>
@@ -297,6 +299,8 @@ export function ShopCollectionDetailDrawer({
                             {col.paymentMode || "Cash"}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{col.referenceNo || "—"}</td>
+                        <td className="max-w-[16rem] px-4 py-3 text-sm text-slate-600"><span className="block truncate" title={col.remarks || undefined}>{col.remarks || "—"}</span></td>
                         <td className="px-4 py-3 text-sm text-slate-600">{col.collector || "-"}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${

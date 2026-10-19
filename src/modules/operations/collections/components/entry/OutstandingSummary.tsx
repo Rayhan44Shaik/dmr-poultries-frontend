@@ -109,6 +109,7 @@ export default function OutstandingSummary({
   const displayApprovedCollections = ledgerLoaded ? approvedCollections : 0;
   const displayPendingApproval = ledgerLoaded ? pendingApproval : 0;
   const displayCurrentOutstanding = ledgerLoaded ? currentOutstanding : 0;
+  const hasCreditBalance = displayCurrentOutstanding < 0;
 
   const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
 
@@ -221,21 +222,21 @@ export default function OutstandingSummary({
         {/* Current Outstanding uses the same row geometry as the rows above
           * (h-10 icon tile, px-4 py-3) so the column reads as one consistent
           * list; only the colour weight marks it as the total. */}
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+        <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 shadow-sm transition-colors duration-300 ${hasCreditBalance ? "border-blue-200 bg-blue-50" : "border-emerald-200 bg-emerald-50"}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${hasCreditBalance ? "bg-blue-600" : "bg-emerald-600"}`}>
               <Calculator size={18} />
             </div>
             <div className="flex min-w-0 flex-col">
               <span className="text-sm font-bold text-slate-800">
                 {t("ops.collection.current_outstanding")}
               </span>
-              <span className="text-[11px] font-medium text-emerald-700">
-                {t("ops.collection.outstanding_approved_only")}
+              <span className={`text-[11px] font-medium ${hasCreditBalance ? "text-blue-700" : "text-emerald-700"}`}>
+                {hasCreditBalance ? t("ops.collection.status.overpaid") : t("ops.collection.outstanding_approved_only")}
               </span>
             </div>
           </div>
-          <span className="shrink-0 text-base font-extrabold tabular-nums text-emerald-700">
+          <span className={`shrink-0 text-base font-extrabold tabular-nums ${hasCreditBalance ? "text-blue-700" : "text-emerald-700"}`}>
             {inr(displayCurrentOutstanding)}
           </span>
         </div>

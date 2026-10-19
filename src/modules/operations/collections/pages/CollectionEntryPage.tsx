@@ -8,8 +8,6 @@ import CollectionAmount from "../components/entry/CollectionAmount";
 import RecentCollectionsTable from "../components/entry/RecentCollectionsTable";
 import type { Collection, RecentCollection } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { useI18n } from "../../../../i18n";
 import { CAPABILITIES, useCan } from "../../../auth/permissions";
 
 type Props = {
@@ -17,9 +15,7 @@ type Props = {
 };
 
 export default function CollectionEntryPage({ embedded: _embedded = false }: Props) {
-  const { t } = useI18n();
   const vm = useCollectionEntry();
-  const { showNotification } = useSafeNotification();
   // Entry-only roles (supervisor) never receive approve / delete affordances.
   const can = useCan();
 
@@ -61,11 +57,13 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
   };
 
   const handleSaveCollection = async () => {
-    try {
-      await vm.saveCollection();
-      showNotification(t("ops.collection.saved_success"), "success");
-    } catch (err) {
-      showNotification(t("ops.collection.failed_save_try_again"), "error");
+    const saved = await vm.saveCollection();
+    if (saved) {
+      // Saving begins a fresh collection-entry cycle. Keep keyboard users in
+      // the form instead of letting focus fall through into the results table.
+      window.requestAnimationFrame(() => {
+        document.getElementById("collection-entry-date")?.focus({ preventScroll: true });
+      });
     }
   };
 
@@ -139,6 +137,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onStatusChange={vm.changeStatusFilter}
         onApprove={can(CAPABILITIES.COLLECTION_APPROVE) ? vm.approveCollection : undefined}
         onReject={can(CAPABILITIES.COLLECTION_REJECT) ? vm.rejectCollection : undefined}
+        onDelete={can(CAPABILITIES.COLLECTION_DELETE) ? vm.deleteCollection : undefined}
         onEdit={vm.editCollection}
         onViewShop={handleViewShop}
         onRefresh={vm.reloadCollections}

@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil,
-  Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2,
+  FileText, Calendar, Store, UserCog, CreditCard, IndianRupee, Activity, MessageSquareText,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
@@ -27,6 +27,7 @@ interface Props {
   /** Optional: roles without approve rights simply never receive it. */
   onApprove?: (id: string) => void;
   onReject?: (id: string) => void;
+  onDelete?: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
   /**
@@ -66,6 +67,7 @@ export default function RecentCollectionsTable({
   statusFilter,
   onStatusChange,
   onApprove,
+  onDelete,
   onEdit,
   onViewShop,
   onRefresh,
@@ -100,6 +102,8 @@ export default function RecentCollectionsTable({
         col.collectionNo,
         col.shopName,
         col.collectorName,
+        col.paymentModeName,
+        col.remarks,
         col.collectionDate,
         String(col.amount ?? ""),
         rawStatus,
@@ -151,6 +155,11 @@ export default function RecentCollectionsTable({
   }, [collections, filteredBySearch]);
 
   const displayedData = buckets[statusFilter];
+  const selectedCollection = displayedData.find((row) => row.id === selectedId) ?? null;
+  const selectedStatus = selectedCollection?.rawStatus || selectedCollection?.status;
+  const canEditSelected = Boolean(selectedCollection && selectedStatus === "Pending Approval" && onEdit);
+  const canViewSelected = Boolean(selectedCollection && selectedStatus === "Approved");
+  const canDeleteSelected = Boolean(selectedCollection && selectedStatus !== "Deleted" && onDelete);
 
   // Pagination. Reset to page 1 whenever the tab or the search changes, so a
   // filtered-down list can never leave the view stranded on an empty page.
@@ -170,6 +179,23 @@ export default function RecentCollectionsTable({
    * any route reports the row upward so the page shows its detail.
    */
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+
+  /** Clear the active row when the user clicks anywhere that is not a row in
+    * this table. Using pointerdown makes the selection disappear immediately,
+    * while a click on another row still proceeds to select that row normally. */
+  useEffect(() => {
+    if (!selectedId) return;
+
+    const handleClickAway = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest("[data-recent-collection-row]")) return;
+      setSelectedId(null);
+      onSelectionChange?.(null);
+    };
+
+    document.addEventListener("pointerdown", handleClickAway);
+    return () => document.removeEventListener("pointerdown", handleClickAway);
+  }, [selectedId, onSelectionChange]);
 
   const selectRow = (col: RecentCollection | null) => {
     setSelectedId(col ? col.id : null);
@@ -348,31 +374,72 @@ export default function RecentCollectionsTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => updateSearch(e.target.value)}
-              placeholder={t("ops.collection.search_collections_placeholder")}
-              className="w-full sm:w-64 pl-8 pr-8 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                aria-label={t("common.clear")}
-                className="group absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={14} className={uiActionIconMotionClass.close} />
-              </button>
-            )}
+          {/* Same compact search treatment as Recent Trip Activity: the icon
+            * sits in its own tile and the input uses the identical height and
+            * responsive width. */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 sm:flex-initial">
+            <span
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm"
+              aria-hidden="true"
+            >
+              <Search size={14} />
+            </span>
+            <div className="relative min-w-0 flex-1 sm:flex-initial">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => updateSearch(e.target.value)}
+                placeholder={t("ops.collection.search_collections_placeholder")}
+                aria-label={t("ops.collection.search_collections_placeholder")}
+                className="h-8 w-full sm:w-44 md:w-52 min-w-0 px-2.5 pr-8 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all shadow-sm"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  aria-label={t("common.clear")}
+                  className="group absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} className={uiActionIconMotionClass.close} />
+                </button>
+              )}
+            </div>
           </div>
 
           <FilterResetButton
             count={countActiveFilters(searchQuery.trim() !== "")}
             onClick={resetTable}
           />
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => selectedCollection && viewApprovedCollection(selectedCollection)}
+              disabled={!canViewSelected}
+              className={`group relative flex h-8 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium shadow-sm transition-all ${canViewSelected ? "border-violet-200/60 bg-violet-50/70 text-violet-600 hover:bg-violet-50 active:scale-95" : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"}`}
+              aria-label={t("common.view")}
+            >
+              <Eye size={13} /> <span className="hidden xl:inline">{t("common.view")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedCollection && onEdit(selectedCollection)}
+              disabled={!canEditSelected}
+              className={`group relative flex h-8 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium shadow-sm transition-all ${canEditSelected ? "border-blue-200/60 bg-blue-50/70 text-blue-600 hover:bg-blue-50 active:scale-95" : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"}`}
+              aria-label={t("common.edit")}
+            >
+              <Pencil size={13} /> <span className="hidden xl:inline">{t("common.edit")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectedCollection && onDelete?.(selectedCollection.id)}
+              disabled={!canDeleteSelected}
+              className={`group relative flex h-8 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium shadow-sm transition-all ${canDeleteSelected ? "border-rose-200/60 bg-rose-50/70 text-rose-600 hover:bg-rose-50 active:scale-95" : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"}`}
+              aria-label={t("common.delete")}
+            >
+              <Trash2 size={13} /> <span className="hidden xl:inline">{t("common.delete")}</span>
+            </button>
+          </div>
 
           {onRefresh && (
             <BrandRefreshButton
@@ -386,30 +453,28 @@ export default function RecentCollectionsTable({
         </div>
       </div>
 
-      {/* Data-first order shared with View Collection: S.No, Collection No,
-        * then Day. Remaining widths follow the content they carry so labels
-        * and values stay evenly separated without wasting table space. */}
+      {/* Balanced fixed columns keep the header and row values on the same
+        * visual axis. Shop, Collector and Amount deliberately receive equal
+        * space; Mode follows Collector because it describes that collection. */}
       <div className="overflow-x-auto">
-        <table className="min-w-[1200px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1460px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[6%]" />
-            <col className="w-[15%]" />
-            <col className="w-[16%]" />
-            <col className="w-[18%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
+            <col className="w-[4%]" />
+            <col className="w-[14%]" />
             <col className="w-[11%]" />
+            <col className="w-[14%]" />
+            <col className="w-[14%]" />
+            <col className="w-[9%]" />
+            <col className="w-[14%]" />
+            <col className="w-[6%]" />
+            <col className="w-[14%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
               {/* Each column is tagged with the same icon vocabulary Shop Sales
                 * uses, so a column means the same thing across the product. */}
               <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center gap-1.5">
-                  <Hash size={14} className="shrink-0 text-slate-400" />
-                  {t("table.s_no")}
-                </span>
+                #
               </th>
               <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
@@ -423,22 +488,34 @@ export default function RecentCollectionsTable({
                   {t("common.day")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center gap-1.5">
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
                   <Store size={14} className="shrink-0 text-amber-500" />
                   {t("table.shop")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center gap-1.5">
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
                   <UserCog size={14} className="shrink-0 text-violet-500" />
                   {t("table.collector")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex w-full items-center justify-end gap-1.5">
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <CreditCard size={14} className="shrink-0 text-blue-500" />
+                  {t("table.mode")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
                   <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                   {t("table.amount")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <MessageSquareText size={14} className="shrink-0 text-sky-500" />
+                  {t("table.remarks")}
                 </span>
               </th>
               <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
@@ -447,18 +524,12 @@ export default function RecentCollectionsTable({
                   {t("table.status")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-center gap-1.5">
-                  <Settings2 size={14} className="shrink-0 text-slate-400" />
-                  {t("table.actions")}
-                </span>
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400">
+                <td colSpan={9} className="py-16 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
@@ -470,7 +541,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : displayedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-[13px] font-medium text-slate-400">
+                <td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">
                   {getEmptyStateMessage()}
                 </td>
               </tr>
@@ -492,6 +563,7 @@ export default function RecentCollectionsTable({
                 return (
                   <tr
                     key={`${col.id}-${index}`}
+                    data-recent-collection-row
                     ref={(node) => {
                       // Clearing on unmount keeps the arrow keys from ever
                       // focusing a detached row after the page shrinks.
@@ -519,71 +591,52 @@ export default function RecentCollectionsTable({
                     <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
                       {formatTripListDay(col.collectionDate, language)}
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>
-                    <td className="px-4 py-3 text-right text-xs font-bold text-slate-700 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 truncate" title={localize(col.shopName)}>{localize(col.shopName)}</td>
+                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-600 truncate" title={localize(col.collectorName)}>{localize(col.collectorName)}</td>
+                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-600 truncate" title={col.paymentModeName || "Cash"}>
+                      {col.paymentModeName || "Cash"}
+                    </td>
+                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 tabular-nums whitespace-nowrap">
                       {inr(col.amount)}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${getStatusBadgeClass(rawStatus)}`}
-                      >
-                        {statusIcon}
-                        {statusLabel}
-                      </span>
+                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
+                      <span className="block truncate" title={col.remarks || undefined}>{col.remarks || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      {/* Icon buttons matching the Trip List action vocabulary.
-                        * No title attributes — the page is tooltip-free, so each
-                        * control carries an aria-label for assistive tech only. */}
-                      <div className="flex items-center justify-center gap-1.5">
-                        {isPending && onApprove && (
-                          <button
-                            type="button"
-                            onClick={() => onApprove(col.id)}
-                            aria-label={t("common.approve")}
-                            className="group h-8 w-8 rounded-xl bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                    <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                      {isPending && onApprove ? (
+                        <div className="group relative mx-auto w-[9rem]">
+                          <select
+                            value="Pending Approval"
+                            onChange={(event) => {
+                              if (event.target.value === "Approved") onApprove(col.id);
+                            }}
+                            aria-label={`${t("table.status")} — ${col.collectionNo}`}
+                            className="w-full cursor-pointer appearance-none rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 pr-8 text-xs font-bold text-orange-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1"
                           >
-                            <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
-                              <CheckCircle size={14} />
+                            <option value="Pending Approval" className="bg-white font-semibold text-orange-700">
+                              ⏳ {collectionStatusLabel("Pending Approval", t)}
+                            </option>
+                            <option value="Approved" className="bg-white font-semibold text-emerald-700">
+                              ✅ {collectionStatusLabel("Approved", t)}
+                            </option>
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-0.5 px-2 text-slate-500">
+                            <span className={`inline-flex text-emerald-600 ${uiActionIconMotionClass.approve}`} aria-hidden="true">
+                              <CheckCircle size={13} />
                             </span>
-                          </button>
-                        )}
-                        {isPending && onEdit && (
-                          <button
-                            type="button"
-                            onClick={() => onEdit(col)}
-                            aria-label={t("common.edit")}
-                            className="group h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                          >
-                            <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
-                              <Pencil size={14} />
-                            </span>
-                          </button>
-                        )}
-
-                        {/* View is an approved-only affordance. A pending row
-                          * has nothing settled to inspect yet — approve or edit
-                          * it first. */}
-                        {!isDeleted && !isPending && (
-                          <button
-                            type="button"
-                            onClick={() => viewApprovedCollection(col)}
-                            aria-label={`${t("common.view")} ${col.collectionNo}`}
-                            className="group inline-flex h-8 items-center justify-center gap-1.5 rounded-xl bg-violet-50 px-3 text-xs font-bold text-violet-600 shadow-sm transition-all hover:bg-violet-500 hover:text-white active:scale-95"
-                          >
-                            <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
-                              <Eye size={14} />
-                            </span>
-                            {t("common.view")}
-                          </button>
-                        )}
-
-                        {/* Deleted rows have no actions left to offer. */}
-                        {isDeleted && (
-                          <span className="text-xs font-medium text-slate-400">{t("status.deleted")}</span>
-                        )}
-                      </div>
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </div>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm ${getStatusBadgeClass(rawStatus)}`}
+                        >
+                          {statusIcon}
+                          {statusLabel}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );

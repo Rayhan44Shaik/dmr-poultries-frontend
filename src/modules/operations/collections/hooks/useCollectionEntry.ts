@@ -451,13 +451,13 @@ export default function useCollectionEntry() {
   }
 
   async function saveCollection() {
-    if (!validateEntry()) return;
+    if (!validateEntry()) return false;
     try {
       setIsSaving(true);
       const success = await collectionService.saveCollection(entry);
       if (!success) {
         showNotification(translate("ops.collection.failed_save"), "error");
-        return;
+        return false;
       }
       showNotification(translate("ops.collection.saved_success"), "success");
 
@@ -470,8 +470,10 @@ export default function useCollectionEntry() {
       resetEntry();
       setErrors({});
       setIsEditing(false);
+      return true;
     } catch (error) {
       showNotification(translate("ops.collection.failed_save"), "error");
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -503,6 +505,14 @@ export default function useCollectionEntry() {
   }
 
   async function deleteCollection(id: string) {
+    const confirmed = await confirmDialog({
+      title: translate("ops.collection.delete_confirm_title"),
+      message: translate("ops.collection.confirm_delete_collection"),
+      confirmLabel: translate("common.delete"),
+      cancelLabel: translate("common.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed) return;
     const success = await collectionService.deleteCollection(id);
     if (success) {
       showNotification(translate("ops.collection.deleted_success"), "success");
@@ -592,10 +602,10 @@ export default function useCollectionEntry() {
   }
 
   async function updateExistingCollection() {
-    if (!validateEntry()) return;
+    if (!validateEntry()) return false;
     const collections = collectionService.getCollections();
     const existing = collections.find((row) => row.id === entry.collectionId);
-    if (!existing) return;
+    if (!existing) return false;
     const success = await collectionService.updateCollection({
       ...existing,
       collectionDate: entry.collectionDate,
@@ -608,20 +618,20 @@ export default function useCollectionEntry() {
     });
     if (!success) {
       showNotification(translate("ops.collection.edit_failed_locked"), "error");
-      return;
+      return false;
     }
     showNotification(translate("ops.collection.updated_success"), "success");
     refreshPage();
     resetEntry();
     setIsEditing(false);
+    return true;
   }
 
   async function saveOrUpdateCollection() {
     if (entry.collectionId) {
-      await updateExistingCollection();
-    } else {
-      await saveCollection();
+      return await updateExistingCollection();
     }
+    return await saveCollection();
   }
 
   const hasPendingCollections = pendingCollections.length > 0;

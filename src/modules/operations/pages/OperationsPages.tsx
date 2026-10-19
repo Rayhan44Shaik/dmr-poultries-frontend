@@ -202,7 +202,7 @@ function OperationsPages() {
         className={
           activeTab === "orders"
             ? "w-full"
-            : "mx-auto w-full max-w-[1600px] animate-page-pop"
+            : "w-full min-w-0 animate-page-pop"
         }
       >
         <Suspense

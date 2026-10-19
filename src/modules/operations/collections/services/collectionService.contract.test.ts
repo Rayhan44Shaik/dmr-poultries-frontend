@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import type { AxiosRequestConfig } from "axios";
 import { apiClient } from "../../../../api/client";
+import { mapRawEntry } from "./collectionMapping";
 import { collectionService } from "./collectionService";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -26,6 +27,17 @@ interface RecordedCall {
   url: string;
   params?: Record<string, unknown>;
 }
+
+test("legacy mixed-case collection numbers are exposed with the permanent COL prefix", () => {
+  const entry = mapRawEntry({
+    id: 1,
+    collection_no: "Col-20261019-001",
+    collection_date: "2026-10-19",
+    amount: 100,
+  });
+
+  assert.equal(entry.collectionNo, "COL-20261019-001");
+});
 
 function installMockAdapter(): { calls: RecordedCall[]; restore: () => void } {
   const calls: RecordedCall[] = [];
