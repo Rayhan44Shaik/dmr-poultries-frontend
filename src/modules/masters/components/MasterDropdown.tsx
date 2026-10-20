@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { useI18n } from "../../../i18n";
 
 export interface MasterDropdownOption {
@@ -33,6 +33,8 @@ interface MasterDropdownProps {
   onChange: (value: string) => void;
   placeholder?: string;
   searchable?: boolean;
+  /** Match search terms only at the beginning of an option. */
+  searchFromStart?: boolean;
   allowClear?: boolean;
   /**
    * Let the user COMMIT the search text as the value when it matches no option
@@ -83,6 +85,7 @@ export default function MasterDropdown({
   onChange,
   placeholder = label,
   searchable = false,
+  searchFromStart = false,
   allowClear = false,
   allowCustomValue = false,
   validateCustom,
@@ -135,17 +138,21 @@ export default function MasterDropdown({
   }, [options, allowClear, placeholder]);
   const filtered = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
+    const matches = (value: unknown) => {
+      const candidate = lowerOptionText(value);
+      return searchFromStart ? candidate.startsWith(keyword) : candidate.includes(keyword);
+    };
     return items.filter((option) => {
       if (allowClear && option.value === "") return true;
       if (!keyword) return true;
       return (
-        lowerOptionText(option.label).includes(keyword) ||
-        lowerOptionText(option.searchText).includes(keyword) ||
-        lowerOptionText(option.value).includes(keyword) ||
-        lowerOptionText(option.keywords).includes(keyword)
+        matches(option.label) ||
+        matches(option.searchText) ||
+        matches(option.value) ||
+        matches(option.keywords)
       );
     });
-  }, [items, query, allowClear]);
+  }, [items, query, allowClear, searchFromStart]);
   const noMatches = !filtered.some(
     (option) => !(allowClear && option.value === ""),
   );
@@ -397,6 +404,10 @@ export default function MasterDropdown({
               onChange={(event) => {
                 setQuery(event.target.value);
                 const keyword = event.target.value.trim().toLocaleLowerCase();
+                const matchesFromQuery = (value: unknown) => {
+                  const candidate = lowerOptionText(value);
+                  return searchFromStart ? candidate.startsWith(keyword) : candidate.includes(keyword);
+                };
                 // Must mirror the `filtered` memo above exactly, searchText
                 // included: a translated label (Telugu shop or person name)
                 // only matches the query through its retained raw spelling, and
@@ -406,10 +417,10 @@ export default function MasterDropdown({
                   (option) =>
                     (allowClear && option.value === "") ||
                     !keyword ||
-                    lowerOptionText(option.label).includes(keyword) ||
-                    lowerOptionText(option.searchText).includes(keyword) ||
-                    lowerOptionText(option.value).includes(keyword) ||
-                    lowerOptionText(option.keywords).includes(keyword),
+                    matchesFromQuery(option.label) ||
+                    matchesFromQuery(option.searchText) ||
+                    matchesFromQuery(option.value) ||
+                    matchesFromQuery(option.keywords),
                 );
                 setActive(
                   matches.findIndex(
@@ -436,41 +447,41 @@ export default function MasterDropdown({
         className="relative min-h-0 overflow-y-auto overscroll-contain"
         style={{ maxHeight: 180 }}
       >
-        {filtered.map((option, index) => (
-          <button
-            key={option.value}
-            id={`${id}-option-${index}`}
-            type="button"
-            tabIndex={-1}
-            role={kind === "action" ? "menuitem" : "option"}
-            aria-selected={
-              kind === "select" ? option.value === value : undefined
-            }
-            disabled={option.disabled}
-            onClick={() => pick(option)}
-            onPointerMove={() => {
-              if (!option.disabled) setActive(index);
-            }}
-            className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
-              kind === "select" && option.value === value
-                ? // Selected row: light-green brand treatment for All Vehicles /
-                  // All Supervisors and normal options; visible but not harsh.
-                  "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
-                : index === active
-                  ? "bg-emerald-100/70 text-emerald-800"
-                  : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
-            }`}
-          >
-            {option.icon && (
-              <span className="shrink-0" aria-hidden="true">
-                {option.icon}
+        {filtered.map((option, index) => {
+          const isSelected = kind === "select" && option.value === value;
+          const isActive = index === active;
+          return (
+            <button
+              key={option.value}
+              id={`${id}-option-${index}`}
+              type="button"
+              tabIndex={-1}
+              role={kind === "action" ? "menuitem" : "option"}
+              aria-selected={kind === "select" ? isSelected : undefined}
+              disabled={option.disabled}
+              onClick={() => pick(option)}
+              className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
+                isActive
+                  ? "bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-300"
+                  : isSelected
+                    ? "bg-white text-emerald-800"
+                    : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
+              }`}
+            >
+              {option.icon && (
+                <span className="shrink-0" aria-hidden="true">
+                  {option.icon}
+                </span>
+              )}
+              <span className="min-w-0 flex-1 truncate" title={option.label}>
+                {option.label}
               </span>
-            )}
-            <span className="truncate" title={option.label}>
-              {option.label}
-            </span>
-          </button>
-        ))}
+              {isSelected && (
+                <Check size={14} aria-hidden="true" className="shrink-0 text-emerald-600" />
+              )}
+            </button>
+          );
+        })}
         {noMatches && customValue != null && (
           <button
             type="button"

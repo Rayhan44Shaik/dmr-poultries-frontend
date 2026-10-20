@@ -123,6 +123,13 @@ test("Collection Entry renders the collection table with the required columns", 
   assert.match(tableSrc, /col\.paymentModeName/);
 });
 
+test("Collection Entry shop search is prefix-based and shows the latest shop transaction", () => {
+  assert.match(collectionInformationSrc, /searchFromStart/);
+  assert.match(collectionInformationSrc, /latestTransaction\.paymentModeName/);
+  assert.match(collectionInformationSrc, /latestTransaction\.amount/);
+  assert.match(collectionInformationSrc, /compactDate\(latestTransaction\.collectionDate\)/);
+});
+
 test("Filtering happens before display (single global filter)", () => {
   const filterIdx = tableSrc.indexOf("filteredBySearch");
   const displayIdx = tableSrc.indexOf("displayedData");
@@ -133,9 +140,17 @@ test("Filtering happens before display (single global filter)", () => {
 
 test("Recent Collections clears the selected row when clicking outside the table rows", () => {
   assert.match(tableSrc, /document\.addEventListener\("pointerdown", handleClickAway\)/);
-  assert.match(tableSrc, /target\.closest\("\[data-recent-collection-row\]"\)/);
+  assert.match(tableSrc, /target\.closest\("\[data-recent-collection-row\], \[data-recent-collection-actions\]"\)/);
   assert.match(tableSrc, /data-recent-collection-row/);
+  assert.match(tableSrc, /data-recent-collection-actions/);
   assert.match(tableSrc, /onSelectionChange\?\.\(null\)/);
+});
+
+test("Recent Collections keeps the selected row while a table-level action is clicked", () => {
+  const guard = tableSrc.indexOf('target.closest("[data-recent-collection-row], [data-recent-collection-actions]")');
+  const edit = tableSrc.indexOf("selectedCollection && onEdit(selectedCollection)");
+  assert.ok(guard !== -1, "the click-away guard must include the selected-row action toolbar");
+  assert.ok(edit !== -1, "the Edit action must use the selected collection");
 });
 
 test("Recent Collections uses selected-row toolbar actions instead of an actions column", () => {

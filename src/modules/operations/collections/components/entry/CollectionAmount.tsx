@@ -76,6 +76,21 @@ const formatWithCommas = (num: number): string => {
   return formattedInteger + "." + decimalPart;
 };
 
+export function formatCollectionAmountInput(value: string): { display: string; amount: number } {
+  let raw = value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+  const parts = raw.split(".");
+  if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
+  const [integer = "", decimal] = raw.split(".");
+  const normalizedInteger = integer.replace(/^0+(?=\d)/, "");
+  const grouped = normalizedInteger
+    ? Number(normalizedInteger).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+    : "";
+  return {
+    display: decimal !== undefined ? `${grouped}.${decimal.slice(0, 2)}` : grouped,
+    amount: Number.isFinite(Number(raw)) ? Number(raw) : 0,
+  };
+}
+
 export default function CollectionAmount({
   amount,
   remarks,
@@ -110,13 +125,6 @@ export default function CollectionAmount({
 
   const handleFocus = () => {
     isFocusedRef.current = true;
-    // On focus, convert formatted string back to raw number for easy typing
-    const raw = parseFloat(inputValue.replace(/,/g, ""));
-    if (!isNaN(raw)) {
-      setInputValue(raw.toFixed(2));
-    } else {
-      setInputValue("");
-    }
   };
 
   const handleBlur = () => {
@@ -134,14 +142,12 @@ export default function CollectionAmount({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Allow only digits and decimal point
-    let val = e.target.value.replace(/[^0-9.]/g, "");
-    // Allow only one decimal point
-    const parts = val.split(".");
-    if (parts.length > 2) {
-      val = parts[0] + "." + parts.slice(1).join("");
-    }
-    setInputValue(val);
+    // Format Indian digit grouping on every keystroke. Keep a typed decimal
+    // portion verbatim so `7000.5` becomes `7,000.5`, not a forced blur-only
+    // `7,000.50`.
+    const next = formatCollectionAmountInput(e.target.value);
+    setInputValue(next.display);
+    onAmountChange(next.amount);
   };
 
   // Amount in words — read from what is in the box right now, so the words
@@ -209,7 +215,7 @@ export default function CollectionAmount({
             onChange={handleChange}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            className={`h-10 w-full rounded-md border ${amountError ? "border-red-500" : "border-slate-300"} pl-8 pr-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
+            className={`h-10 w-full rounded-md border ${amountError ? "border-red-500" : "border-slate-300"} pl-8 pr-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none`}
             placeholder="0.00"
           />
         </div>
@@ -238,7 +244,7 @@ export default function CollectionAmount({
           onChange={(e) => onRemarksChange(e.target.value)}
           maxLength={2000}
           placeholder={t("placeholder.enter_remarks")}
-          className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+          className="h-10 flex-1 rounded-md border border-slate-300 px-3 text-sm font-bold text-slate-800 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
         />
       </div>
 

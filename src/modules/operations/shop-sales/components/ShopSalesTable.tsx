@@ -1,7 +1,7 @@
 // Shop Sales table. Rows are backend-authoritative: the edit/lock state comes
 // exclusively from the API response, and the table only presents that state.
 
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -39,6 +39,7 @@ interface Props {
   sortBy?: string;
   onSortChange?: (sortBy: string) => void;
   onUpdateSale?: (updatedSale: ShopSale) => void | Promise<void>;
+  onViewTrip?: (sale: ShopSale) => void;
 }
 
 type SortColumn = "saleNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
@@ -73,6 +74,7 @@ function ShopSalesTable({
   sortBy = "latest",
   onSortChange,
   onUpdateSale,
+  onViewTrip,
 }: Props) {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -80,6 +82,15 @@ function ShopSalesTable({
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
   const [saving, setSaving] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+  const tableRootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const clearOutside = (event: PointerEvent) => {
+      if (!tableRootRef.current?.contains(event.target as Node) && !editingId && !saving) setSelectedId(null);
+    };
+    document.addEventListener("pointerdown", clearOutside);
+    return () => document.removeEventListener("pointerdown", clearOutside);
+  }, [editingId, saving]);
 
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
@@ -114,15 +125,21 @@ function ShopSalesTable({
     );
   };
 
-  const startEditing = useCallback(() => {
-    if (!selectedSale || !selectedSale.editable || saving) return;
-    setEditingId(selectedSale.id);
+  const startEditingSale = useCallback((sale: ShopSale) => {
+    if (!sale.editable || saving) return;
+    setSelectedId(sale.id);
+    setEditingId(sale.id);
     setEditData({
-      totalBirds: selectedSale.totalBirds,
-      totalWeight: selectedSale.totalWeight,
-      rate: selectedSale.rate,
+      totalBirds: sale.totalBirds,
+      totalWeight: sale.totalWeight,
+      rate: sale.rate,
     });
-  }, [selectedSale, saving]);
+  }, [saving]);
+
+  const startEditing = useCallback(() => {
+    if (!selectedSale) return;
+    startEditingSale(selectedSale);
+  }, [selectedSale, startEditingSale]);
 
   const cancelEditing = useCallback(() => {
     setEditingId(null);
@@ -220,7 +237,7 @@ function ShopSalesTable({
   );
 
   return (
-    <>
+    <div ref={tableRootRef}>
       {/* Same static title treatment as the Trip List table. */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-5 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
@@ -338,13 +355,16 @@ function ShopSalesTable({
               <th className="px-4 py-4 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
               <th className="px-4 py-4 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
               <th className="px-4 py-4 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
+              <th className="px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                <div className="flex items-center justify-center gap-1.5"><Pencil size={14} className="text-emerald-500" /><span>Action</span></div>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
+              <tr><td colSpan={10} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
+              <tr><td colSpan={10} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;
@@ -367,7 +387,13 @@ function ShopSalesTable({
                 >
                   <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">{startIndex + index + 1}</td>
                   <td className="px-4 py-5 text-[13px] font-semibold text-emerald-600 whitespace-nowrap">
-                    <div>{sale.saleNo || sale.tripNo || "—"}</div>
+                    <button
+                      type="button"
+                      onClick={(event) => { event.stopPropagation(); onViewTrip?.(sale); }}
+                      className="font-semibold text-emerald-600 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                    >
+                      {sale.saleNo || sale.tripNo || "—"}
+                    </button>
                   </td>
                   <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
                   <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">
@@ -379,13 +405,32 @@ function ShopSalesTable({
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
                   <td className="max-w-[260px] px-4 py-5 text-[13px] text-slate-600"><span className="block whitespace-normal break-words font-medium leading-5 text-slate-700" title={sale.remark || undefined}>{formatSaleRemark(sale.remark)}</span></td>
+                  <td className="px-4 py-5 text-center">
+                    <button
+                      type="button"
+                      disabled={!lock.editable || saving}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        startEditingSale(sale);
+                      }}
+                      aria-label={`${t("common.edit")} ${sale.saleNo || sale.tripNo || "shop sale"}`}
+                      title={lock.editable ? t("common.edit") : lock.message}
+                      className={`group inline-flex h-7 w-7 items-center justify-center rounded-lg border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                        lock.editable && !saving
+                          ? "border-emerald-200/80 bg-emerald-50/70 text-emerald-600 shadow-xs hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-sm active:scale-95"
+                          : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                      }`}
+                    >
+                      <span className={`inline-flex ${lock.editable && !saving ? uiActionIconMotionClass.edit : ""}`}><Pencil size={12} strokeWidth={2.25} /></span>
+                    </button>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-    </>
+    </div>
   );
 }
 

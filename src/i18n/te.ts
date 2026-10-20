@@ -970,12 +970,20 @@ export default {
   // Quick actions
   'quick.new_trip': 'కొత్త ట్రిప్ నమోదు',
   'quick.new_trip_desc': 'కొత్త ట్రిప్‌లో వాహనాన్ని డిస్పాచ్ చేయండి',
-  'quick.record_collection': 'కలెక్షన్ నమోదు',
-  'quick.record_collection_desc': 'అందుకున్న షాప్ కలెక్షన్ నమోదు చేయండి',
+  'quick.collection_entry': 'కలెక్షన్ ఎంట్రీ',
+  'quick.collection_entry_desc': 'అందుకున్న షాప్ కలెక్షన్ నమోదు చేయండి',
+  'quick.rate_entry': 'రేటు ఎంట్రీ',
+  'quick.rate_entry_desc': 'పూర్తయిన ట్రిప్‌లకు రేట్లు నమోదు చేసి లాక్ చేయండి',
   'quick.enter_shop_sale': 'షాప్ అమ్మకం నమోదు చేయండి',
   'quick.enter_shop_sale_desc': 'షాప్‌కు డెలివరీ నమోదు చేయండి',
   'quick.add_fuel': 'ఇంధన ఖర్చు జోడించండి',
   'quick.add_fuel_desc': 'వాహనానికి డీజిల్ / ఇంధనం నమోదు చేయండి',
+  'quick.account_analysis': 'అకౌంట్స్ – విశ్లేషణ',
+  'quick.account_analysis_desc': 'ఖాతా పనితీరు మరియు మొత్తాలను సమీక్షించండి',
+  'quick.shop_ledger': 'షాప్ లెడ్జర్',
+  'quick.shop_ledger_desc': 'షాప్ లెడ్జర్ నివేదికను తెరవండి',
+  'quick.collection_report': 'కలెక్షన్ నివేదిక',
+  'quick.collection_report_desc': 'కలెక్షన్ రికార్డులను సమీక్షించి ఎగుమతి చేయండి',
 
   // Page titles (browser)
   'page_title.dashboard': 'DMR Poultries - డ్యాష్‌బోర్డ్',

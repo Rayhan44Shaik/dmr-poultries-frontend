@@ -1,6 +1,7 @@
 // src/modules/collections/pages/CollectionEntryPage.tsx
 
 import { useState } from "react";
+import { useMemo } from "react";
 import useCollectionEntry from "../hooks/useCollectionEntry";
 import CollectionInformation from "../components/entry/CollectionInformation";
 import OutstandingSummary from "../components/entry/OutstandingSummary";
@@ -28,6 +29,14 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
    * the arrow keys — instead of defaulting to the shop's latest collection.
    */
   const [selectedRow, setSelectedRow] = useState<RecentCollection | null>(null);
+  const latestShopTransaction = useMemo(() => {
+    if (!vm.entry.shopName) return null;
+    return [...(vm.allCollections || [])]
+      .filter((collection: Collection) => collection.shopName === vm.entry.shopName && collection.status !== "Deleted")
+      .sort((a: Collection, b: Collection) =>
+        b.collectionDate.localeCompare(a.collectionDate) || Number(b.numericId ?? 0) - Number(a.numericId ?? 0)
+      )[0] ?? null;
+  }, [vm.allCollections, vm.entry.shopName]);
 
   const handleViewShop = (shopName: string) => {
     setSelectedShop(shopName);
@@ -84,6 +93,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onViewLedger={vm.viewLedger}
         onReset={vm.resetEntry}
         ledgerLoading={vm.ledgerLoading}
+        latestTransaction={latestShopTransaction}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-stretch">

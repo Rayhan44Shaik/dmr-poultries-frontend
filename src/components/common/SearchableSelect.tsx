@@ -236,8 +236,12 @@ const SearchableSelect = ({
                     aria-selected={isSelected}
                     onClick={() => pickRow(opt.value)}
                     onMouseEnter={() => setActiveIndex(index)}
-                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? `${selectedTextClass} ${selectedBgClass}` : index === visibleActiveIndex ? 'text-slate-800 bg-slate-100' : 'text-slate-700'
+                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate transition ${
+                      index === visibleActiveIndex
+                        ? `${selectedTextClass} ${selectedBgClass} ring-1 ring-inset ${selectionTone === 'green' ? 'ring-emerald-200' : 'ring-blue-200'}`
+                        : isSelected
+                          ? `${selectedTextClass} bg-white`
+                          : 'text-slate-700 hover:bg-slate-50'
                     }`}
                   >
                     <span className="w-3.5 shrink-0">

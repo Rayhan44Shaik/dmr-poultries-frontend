@@ -5,6 +5,7 @@ import {
   assignedShopOrderFromRows,
   captureRemarksFor,
   computeRemainingBoxes,
+  getDeliveryBoxAssignmentIssues,
   isDeliveredRow,
   pendingBoxesFromRows,
   pendingShopsFromRows,
@@ -437,6 +438,19 @@ test("editing a row keeps its own boxes but removes boxes consumed by another de
     sanitizeSelectedBoxIds(boxes, [editing, other], [58, 59, 60], 100),
     [58],
   );
+});
+
+test("final-submit diagnosis names every shop whose boxes became stale after pickup correction", () => {
+  const boxes = [box(1, 20, 100), box(2, 20, 99.4), box(3, 20, 100)];
+  const issues = getDeliveryBoxAssignmentIssues(boxes, [
+    row({ shopId: 10, shopName: "Good Shop", selectedBoxIds: [1], birds: 20, weight: 100 }),
+    row({ shopId: 11, shopName: "Weight Shop", selectedBoxIds: [2], birds: 20, weight: 100 }),
+    row({ shopId: 12, shopName: "Missing Shop", selectedBoxIds: [4], birds: 20, weight: 100 }),
+  ]);
+  assert.equal(issues.length, 2);
+  assert.match(issues[0], /Weight Shop.*boxes 2.*100\.00 kg exceeds 99\.40 kg/);
+  assert.match(issues[1], /Missing Shop.*boxes 4.*no longer exist/);
+  assert.ok(issues.every((issue) => !issue.includes("Good Shop")));
 });
 
 // ─── Derived weight-mode validation (farm weight 29) ─────────────────

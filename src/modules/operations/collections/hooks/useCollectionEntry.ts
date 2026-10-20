@@ -177,8 +177,10 @@ export default function useCollectionEntry() {
     setEntry((prev) => ({
       ...prev,
       shopName,
-      amount: 0,
-      remarks: ""
+      // While editing, moving the collection to another shop must retain the
+      // entered payment. Resetting these fields made a valid edit appear lost.
+      amount: prev.collectionId ? prev.amount : 0,
+      remarks: prev.collectionId ? prev.remarks : ""
     }));
     // Clear ledger state when shop changes - require explicit View Shop Ledger click
     setShowSummary(false);
@@ -263,9 +265,9 @@ export default function useCollectionEntry() {
   }, [ledgerLoaded]);
 
   // Invalidate ledger when shop changes (already handled in selectShop)
-  const handleShopChange = useCallback((shopName: string) => {
+  const handleShopChange = (shopName: string) => {
     selectShop(shopName);
-  }, []);
+  };
 
   const shopId = pendingShop?.shopId ?? collectionService.getShopIdForName(entry.shopName);
 
@@ -614,7 +616,8 @@ export default function useCollectionEntry() {
       paymentModeName: entry.paymentModeName,
       referenceNo: entry.referenceNo,
       amount: Number(entry.amount),
-      remarks: entry.remarks
+      remarks: entry.remarks,
+      numericShopId: collectionService.getShopIdForName(entry.shopName)
     });
     if (!success) {
       showNotification(translate("ops.collection.edit_failed_locked"), "error");

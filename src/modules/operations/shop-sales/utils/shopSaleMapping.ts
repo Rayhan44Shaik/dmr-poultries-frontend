@@ -29,6 +29,9 @@ export interface ApiShopSale {
   rate: number;
   amount: number;
   mortality: number;
+  mortalityWeight?: number;
+  deliveryMode?: "box" | "weight";
+  selectedBoxCount?: number;
   /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
   tripPickupBirds?: number | null;
   maxEditableBirds?: number | null;
@@ -101,6 +104,9 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     numericTripId: row.tripId,
     numericShopId: row.shopId,
     mortality: num(row.mortality),
+    mortalityWeight: num(row.mortalityWeight),
+    deliveryMode: row.deliveryMode === "weight" ? "weight" : "box",
+    selectedBoxCount: num(row.selectedBoxCount),
     tripPickupBirds: row.tripPickupBirds ?? null,
     maxEditableBirds: row.maxEditableBirds ?? null,
     tripDeliveredBirds: row.tripDeliveredBirds ?? null,

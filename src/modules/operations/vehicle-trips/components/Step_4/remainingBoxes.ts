@@ -100,6 +100,62 @@ export function sanitizeSelectedBoxIds(
   );
 }
 
+/** Diagnose stale Step 4 rows after Step 3 pickup boxes were corrected.
+ * Returns every affected shop in one pass; unrelated rows are omitted. */
+export function getDeliveryBoxAssignmentIssues(
+  boxDetails: BoxDetail[],
+  rows: ShopDelivery[],
+  weightToleranceKg = 0.05,
+): string[] {
+  const boxes = new Map(
+    boxDetails.map((box) => [
+      Number(box.boxNo),
+      { birds: Number(box.birds || 0), weight: Number(box.weight || 0) },
+    ]),
+  );
+  const owner = new Map<number, string>();
+  const issues: string[] = [];
+  for (const row of rows) {
+    if (!isDeliveredRow(row)) continue;
+    const shop = String(row.shopName || "").trim() || `Shop ${row.shopId || "unknown"}`;
+    const selected = [...new Set((row.selectedBoxIds ?? []).map(Number))]
+      .filter((boxNo) => Number.isSafeInteger(boxNo) && boxNo > 0)
+      .sort((a, b) => a - b);
+    if (!selected.length) continue; // legacy row: aggregate validation handles it
+    const missing = selected.filter((boxNo) => !boxes.has(boxNo));
+    if (missing.length) {
+      issues.push(`${shop}: boxes ${missing.join(", ")} no longer exist in Pickup.`);
+      continue;
+    }
+    const duplicated = selected.filter((boxNo) => {
+      const existingOwner = owner.get(boxNo);
+      if (!existingOwner) {
+        owner.set(boxNo, shop);
+        return false;
+      }
+      return existingOwner !== shop;
+    });
+    if (duplicated.length) {
+      issues.push(`${shop}: boxes ${duplicated.join(", ")} are assigned to another shop.`);
+      continue;
+    }
+    const availableBirds = selected.reduce((sum, boxNo) => sum + (boxes.get(boxNo)?.birds ?? 0), 0);
+    const availableWeight = selected.reduce((sum, boxNo) => sum + (boxes.get(boxNo)?.weight ?? 0), 0);
+    const requestedBirds = Number(row.birds || 0) + Number(row.mortality || 0);
+    const requestedWeight = Number(row.weight || 0) + Number(row.mortKg || 0);
+    const label = `boxes ${selected.join(", ")}`;
+    if (requestedBirds > availableBirds) {
+      issues.push(`${shop} (${label}): ${requestedBirds} birds exceed ${availableBirds}.`);
+    }
+    if (requestedWeight > availableWeight + weightToleranceKg) {
+      issues.push(
+        `${shop} (${label}): ${requestedWeight.toFixed(2)} kg exceeds ${availableWeight.toFixed(2)} kg.`,
+      );
+    }
+  }
+  return issues;
+}
+
 /** Assigned shops still awaiting a captured Step 4 delivery. */
 export function pendingShopsFromRows(rows: ShopDelivery[]): number {
   const assigned = new Set<number>();

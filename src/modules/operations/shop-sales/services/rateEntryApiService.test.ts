@@ -59,7 +59,7 @@ function row(deliveries: RateEntryDeliveryDto[]): RateEntryTripDto {
     ratesEntered: 0,
     deliveriesCount: deliveries.length,
     totalAmount: 0,
-    loadAmounts: [{ load: 1, amount: 10040 }],
+    loadAmounts: [{ load: 1, shops: 1, birds: 40, weight: 80, amount: 10040 }],
     deliveries,
   };
 }
@@ -90,5 +90,5 @@ test("mapRowToTrip preserves shop mortality weight for the Rate Entry modal", ()
 test("mapRowToTrip preserves cumulative and per-load amounts for the queue table", () => {
   const trip = mapRowToTrip(row([delivery({ rate: 125.5 })]), true);
   assert.equal(trip.rateEntryTotalAmount, 0);
-  assert.deepEqual(trip.rateEntryLoadAmounts, [{ load: 1, amount: 10040 }]);
+  assert.deepEqual(trip.rateEntryLoadAmounts, [{ load: 1, shops: 1, birds: 40, weight: 80, amount: 10040 }]);
 });

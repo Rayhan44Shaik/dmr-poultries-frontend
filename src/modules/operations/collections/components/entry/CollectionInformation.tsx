@@ -1,6 +1,6 @@
 import React from "react";
-import { RotateCcw, BookOpen, Loader2, Calendar, UserCog, CreditCard, Hash, Store } from "lucide-react";
-import type { CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
+import { RotateCcw, BookOpen, Loader2, Calendar, UserCog, CreditCard, Hash, Store, History } from "lucide-react";
+import type { Collection, CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
 import { DatePicker } from "../../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -26,6 +26,7 @@ interface Props {
   onViewLedger: () => void;
   onReset: () => void;
   ledgerLoading?: boolean;
+  latestTransaction?: Collection | null;
 }
 
 /**
@@ -48,6 +49,7 @@ function CollectionInformation({
   onViewLedger,
   onReset,
   ledgerLoading = false,
+  latestTransaction = null,
 }: Props) {
   const { t, language } = useI18n();
 
@@ -55,6 +57,10 @@ function CollectionInformation({
   // helper the Trip View uses: Telugu script in Telugu, the stored value (and
   // every numeric figure) untouched.
   const modeLabel = (mode: string) => localizeTripViewText(mode, language) || mode;
+  const compactDate = (value: string) => {
+    const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return match ? `${match[3]}-${match[2]}-${match[1].slice(-2)}` : value || "—";
+  };
 
   // Same option contract the Trip List filters use, so every dropdown on this
   // page gets the shared search / clear / keyboard behaviour.
@@ -150,6 +156,7 @@ function CollectionInformation({
             placeholder={t("operations.select_shop")}
             error={errors.shopName}
             searchable
+            searchFromStart
             allowClear
             className="w-full"
           />
@@ -159,7 +166,7 @@ function CollectionInformation({
       {/* Row 2 — Shop Name is searchable and holds long trading names, so it
         * spans the width of the four fields above, with the actions alongside. */}
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 items-end pt-1">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <Hash size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("operations.reference_no")}</span>
@@ -177,7 +184,29 @@ function CollectionInformation({
           {errors.referenceNo && <p id="referenceNo-error" className="mt-1 text-xs text-red-600">{errors.referenceNo}</p>}
         </div>
 
-        <div className="lg:col-span-7 flex items-center justify-end gap-2 flex-wrap">
+        <div className="lg:col-span-6 min-w-0">
+          <span className={opsFilterLabelClass}>
+            <History size={17} className="shrink-0 text-blue-500" />
+            {t("ops.collection.recent_collections")}
+          </span>
+          <div className="flex h-9 min-w-0 w-full items-center gap-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] font-bold text-slate-800">
+            {latestTransaction ? (
+              <>
+                <span className="shrink-0">{modeLabel(latestTransaction.paymentModeName || "Cash")}</span>
+                <span className="text-slate-400">·</span>
+                <span className="shrink-0 tabular-nums">₹{Number(latestTransaction.amount || 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}</span>
+                <span className="text-slate-400">·</span>
+                <span className="shrink-0 tabular-nums">{compactDate(latestTransaction.collectionDate)}</span>
+                <span className="text-slate-400">—</span>
+                <span className={latestTransaction.status === "Approved" ? "text-emerald-700" : "text-orange-700"}>{latestTransaction.status}</span>
+              </>
+            ) : (
+              <span className="text-slate-400">No recent transaction</span>
+            )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-3 flex items-center justify-end gap-2 flex-wrap">
         <button
           type="button"
           onClick={onViewLedger}

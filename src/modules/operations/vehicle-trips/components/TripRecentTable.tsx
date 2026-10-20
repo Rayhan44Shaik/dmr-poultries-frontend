@@ -512,7 +512,7 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.birds")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_loss_short")}</th>
-                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.mortality_short")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">MOR</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.status")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.load")}</th>
               </tr>

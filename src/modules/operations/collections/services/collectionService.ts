@@ -474,6 +474,8 @@ async function updateCollection(collection: Collection): Promise<boolean> {
       `${COLLECTION_PATH}/${collection.numericId}`,
       {
         collectionDate: collection.collectionDate,
+        shopId: collection.numericShopId,
+        shopName: collection.shopName,
         amount: Number(collection.amount),
         collector: collection.collectorName,
         paymentMode: collection.paymentModeName,
@@ -486,6 +488,7 @@ async function updateCollection(collection: Collection): Promise<boolean> {
     noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "updated");
+    announceShopBalanceChange({ shopId: collection.numericShopId, shopName: collection.shopName }, "updated");
     return true;
   } catch (error) {
     handleApiError(error);

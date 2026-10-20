@@ -975,12 +975,20 @@ export default {
   // Quick actions
   'quick.new_trip': 'New Trip Entry',
   'quick.new_trip_desc': 'Dispatch a vehicle on a new trip',
-  'quick.record_collection': 'Record Collection',
-  'quick.record_collection_desc': 'Enter a shop collection received',
+  'quick.collection_entry': 'Collection Entry',
+  'quick.collection_entry_desc': 'Enter a shop collection received',
+  'quick.rate_entry': 'Rate Entry',
+  'quick.rate_entry_desc': 'Enter and lock rates for completed trips',
   'quick.enter_shop_sale': 'Enter Shop Sale',
   'quick.enter_shop_sale_desc': 'Record a delivery against a shop',
   'quick.add_fuel': 'Add Fuel Expense',
   'quick.add_fuel_desc': 'Log diesel / fuel for a vehicle',
+  'quick.account_analysis': 'Accounts – Analysis',
+  'quick.account_analysis_desc': 'Review account performance and totals',
+  'quick.shop_ledger': 'Shop Ledger',
+  'quick.shop_ledger_desc': 'Open the shop ledger report',
+  'quick.collection_report': 'Collection Report',
+  'quick.collection_report_desc': 'Review and export collection records',
 
   // Page titles (browser)
   'page_title.dashboard': 'DMR Poultries - Dashboard',

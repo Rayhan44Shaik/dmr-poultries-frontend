@@ -20,6 +20,9 @@ const KEEP = new Set([
   "dmr_schema_version",
   "dmr_storage_version",
   "dmr-sidebar-mode",
+  // Login preference only; contains a username, never a password or session.
+  // Keeping it here lets "Remember me" survive explicit and idle logout.
+  "dmr-remember-username",
 ]);
 
 /** localStorage key remembering the most recent signed-in username. */

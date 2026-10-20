@@ -252,11 +252,14 @@ export default function EnterRateModal({
   }, [deliveries]);
 
   const loadTotals = useMemo(() => {
-    const byLoad = new Map<number, { birds: number; weight: number; amount: number }>();
+    const byLoad = new Map<number, { shopKeys: Set<string>; birds: number; weight: number; amount: number }>();
     for (const delivery of deliveries) {
       const load = Math.max(1, Number(delivery.legIndex || 1));
-      const current = byLoad.get(load) ?? { birds: 0, weight: 0, amount: 0 };
+      const current = byLoad.get(load) ?? { shopKeys: new Set<string>(), birds: 0, weight: 0, amount: 0 };
       const rate = normalizeRate(delivery.rate);
+      current.shopKeys.add(
+        delivery.shopId > 0 ? `id:${delivery.shopId}` : `name:${shopLookupKey(delivery.shopName)}`,
+      );
       current.birds += Number(delivery.birds || 0);
       current.weight += Number(delivery.weight || 0);
       if (isValidSellingRate(rate)) {
@@ -266,7 +269,12 @@ export default function EnterRateModal({
     }
     return [...byLoad.entries()]
       .sort(([a], [b]) => a - b)
-      .map(([load, values]) => [load, { ...values, amount: Number(values.amount.toFixed(2)) }] as const);
+      .map(([load, values]) => [load, {
+        shops: values.shopKeys.size,
+        birds: values.birds,
+        weight: values.weight,
+        amount: Number(values.amount.toFixed(2)),
+      }] as const);
   }, [deliveries]);
 
   const tripDetailLoadRows = useMemo(() => {
@@ -585,7 +593,25 @@ export default function EnterRateModal({
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p>{loadTotals.length > 1 && loadTotals.map(([load, value]) => <p key={load} className="text-[12px] font-bold text-amber-700 tabular-nums">Load {load}: {value.birds.toLocaleString()} • {value.weight.toFixed(2)} kg • ₹ {formatInr(value.amount)}</p>)}</div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p>
+                {loadTotals.length === 2 ? (
+                  <div className="mt-1 space-y-1">
+                    {loadTotals.map(([load, value]) => (
+                      <div key={load} className="rounded-md border border-amber-200/80 bg-white/70 px-2 py-1">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wide text-amber-800">Load {load}</p>
+                        <p className="whitespace-nowrap text-[10px] font-bold leading-tight text-amber-900 tabular-nums">
+                          {value.shops} {t("ops.trip.shops")} • {value.birds.toLocaleString()} {t("common.birds")} • {value.weight.toFixed(2)} {t("common.kg")} • ₹ {formatInr(value.amount)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">
+                    {totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")} • ₹ {formatInr(totals.totalAmount)}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -6,7 +6,6 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsPrimaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
@@ -26,7 +25,6 @@ interface Props {
   setSearch: (value: string) => void;
   setVehicle: (value: string) => void;
   setSupervisor: (value: string) => void;
-  onSearch: () => void;
   onReset: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
@@ -56,7 +54,6 @@ function CompletedTripsFilters({
   setSearch,
   setVehicle,
   setSupervisor,
-  onSearch,
   onReset,
   onRefresh,
   refreshing = false,
@@ -155,11 +152,6 @@ function CompletedTripsFilters({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                onSearch();
-              }}
               placeholder={t("ops.rate.search_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
@@ -172,10 +164,6 @@ function CompletedTripsFilters({
           {t("ops.rate.pending_trips")} : <span className="font-extrabold text-orange-600 text-[16px] tabular-nums">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("ops.rate.search_tooltip")}>
-            <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
-            {t("common.search")}
-          </button>
           <FilterResetButton
             count={countActiveFilters(
               search.trim() !== "",

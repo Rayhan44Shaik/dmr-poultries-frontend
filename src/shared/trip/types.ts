@@ -249,9 +249,12 @@ export interface Trip {
   ratesEntered?: number;
   /** Rate Entry queue: saved cumulative amount. */
   rateEntryTotalAmount?: number;
-  /** Rate Entry queue: saved amount split by trip load. */
+  /** Rate Entry queue: table metrics split by trip load. */
   rateEntryLoadAmounts?: Array<{
     load: number;
+    shops: number;
+    birds: number;
+    weight: number;
     amount: number;
   }>;
   version?: number;

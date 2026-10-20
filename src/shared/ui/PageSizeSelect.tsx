@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useMemo } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useMemo } from "react";
 import { ChevronDown, Check, Search } from "lucide-react";
 import { useI18n } from "../../i18n";
 
@@ -35,13 +35,25 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
   const [query, setQuery] = useState("");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const selectedRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (open) {
-      setQuery("");
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      const list = listRef.current;
+      const selected = selectedRef.current;
+      if (!list || !selected) return;
+      list.scrollTop = Math.max(0, selected.offsetTop - (list.clientHeight - selected.offsetHeight) / 2);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, safeValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -85,7 +97,10 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (!open) setQuery("");
+          setOpen((value) => !value);
+        }}
         className="inline-flex h-8 min-w-[64px] items-center justify-between gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[13px] font-bold text-emerald-700 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="tabular-nums">{safeValue}</span>
@@ -106,11 +121,12 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
             />
           </div>
 
-          <div className="max-h-60 overflow-auto p-1.5">
+          <div ref={listRef} className="max-h-60 overflow-auto p-1.5">
             {filtered.map((opt) => {
               const selected = safeValue === opt;
               return (
                 <button
+                  ref={selected ? selectedRef : undefined}
                   key={opt}
                   type="button"
                   role="option"

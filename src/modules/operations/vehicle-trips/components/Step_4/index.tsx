@@ -23,6 +23,7 @@ import {
   assignedShopOrderFromRows,
   buildDeliveredShopKeys,
   captureRemarksFor,
+  getDeliveryBoxAssignmentIssues,
   isDeliveredRow,
   orderAssignedShops,
   pendingBoxesFromRows,
@@ -576,6 +577,15 @@ export default function UnLoadingTable({
   // ─── Submit / Update Deliveries Handler ──────────────────────────
   const handleSubmitOrUpdateDeliveries = () => {
     if (readOnly || isSubmitting) return;
+
+    const boxAssignmentIssues = getDeliveryBoxAssignmentIssues(safeBoxDetails, safeRows);
+    if (boxAssignmentIssues.length) {
+      setToast({
+        message: `Pickup boxes changed. Correct only these deliveries: ${boxAssignmentIssues.join(" ")}`,
+        type: "error",
+      });
+      return;
+    }
 
     // Field-level balance rules block submission BEFORE any confirmation —
     // the inline panel + WizardStepNotice explain exactly what is wrong.

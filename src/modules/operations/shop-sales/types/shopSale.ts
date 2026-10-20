@@ -50,6 +50,10 @@ amount: number;
   numericTripId?: number | null;
   numericShopId?: number | null;
   mortality?: number;
+  mortalityWeight?: number;
+  /** Persisted Step 4 delivery facts supplied by the backend. */
+  deliveryMode?: "box" | "weight";
+  selectedBoxCount?: number;
   /** Server-reported pickup quantity for the sale's source trip. */
   tripPickupBirds?: number | null;
   /** Server-computed maximum birds for this shop after all other deliveries

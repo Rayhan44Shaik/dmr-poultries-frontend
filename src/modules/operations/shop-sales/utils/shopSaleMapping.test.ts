@@ -23,6 +23,9 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     rate: 100,
     amount: 5800,
     mortality: 0,
+    mortalityWeight: 0,
+    deliveryMode: "box",
+    selectedBoxCount: 3,
     tripPickupBirds: 600,
     maxEditableBirds: 84,
     tripDeliveredBirds: 596,
@@ -57,6 +60,22 @@ describe("mapApiSaleToShopSale", () => {
   it("maps the backend Shop Sales number verbatim", () => {
     const mapped = mapApiSaleToShopSale(row());
     assert.equal(mapped.saleNo, "TR-20260820-001-S002");
+  });
+
+  it("preserves persisted Step 4 delivery mode and selected-box count", () => {
+    const box = mapApiSaleToShopSale(row());
+    assert.equal(box.deliveryMode, "box");
+    assert.equal(box.selectedBoxCount, 3);
+
+    const weight = mapApiSaleToShopSale(row({ deliveryMode: "weight", selectedBoxCount: 0 }));
+    assert.equal(weight.deliveryMode, "weight");
+    assert.equal(weight.selectedBoxCount, 0);
+  });
+
+  it("preserves persisted box-mode mortality weight", () => {
+    const mapped = mapApiSaleToShopSale(row({ mortality: 1, mortalityWeight: 2.5 }));
+    assert.equal(mapped.mortality, 1);
+    assert.equal(mapped.mortalityWeight, 2.5);
   });
 
   it("keeps backend date, weight, rate and amount untouched", () => {

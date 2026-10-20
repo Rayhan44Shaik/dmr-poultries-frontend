@@ -207,10 +207,18 @@ export default function LoginPage() {
     );
   }
 
-  const handleSignIn = (e: FormEvent) => {
+  const handleSignIn = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (busy) return;
-    const checked = validateLoginForm(username, password);
+    // Password managers can populate the DOM without dispatching the input
+    // events React uses to update controlled state. Read the submitted form
+    // itself so browser-restored credentials work on the first click.
+    const formData = new FormData(e.currentTarget);
+    const submittedUsername = String(formData.get("username") ?? username);
+    const submittedPassword = String(formData.get("password") ?? password);
+    setUsername(submittedUsername);
+    setPassword(submittedPassword);
+    const checked = validateLoginForm(submittedUsername, submittedPassword);
     if (!checked.ok) {
       setFieldErrors({
         username: checked.errors.username,
@@ -355,7 +363,7 @@ export default function LoginPage() {
                 </div>
               </form>
             ) : (
-            <form onSubmit={handleSignIn} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={handleSignIn} className="mt-6 space-y-4" autoComplete="on" noValidate>
               <div>
                 <label htmlFor="login-username" className="mb-1 block text-xs font-semibold text-slate-600">
                   {t("auth.login.username")}
@@ -364,6 +372,7 @@ export default function LoginPage() {
                   <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="login-username"
+                    name="username"
                     type="text"
                     value={username}
                     onChange={(e) => {
@@ -395,6 +404,7 @@ export default function LoginPage() {
                   <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     id="login-password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => {
@@ -445,6 +455,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between text-xs">
                 <label className="flex items-center gap-2 font-medium text-slate-500">
                   <input
+                    name="remember"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}

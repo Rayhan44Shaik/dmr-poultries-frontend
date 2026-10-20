@@ -15,6 +15,8 @@ import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
 import { useI18n } from "../../../../i18n";
+import ShopDeliveryTripViewModal from "../components/ShopDeliveryTripViewModal";
+import { exportShopSalesExcel, exportShopSalesPdf } from "../utils/exportShopSales";
 
 interface ShopSalesPageProps {
   initialTrip?: Trip | null;
@@ -25,6 +27,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchInput, setSearchInput] = useState("");
+  const [tripViewSale, setTripViewSale] = useState<ShopSale | null>(null);
 
   const {
     sales,
@@ -60,7 +63,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         ...prev,
         search: tripNo,
       }));
-      setSearchInput(tripNo);
+      queueMicrotask(() => setSearchInput(tripNo));
       showNotification(t("ops.shop_sales.loaded_trip", { trip: tripNo }), "success");
     }
   }, [initialTrip, setFilter, showNotification, t]);
@@ -143,6 +146,15 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     filter.shopName.trim() !== "" ||
     filter.search.trim() !== "";
 
+  const exportFileName = `shop-sales-${new Date().toISOString().slice(0, 10)}`;
+  const handleExportPdf = useCallback(() => {
+    void exportShopSalesPdf(filteredSales, summary, exportFileName);
+  }, [exportFileName, filteredSales, summary]);
+
+  const handleExportExcel = useCallback(() => {
+    exportShopSalesExcel(filteredSales, summary, exportFileName);
+  }, [exportFileName, filteredSales, summary]);
+
   const content = (
     <div className="w-full space-y-5 animate-in fade-in duration-500">
       <ShopSalesFilters
@@ -165,6 +177,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         }}
         onReset={handleResetFilters}
         onRefresh={() => void handleRefresh()}
+        onExportPdf={handleExportPdf}
+        onExportExcel={handleExportExcel}
         refreshing={isLoading}
         unassignedBirds={assignmentNoticeBirds}
         assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}
@@ -188,6 +202,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
             setCurrentPage(1);
           }}
           onUpdateSale={handleUpdateSale}
+          onViewTrip={setTripViewSale}
         />
         {shouldShowPagination(filteredSales.length) && (
           <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
@@ -205,6 +220,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           </div>
         )}
       </div>
+      <ShopDeliveryTripViewModal
+        sale={tripViewSale}
+        deliveries={tripViewSale ? sales.filter((sale) => String(sale.tripId) === String(tripViewSale.tripId)) : []}
+        onClose={() => setTripViewSale(null)}
+      />
     </div>
   );
 

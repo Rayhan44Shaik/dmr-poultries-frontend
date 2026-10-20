@@ -1,4 +1,4 @@
-export const DEFAULT_COLLECTION_DATE = "2026-10-05";
+export const DEFAULT_COLLECTION_DATE = "2026-10-12";
 export const DEFAULT_COLLECTION_PAYMENT_MODE = "Cash";
 
 function collectorKey(value: string): string {

@@ -188,7 +188,10 @@ export default function RecentCollectionsTable({
 
     const handleClickAway = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Element && target.closest("[data-recent-collection-row]")) return;
+      if (
+        target instanceof Element &&
+        target.closest("[data-recent-collection-row], [data-recent-collection-actions]")
+      ) return;
       setSelectedId(null);
       onSelectionChange?.(null);
     };
@@ -411,7 +414,7 @@ export default function RecentCollectionsTable({
             onClick={resetTable}
           />
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1" data-recent-collection-actions>
             <button
               type="button"
               onClick={() => selectedCollection && viewApprovedCollection(selectedCollection)}
@@ -457,7 +460,7 @@ export default function RecentCollectionsTable({
         * visual axis. Shop, Collector and Amount deliberately receive equal
         * space; Mode follows Collector because it describes that collection. */}
       <div className="overflow-x-auto">
-        <table className="min-w-[1460px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1460px] w-full table-fixed text-[13px] text-left border-collapse">
           <colgroup>
             <col className="w-[4%]" />
             <col className="w-[14%]" />
@@ -473,52 +476,52 @@ export default function RecentCollectionsTable({
             <tr>
               {/* Each column is tagged with the same icon vocabulary Shop Sales
                 * uses, so a column means the same thing across the product. */}
-              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 #
               </th>
-              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <FileText size={14} className="shrink-0 text-emerald-500" />
                   {t("table.collection_no")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar size={14} className="shrink-0 text-blue-500" />
                   {t("common.day")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <Store size={14} className="shrink-0 text-amber-500" />
                   {t("table.shop")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <UserCog size={14} className="shrink-0 text-violet-500" />
                   {t("table.collector")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <CreditCard size={14} className="shrink-0 text-blue-500" />
                   {t("table.mode")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                   {t("table.amount")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <MessageSquareText size={14} className="shrink-0 text-sky-500" />
                   {t("table.remarks")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center justify-center gap-1.5">
                   <Activity size={14} className="shrink-0 text-orange-500" />
                   {t("table.status")}
@@ -579,30 +582,30 @@ export default function RecentCollectionsTable({
                     className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
-                        : "hover:bg-slate-50/80"
+                        : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
-                    <td className="px-4 py-3 text-left text-xs font-semibold text-slate-500 tabular-nums">
+                    <td className="px-4 py-5 text-center text-[13px] font-medium text-slate-500 tabular-nums">
                       {startIndex + index + 1}
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-slate-800 truncate">
+                    <td className="px-4 py-5 text-[13px] font-bold text-emerald-600 truncate">
                       {col.collectionNo}
                     </td>
-                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-5 text-left text-[13px] font-medium text-slate-600 tabular-nums whitespace-nowrap">
                       {formatTripListDay(col.collectionDate, language)}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-700 truncate" title={localize(col.shopName)}>{localize(col.shopName)}</td>
-                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-600 truncate" title={localize(col.collectorName)}>{localize(col.collectorName)}</td>
-                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-600 truncate" title={col.paymentModeName || "Cash"}>
+                    <td className="px-4 py-5 text-center text-[13px] font-medium text-slate-700 truncate" title={localize(col.shopName)}>{localize(col.shopName)}</td>
+                    <td className="px-4 py-5 text-center text-[13px] font-normal text-slate-600 truncate" title={localize(col.collectorName)}>{localize(col.collectorName)}</td>
+                    <td className="px-4 py-5 text-center text-[13px] font-medium text-slate-600 truncate" title={col.paymentModeName || "Cash"}>
                       {col.paymentModeName || "Cash"}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-5 text-center text-[13px] font-bold text-emerald-600 tabular-nums whitespace-nowrap">
                       {inr(col.amount)}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-600">
+                    <td className="px-4 py-5 text-center text-[13px] font-normal text-slate-600">
                       <span className="block truncate" title={col.remarks || undefined}>{col.remarks || "—"}</span>
                     </td>
-                    <td className="px-4 py-3 text-center" onClick={(event) => event.stopPropagation()}>
+                    <td className="px-4 py-5 text-center" onClick={(event) => event.stopPropagation()}>
                       {isPending && onApprove ? (
                         <div className="group relative mx-auto w-[9rem]">
                           <select

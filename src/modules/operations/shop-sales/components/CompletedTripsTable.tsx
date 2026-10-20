@@ -1,4 +1,5 @@
-import React, { useCallback, useRef, type ReactNode } from "react";
+import React, { useCallback, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowUp,
   ArrowDown,
@@ -6,7 +7,6 @@ import {
   Hash,
   Calendar,
   Truck,
-  UserCog,
   Warehouse,
   ShoppingBag,
   Bird,
@@ -32,6 +32,53 @@ interface Props {
   sortBy?: RateEntrySortKey | null;
   sortDir?: "asc" | "desc";
   onSortChange?: (key: RateEntrySortKey) => void;
+}
+
+type LoadMetricItem = { load: number; value: string };
+
+function LoadMetricValue({
+  value,
+  items,
+  label,
+  valueClassName,
+  focusRingClassName,
+}: {
+  value: ReactNode;
+  items: LoadMetricItem[];
+  label: string;
+  valueClassName: string;
+  focusRingClassName: string;
+}) {
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const showBreakdown = items.length === 2;
+  const open = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const width = 230;
+    const height = 54 + items.length * 32;
+    setPosition({
+      left: Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2)),
+      top: rect.bottom + height + 12 <= window.innerHeight ? rect.bottom + 8 : Math.max(8, rect.top - height - 8),
+    });
+  };
+  return (
+    <span className="inline-flex" onMouseLeave={() => setPosition(null)}>
+      {showBreakdown ? <button type="button" onMouseEnter={(event) => open(event.currentTarget)} onFocus={(event) => open(event.currentTarget)} onBlur={() => setPosition(null)} className={`rounded border-b border-dotted border-current px-0.5 font-bold focus:outline-none focus:ring-2 ${focusRingClassName}`} aria-label={`${label} by load`}>{value}</button> : <span>{value}</span>}
+      {showBreakdown && position && createPortal(<span role="tooltip" style={position} className="pointer-events-none fixed z-[9999] w-[230px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl"><span className="mb-2 block border-b border-slate-100 pb-2 font-bold">{label} by load</span>{items.map((item) => <span key={item.load} className="flex items-center justify-between rounded-md px-1.5 py-1.5 odd:bg-slate-50"><span>Load {item.load}</span><span className={`font-bold ${valueClassName}`}>{item.value}</span></span>)}</span>, document.body)}
+    </span>
+  );
+}
+
+function RateAmountCell({ trip }: { trip: Trip }) {
+  const items = (trip.rateEntryLoadAmounts ?? []).map((item) => ({
+    load: item.load,
+    value: `₹ ${Math.round(item.amount).toLocaleString("en-IN")}`,
+  }));
+  const total = !trip.ratesEntered ? "—" : `₹ ${Math.round(trip.rateEntryTotalAmount ?? 0).toLocaleString("en-IN")}`;
+  return (
+    <td className="px-4 py-4 text-center text-[13px] font-bold text-emerald-700 whitespace-nowrap">
+      <LoadMetricValue value={total} items={items} label="Amount" valueClassName="text-emerald-700" focusRingClassName="focus:ring-emerald-300" />
+    </td>
+  );
 }
 
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
@@ -120,9 +167,6 @@ function CompletedTripsTable({
               {sortable("vehicleNo", <div className="flex items-center gap-1.5"><Truck size={14} className="text-indigo-500 flex-shrink-0" /><span>{t("common.vehicle")}</span></div>)}
             </th>
             <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("supervisorName", <div className="flex items-center gap-1.5"><UserCog size={14} className="text-purple-500 flex-shrink-0" /><span>{t("common.supervisor")}</span></div>)}
-            </th>
-            <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("sourceFarm", <div className="flex items-center gap-1.5"><Warehouse size={14} className="text-amber-500 flex-shrink-0" /><span>{t("ops.trip.source_farm")}</span></div>)}
             </th>
             <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
@@ -142,7 +186,7 @@ function CompletedTripsTable({
         <tbody className="divide-y divide-slate-100">
           {trips.length === 0 ? (
             <tr>
-              <td colSpan={10} className="py-12 text-center text-slate-400 text-[13px] font-medium">
+              <td colSpan={9} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                 {t("ops.rate.no_waiting_trips")}
               </td>
             </tr>
@@ -151,8 +195,10 @@ function CompletedTripsTable({
               const serialNo = startIndex + index + 1;
               const isSelected = trip.id === selectedRowId;
               const totalShops = trip.totalShops ?? 0;
-              const loadAmounts = trip.rateEntryLoadAmounts ?? [];
-              const showLoadAmounts = loadAmounts.length > 1;
+              const loadMetrics = trip.rateEntryLoadAmounts ?? [];
+              const shopLoadItems = loadMetrics.map((item) => ({ load: item.load, value: Number(item.shops || 0).toLocaleString("en-IN") }));
+              const birdLoadItems = loadMetrics.map((item) => ({ load: item.load, value: Number(item.birds || 0).toLocaleString("en-IN") }));
+              const weightLoadItems = loadMetrics.map((item) => ({ load: item.load, value: `${Number(item.weight || 0).toFixed(2)} kg` }));
 
               return (
                 <tr
@@ -183,33 +229,21 @@ function CompletedTripsTable({
                     {displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}
                     {trip.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
                   </td>
                   <td className="px-4 py-4 text-center whitespace-nowrap">
                     <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[12px] font-bold text-slate-700">
-                      {totalShops}
+                      <LoadMetricValue value={totalShops} items={shopLoadItems} label="Shops" valueClassName="text-cyan-700" focusRingClassName="focus:ring-cyan-300" />
                     </span>
                   </td>
                   <td className="px-4 py-4 text-center text-[13px] font-bold text-blue-600 whitespace-nowrap">
-                    {trip.totalBirds.toLocaleString()}
+                    <LoadMetricValue value={trip.totalBirds.toLocaleString()} items={birdLoadItems} label="Birds" valueClassName="text-blue-700" focusRingClassName="focus:ring-blue-300" />
                   </td>
-                  <td className="px-4 py-4 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
-                    <div className="text-[13px] font-bold text-emerald-700 tabular-nums">
-                      {!trip.ratesEntered ? "—" : `₹ ${Math.round(trip.rateEntryTotalAmount ?? 0).toLocaleString("en-IN")}`}
-                    </div>
-                    {showLoadAmounts ? (
-                      <div className="mt-0.5 flex flex-col text-[10px] font-semibold leading-tight text-slate-500 tabular-nums">
-                        {loadAmounts.map((loadAmount) => (
-                          <span key={loadAmount.load}>
-                            Load {loadAmount.load}: {loadAmount.amount > 0 ? `₹ ${Math.round(loadAmount.amount).toLocaleString("en-IN")}` : "—"}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
+                  <td className="px-4 py-4 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">
+                    <LoadMetricValue value={trip.totalWeight.toFixed(2)} items={weightLoadItems} label="Wt (kg)" valueClassName="text-amber-700" focusRingClassName="focus:ring-amber-300" />
                   </td>
+                  <RateAmountCell trip={trip} />
                 </tr>
               );
             })

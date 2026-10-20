@@ -76,6 +76,9 @@ export interface RateEntryTripDto {
   totalAmount: number;
   loadAmounts: Array<{
     load: number;
+    shops: number;
+    birds: number;
+    weight: number;
     amount: number;
   }>;
   deliveries: RateEntryDeliveryDto[];

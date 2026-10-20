@@ -8,7 +8,7 @@ import {
 } from "./collectionEntryDefaults";
 
 test("new collection defaults use the requested date and cash mode", () => {
-  assert.equal(DEFAULT_COLLECTION_DATE, "2026-10-05");
+  assert.equal(DEFAULT_COLLECTION_DATE, "2026-10-12");
   assert.equal(DEFAULT_COLLECTION_PAYMENT_MODE, "Cash");
 });
 

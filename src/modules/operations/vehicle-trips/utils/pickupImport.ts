@@ -27,6 +27,23 @@ export function continuePickupBoxNumbers(rows: BoxDetail[], existingCount: numbe
   }));
 }
 
+/** Keep only the incoming rows that fit the vehicle's remaining box slots.
+ * Rows are already sorted and renumbered before this is called, so trimming
+ * from the end removes box 85 (then 84, etc.) rather than disturbing earlier
+ * imported entries. A non-positive/unknown capacity is left for validation. */
+export function fitPickupAppendToCapacity(
+  existing: BoxDetail[],
+  incoming: BoxDetail[],
+  capacity: number,
+): { rows: BoxDetail[]; removed: BoxDetail[] } {
+  if (!(capacity > 0)) return { rows: incoming, removed: [] };
+  const available = Math.max(0, Math.floor(capacity) - existing.length);
+  return {
+    rows: incoming.slice(0, available),
+    removed: incoming.slice(available),
+  };
+}
+
 const text = (value: unknown) => String(value ?? "").trim();
 
 function extractMetadata(rows: unknown[][]): PickupImportMetadata {

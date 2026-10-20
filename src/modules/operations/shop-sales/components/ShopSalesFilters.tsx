@@ -1,10 +1,12 @@
 import React, { useMemo } from "react";
-import { AlertTriangle, ArrowUpDown, Calendar, Search, Store } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, FileDown, FileSpreadsheet, Search, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
+  opsExcelButtonClass,
+  opsPdfButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
@@ -25,6 +27,8 @@ interface Props {
   setSearchQuery: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
+  onExportPdf?: () => void;
+  onExportExcel?: () => void;
   refreshing?: boolean;
   /** One active trip-level reassignment notice, if an allocation is incomplete. */
   unassignedBirds?: number | null;
@@ -50,6 +54,8 @@ function ShopSalesFilters({
   setSearchQuery,
   onReset,
   onRefresh,
+  onExportPdf,
+  onExportExcel,
   refreshing = false,
   unassignedBirds = null,
   assignmentTripNo = null,
@@ -178,6 +184,8 @@ function ShopSalesFilters({
         )}
 
         <div className={`flex flex-wrap items-center justify-end gap-2 ${hasAssignmentNotice ? "lg:col-span-4" : "lg:col-span-7"}`}>
+          <button type="button" onClick={onExportPdf} className={opsPdfButtonClass} aria-label="Export Shop Sales PDF"><FileDown size={15} />PDF</button>
+          <button type="button" onClick={onExportExcel} className={opsExcelButtonClass} aria-label="Export Shop Sales Excel"><FileSpreadsheet size={15} />Excel</button>
           <FilterResetButton
             count={countActiveFilters(
               searchQuery.trim() !== "",

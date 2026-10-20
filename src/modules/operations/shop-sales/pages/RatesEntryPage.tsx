@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { IndianRupee, LoaderCircle } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
@@ -75,6 +75,14 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
   const [draftFilter, setDraftFilter] = useState<RateEntryFilterState>(EMPTY_RATE_FILTER);
 
+  useEffect(() => {
+    const clearOutside = (event: PointerEvent) => {
+      if (!tableContainerRef.current?.contains(event.target as Node)) setSelectedRowId(null);
+    };
+    document.addEventListener("pointerdown", clearOutside);
+    return () => document.removeEventListener("pointerdown", clearOutside);
+  }, []);
+
   const hasFilters =
     filter.fromDate !== "" ||
     filter.toDate !== "" ||
@@ -85,15 +93,15 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
   const startIndex = (safeCurrentPage - 1) * pageSize;
 
-  const handleApplyFilters = () => {
-    const nextFilter = {
-      ...draftFilter,
-      search: draftFilter.search.trim(),
-    };
-    setDraftFilter(nextFilter);
-    setFilter(nextFilter);
-    setSelectedRowId(null);
-  };
+  // Match Trip List: every filter applies as soon as it changes. The text
+  // field is lightly debounced so typing never creates a request per keypress.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setFilter({ ...draftFilter, search: draftFilter.search.trim() });
+      setSelectedRowId(null);
+    }, draftFilter.search === filter.search ? 0 : 250);
+    return () => window.clearTimeout(timer);
+  }, [draftFilter, filter.search, setFilter]);
 
   const handleResetFilters = () => {
     setDraftFilter({ ...EMPTY_RATE_FILTER });
@@ -128,7 +136,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
           setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
           setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
           setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
-          onSearch={handleApplyFilters}
           onReset={handleResetFilters}
           onRefresh={handleRefresh}
           refreshing={isLoading}
