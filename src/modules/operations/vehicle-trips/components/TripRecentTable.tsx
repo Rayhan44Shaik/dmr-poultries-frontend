@@ -56,7 +56,7 @@ function ShopsCell({ trip }: { trip: Trip }) {
       <button type="button" disabled={!shops.length} onMouseEnter={(event) => openTooltip(event.currentTarget)} onFocus={(event) => openTooltip(event.currentTarget)} onBlur={() => setPosition(null)} className={shops.length ? "rounded border-b border-dotted border-slate-400 px-0.5 font-bold focus:outline-none focus:ring-2 focus:ring-blue-300" : "font-bold"}>{trip.totalShops}</button>
       {position && createPortal(<span role="tooltip" style={{ left: position.left, top: position.top }} className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left shadow-2xl">
         <span className="mb-2 block border-b border-slate-100 pb-2 text-[11px] font-bold text-slate-700">Shops / Sub Shops</span>
-        <span className="block max-h-56 space-y-1 overflow-y-auto">{shops.map((item, index) => <span key={`${item.id}-${index}`} className="block rounded-md bg-slate-50 px-2 py-1.5 text-[11px]"><span className="font-semibold text-slate-800">{item.shop}</span>{item.subShop ? <span className="text-blue-600">, {item.subShop}</span> : null}</span>)}</span>
+        <span className="block max-h-56 space-y-1 overflow-y-auto">{shops.map((item, index) => <span key={`${item.id}-${index}`} className="block rounded-md bg-slate-50 px-2 py-1.5 text-[11px] font-semibold text-slate-800">{item.subShop ? `${item.shop} -- ${item.subShop}` : item.shop}</span>)}</span>
       </span>, document.body)}
     </span>
   </td>;

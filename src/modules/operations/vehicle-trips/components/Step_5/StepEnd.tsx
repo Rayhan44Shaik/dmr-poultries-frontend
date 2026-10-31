@@ -496,6 +496,11 @@ export default function StepEnd({
 
     return {
       ...expenses,
+      // The amount and its description are one backend-validated pair. Keep
+      // the note in the canonical payload used by autosave, Save Progress and
+      // final Submit; otherwise the UI can display a valid note while the API
+      // receives only the maintenance amount and correctly rejects it.
+      vehicleMaintenanceNote: String(sheetData.vehicleMaintenanceNote ?? "").trim().slice(0, 120),
       others2Name: String(sheetData.others2Name ?? "").trim(),
       others3Name: String(sheetData.others3Name ?? "").trim(),
       others4Name: String(sheetData.others4Name ?? "").trim(),

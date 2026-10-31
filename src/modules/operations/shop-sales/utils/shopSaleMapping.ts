@@ -21,6 +21,7 @@ export interface ApiShopSale {
   birdType: string;
   tripId: number | null;
   tripNo: string;
+  load?: number;
   shopNo?: string;
   vehicleNo: string | null;
   farmName: string | null;
@@ -32,6 +33,8 @@ export interface ApiShopSale {
   mortalityWeight?: number;
   deliveryMode?: "box" | "weight";
   selectedBoxCount?: number;
+  dcBirds?: number;
+  dcWeight?: number;
   /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
   tripPickupBirds?: number | null;
   maxEditableBirds?: number | null;
@@ -54,7 +57,7 @@ export interface ApiShopSale {
   approvedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
-  /** Backend-authoritative Rate Entry lock / 10-day correction state. */
+  /** Backend-authoritative Rate Entry lock / 2-week-from-insert correction state. */
   rateCompleted?: boolean;
   rateLockedAt?: string | null;
   rateLockedBy?: string | null;
@@ -87,6 +90,7 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     saleNo: row.saleNo ?? "",
     tripId: row.tripId == null ? "" : String(row.tripId),
     tripNo: row.tripNo,
+    load: Math.max(1, num(row.load, 1)),
     tripDate: row.saleDate,
     deliveryTime: row.deliveryTime ?? null,
     shopId: row.shopId == null ? "" : String(row.shopId),
@@ -103,10 +107,13 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     numericId: row.id,
     numericTripId: row.tripId,
     numericShopId: row.shopId,
+    numericBirdTypeId: row.birdTypeId,
     mortality: num(row.mortality),
     mortalityWeight: num(row.mortalityWeight),
     deliveryMode: row.deliveryMode === "weight" ? "weight" : "box",
     selectedBoxCount: num(row.selectedBoxCount),
+    dcBirds: num(row.dcBirds),
+    dcWeight: num(row.dcWeight),
     tripPickupBirds: row.tripPickupBirds ?? null,
     maxEditableBirds: row.maxEditableBirds ?? null,
     tripDeliveredBirds: row.tripDeliveredBirds ?? null,

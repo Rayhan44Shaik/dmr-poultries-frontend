@@ -110,6 +110,8 @@ export default function NotificationHost() {
   const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const hasItems = items.length > 0;
   const viewOpen = useViewLayerOpen();
+  const fixedTopRightItems = items.filter((item) => item.placement === "top-right");
+  const adaptiveItems = items.filter((item) => item.placement !== "top-right");
 
   /* Escape clears the stack, but only while something is visible — so it can
      never shadow a dialog's or menu's own Escape handling. Listeners are
@@ -128,14 +130,17 @@ export default function NotificationHost() {
   if (!hasItems) return null;
 
   return (
-    <div
-      className={viewOpen ? VIEW_VIEWPORT_CLASS : uiToastViewportClass}
-      role="region"
-      aria-label={t("notification.region")}
-    >
-      {items.map((item) => (
-        <Toast key={item.id} item={item} closeLabel={t("common.close")} />
-      ))}
-    </div>
+    <>
+      {adaptiveItems.length > 0 ? (
+        <div className={viewOpen ? VIEW_VIEWPORT_CLASS : uiToastViewportClass} role="region" aria-label={t("notification.region")}>
+          {adaptiveItems.map((item) => <Toast key={item.id} item={item} closeLabel={t("common.close")} />)}
+        </div>
+      ) : null}
+      {fixedTopRightItems.length > 0 ? (
+        <div className={uiToastViewportClass} role="region" aria-label={t("notification.region")}>
+          {fixedTopRightItems.map((item) => <Toast key={item.id} item={item} closeLabel={t("common.close")} />)}
+        </div>
+      ) : null}
+    </>
   );
 }

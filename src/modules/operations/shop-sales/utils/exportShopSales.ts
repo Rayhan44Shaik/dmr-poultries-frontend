@@ -2,17 +2,15 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import type { ShopSale, ShopSaleSummary } from "../types/shopSale";
-import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
+import { formatShopWithSubShop } from "../../vehicle-trips/utils/shopDisplayName";
 import { drawPreparedDmrPoultryHeader, prepareDmrPoultryHeaderAssets } from "../../../../utils/drawDmrPoultryHeader";
 import henImage from "../../../../assets/dmr-hen.jpg";
 
 type ExportMatrix = { headers: string[]; rows: (string | number)[][] };
 
 function matrix(sales: ShopSale[], includeMortality = true): ExportMatrix {
-  const includeSubShop = sales.some((sale) => Boolean(sale.subShopName?.trim()));
   const includeRemark = sales.some((sale) => Boolean(sale.remark?.trim()));
   const headers = ["S.No", "Date", "Shop Name"];
-  if (includeSubShop) headers.push("Sub Shop Name");
   headers.push("Birds", "Weight (KG)");
   if (includeMortality) headers.push("Mortality");
   headers.push("Rate", "Amount");
@@ -21,8 +19,11 @@ function matrix(sales: ShopSale[], includeMortality = true): ExportMatrix {
   return {
     headers,
     rows: sales.map((sale, index) => {
-      const row: (string | number)[] = [index + 1, sale.tripDate, cleanDeliveryShopName(sale.shopName) || sale.shopName];
-      if (includeSubShop) row.push(sale.subShopName?.trim() || "—");
+      const row: (string | number)[] = [
+        index + 1,
+        sale.tripDate,
+        formatShopWithSubShop(sale.shopName, sale.subShopName) || sale.shopName,
+      ];
       row.push(Number(sale.totalBirds || 0), Number(sale.totalWeight || 0).toFixed(2));
       if (includeMortality) row.push(Number(sale.mortality || 0));
       row.push(Number(sale.rate || 0).toFixed(2), Number(sale.amount || 0).toFixed(2));
@@ -50,7 +51,7 @@ export async function exportShopSalesPdf(sales: ShopSale[], summary: ShopSaleSum
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
   // The Shop Sales PDF is intentionally financial-only: mortality remains in
   // the interactive view, but the document contains exactly the requested
-  // Date/Shop/Sub-shop/Birds/Weight/Rate/Amount register.
+  // Date/Shop -- Sub-shop/Birds/Weight/Rate/Amount register.
   const { headers, rows } = matrix(sales, false);
   const margin = 12;
   const headerBottom = drawPreparedDmrPoultryHeader(doc, { margin }, assets);

@@ -15,6 +15,7 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     birdType: "Broiler",
     tripId: 9,
     tripNo: "TR-20260820-001",
+    load: 2,
     shopNo: "S02",
     vehicleNo: "KA-01-1234",
     farmName: "Farm A",
@@ -60,6 +61,11 @@ describe("mapApiSaleToShopSale", () => {
   it("maps the backend Shop Sales number verbatim", () => {
     const mapped = mapApiSaleToShopSale(row());
     assert.equal(mapped.saleNo, "TR-20260820-001-S002");
+  });
+
+  it("preserves the persisted delivery load for KPI breakdowns", () => {
+    assert.equal(mapApiSaleToShopSale(row()).load, 2);
+    assert.equal(mapApiSaleToShopSale(row({ load: undefined })).load, 1);
   });
 
   it("preserves persisted Step 4 delivery mode and selected-box count", () => {

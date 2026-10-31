@@ -26,9 +26,9 @@
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  X, Eye, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2, Loader2,
+  X, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2, Loader2,
   Search, Wallet, Clock, Activity, Settings2, ChevronLeft, ChevronRight,
-  ArrowUp, ArrowDown,
+  ArrowUp, ArrowDown, Store,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import type { Shop } from "../../../../masters/shops/types/shop";
@@ -168,6 +168,7 @@ function ShopCollectionDetailView({
   );
 
   const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [recentLoading, setRecentLoading] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [search, setSearch] = useState("");
@@ -181,7 +182,7 @@ function ShopCollectionDetailView({
 
   useEffect(() => {
     let cancelled = false;
-    const shopId = collectionService.getShopIdForName(shopName);
+    const shopId = shopInfo?.id ?? collectionService.getShopIdForName(shopName);
     if (!isOpen || !shopId) {
       if (!isOpen) setRecentList([]);
       return;
@@ -190,7 +191,10 @@ function ShopCollectionDetailView({
     collectionService
       .fetchRecentCollectionsForShop(shopId, SHOP_HISTORY_LIMIT)
       .then((rows) => {
-        if (!cancelled) setRecentList(rows);
+        if (!cancelled) {
+          setRecentList(rows);
+          setSelectedRecordId((current) => rows.some((row) => String(row.id) === current) ? current : String(rows[0]?.id ?? "") || null);
+        }
       })
       .catch(() => {
         if (!cancelled) setRecentList([]);
@@ -201,13 +205,14 @@ function ShopCollectionDetailView({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, shopName, refreshToken]);
+  }, [isOpen, shopName, shopInfo?.id, refreshToken]);
 
   // Every open — and every shop step — starts on page 1, unsorted, clean search.
   useEffect(() => {
     if (isOpen) {
       setPage(1);
       setSearch("");
+      setSelectedRecordId(null);
       setSortKey(null);
       setSortDir("asc");
     } else {
@@ -353,6 +358,8 @@ function ShopCollectionDetailView({
     });
   }, [filteredRecent, sortKey, sortDir]);
 
+  const selectedRecord = recentList.find((row) => String(row.id) === selectedRecordId) ?? recentList[0] ?? null;
+
   if (!isOpen) return null;
 
   const startIndex = (page - 1) * pageSize;
@@ -426,18 +433,17 @@ function ShopCollectionDetailView({
     <AppShellModal open={isOpen} onClose={onClose} ariaLabelledBy="shop-collection-view-title">
       {/* Header — shop identity BESIDE the title, walk-through arrows on the
         * right; the Trip List view header shape in this page's tone. */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-orange-50/60 via-white to-orange-50/40 px-6 py-4 flex-shrink-0 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 border border-orange-100 text-orange-500 shadow-inner shrink-0">
-            <Eye size={18} />
+      <div className="flex flex-shrink-0 flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/40 px-6 py-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+            <Wallet size={20} />
           </span>
-          <h3 id="shop-collection-view-title" className="text-base font-bold text-slate-800 tracking-tight shrink-0">
-            {t("ops.collection.shop_collection_details")}
-          </h3>
-          <span className="hidden h-5 w-px shrink-0 bg-slate-200 sm:inline-block" aria-hidden="true" />
-          <span className="truncate text-sm font-bold text-slate-800">{shown(shopName)}</span>
+          <div className="min-w-0">
+            <h3 id="shop-collection-view-title" className="truncate text-base font-bold tracking-tight text-slate-800">{t("ops.collection.shop_collection_details")}</h3>
+            <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-semibold text-slate-500"><Store size={13} className="shrink-0 text-slate-400" />{shown(shopName)}</p>
+          </div>
           {shopInfo && (
-            <>
+            <div className="hidden">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500 shadow-sm">
                 <User size={12} className="text-slate-400" />
                 {t("ops.collection.owner_label")}:
@@ -448,7 +454,7 @@ function ShopCollectionDetailView({
                 {t("ops.collection.mobile_label")}:
                 <span className="font-bold tabular-nums text-slate-800">{shopInfo.phoneNumber || "—"}</span>
               </span>
-            </>
+            </div>
           )}
         </div>
 
@@ -510,7 +516,73 @@ function ShopCollectionDetailView({
 
       {/* Body — the panel scrolls, the header and footer stay put. The content
         * fades up per shop, the same entrance the Trip view's steps use. */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-5">
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {/* Same structure as Collection Entry → Approved → View Collection and
+          * Maintenance Record: history rail left, selected record right. */}
+        <div className="flex h-full min-h-0 flex-col lg:flex-row">
+          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500"><Wallet size={13} className="text-slate-400" />All collection records</p>
+              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-500 ring-1 ring-slate-200">{filteredRecent.length}</span>
+            </div>
+            <div className="px-3 pt-2.5">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("ops.collection.search_collections_placeholder")} className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-medium outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
+              </div>
+            </div>
+            <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none">
+              {recentLoading && recentList.length === 0 ? (
+                <p className="px-2 py-8 text-center text-xs text-slate-400"><Loader2 size={15} className="mx-auto mb-2 animate-spin" />{t("common.loading")}</p>
+              ) : filteredRecent.length === 0 ? (
+                <p className="px-2 py-8 text-center text-xs text-slate-400">{t("ops.collection.no_collections_for_shop")}</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {filteredRecent.map((record) => {
+                    const active = String(record.id) === String(selectedRecord?.id);
+                    return (
+                      <button key={record.id} type="button" onClick={() => setSelectedRecordId(String(record.id))} className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}>
+                        <p className="text-xs font-bold text-slate-700">{formatDate(record.collectionDate)}</p>
+                        <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500"><span className="truncate">{record.collectionNo || "—"}</span><span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatCurrency(Number(record.amount) || 0)}</span></div>
+                        <p className="mt-0.5 truncate text-[10px] text-slate-400">{localizeTripViewText(record.paymentMode || "Cash", language)}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+
+          <div key={String(selectedRecord?.id ?? "empty")} className="min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
+            <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up">
+              <p className="flex items-center gap-1.5 bg-slate-50/80 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500"><Store size={13} className="text-emerald-500" />Shop details</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2">
+                {([[t("operations.shop_name"), shown(shopName)], [t("ops.collection.current_outstanding"), formatCurrency(currentOutstanding)], [t("ops.collection.owner_label"), shown(shopInfo?.ownerName) || "—"], [t("ops.collection.mobile_label"), shopInfo?.phoneNumber || "—"]] as [string, string][]).map(([label, value], index) => (
+                  <div key={label} className={`flex items-center justify-between gap-4 bg-white px-4 py-3 ${index % 2 === 0 ? "sm:border-r" : ""} ${index < 2 ? "border-b border-slate-100" : ""}`}><span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</span><span className="text-right text-[13px] font-bold text-slate-800">{value}</span></div>
+                ))}
+              </div>
+            </section>
+
+            {selectedRecord ? (
+              <>
+                <section className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                    {(() => {
+                      const rows: [string, string][] = [[t("ops.collection.collection_id"), selectedRecord.collectionNo || "—"], [t("ops.collection.collection_date"), formatDate(selectedRecord.collectionDate)], [t("table.amount"), formatCurrency(Number(selectedRecord.amount) || 0)], [t("operations.payment_mode"), localizeTripViewText(selectedRecord.paymentMode || "Cash", language)], [t("operations.reference_no"), selectedRecord.referenceNo || "—"], [t("common.remarks"), selectedRecord.remarks || "—"], [t("ops.collection.collected_by"), localizeTripViewText(selectedRecord.collector || "—", language)], [t("table.status"), collectionStatusLabel(selectedRecord.status, t)]];
+                      const half = Math.ceil(rows.length / 2);
+                      const column = (items: [string, string][]) => <dl className="overflow-hidden rounded-xl border border-slate-200 bg-white">{items.map(([label, value], index) => <div key={label} className={`flex items-start justify-between gap-4 px-4 py-3 transition-colors hover:bg-slate-50/60 ${index ? "border-t border-slate-100" : ""}`}><dt className="w-32 shrink-0 pt-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</dt><dd className={`min-w-0 flex-1 break-words text-right text-[13px] font-bold ${label === t("table.amount") ? "text-emerald-700" : "text-slate-800"}`}>{value}</dd></div>)}</dl>;
+                      return <>{column(rows.slice(0, half))}{column(rows.slice(half))}</>;
+                    })()}
+                  </div>
+                </section>
+                <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}><div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 px-4 py-3"><span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700"><IndianRupee size={15} />Amount received</span><span className="text-lg font-bold tabular-nums text-emerald-700">{formatCurrency(Number(selectedRecord.amount) || 0)}</span></div></section>
+              </>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Previous KPI/table implementation retained but not rendered. */}
+        <div className="hidden">
         <div key={`${shopName}-body`} className="animate-fade-in-up space-y-4">
           {/* Shop summary — the shared KPI surface, compact so the table leads. */}
           <KpiCardGrid
@@ -791,10 +863,22 @@ function ShopCollectionDetailView({
             )}
           </div>
         </div>
+        </div>
       </div>
 
       {/* Footer — Close only, in the Trip List view's button. */}
       <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 md:px-8 rounded-b-2xl flex-shrink-0">
+        {selectedRecord && allowDelete && selectedRecord.canDelete && !selectedRecord.deleted && getDeleteWindowForStatus(selectedRecord.collectionDate, selectedRecord.status).canDelete ? (
+          <button
+            type="button"
+            onClick={() => pendingDelete.requestDelete(String(selectedRecord.id), { label: `${t("ops.collection.delete_collection")} · ${selectedRecord.collectionNo || formatCurrency(Number(selectedRecord.amount) || 0)}` })}
+            disabled={pendingDelete.isPending(String(selectedRecord.id)) || pendingDelete.isCommitting(String(selectedRecord.id))}
+            className="group inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-2.5 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-50 active:scale-95 disabled:opacity-50"
+          >
+            {pendingDelete.isCommitting(String(selectedRecord.id)) ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} className={uiActionIconMotionClass.delete} />}
+            {t("ops.collection.delete_collection")}
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onClose}

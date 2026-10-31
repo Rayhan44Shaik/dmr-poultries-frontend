@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPut, throwApiError } from "../../../../api";
 import type { FuelExpense, FuelExpenseDraft, FuelUiStatus } from "../types/fuelExpense";
+import { resolveFuelGps } from "../utils/fuelGps";
 
 const PATH = "/operations/fuel-expenses";
 
@@ -37,6 +38,7 @@ export interface FuelListFilters {
   tripNo?: string;
   billNo?: string;
   search?: string;
+  includeDeleted?: boolean;
 }
 
 interface ApiFuelListResult {
@@ -70,6 +72,7 @@ interface ApiFuel {
   gpsAccuracy?: number | null;
   gpsCapturedAt?: string | null;
   status: string;
+  deleted?: boolean;
   imageData?: string | null;
   imageName?: string | null;
   createdAt?: string | null;
@@ -87,6 +90,7 @@ function mapStatus(status: string): FuelUiStatus {
 
 function mapRow(row: ApiFuel): FuelExpense {
   const isTrip = row.sourceType === "TRIP" || !!row.tripNo || !!row.tripId;
+  const gps = resolveFuelGps(row.gpsLat, row.gpsLon, row.bunkAddress);
   return {
     id: row.id,
     billNo: row.billNo,
@@ -105,14 +109,15 @@ function mapRow(row: ApiFuel): FuelExpense {
     rate: Number(row.fuelRate ?? 0),
     litres: Number(row.liters ?? 0),
     petrolBunk: row.pumpName ?? "",
-    gpsAddress: row.bunkAddress ?? "",
+    gpsAddress: gps.placeName || "",
     remarks: row.remarks ?? undefined,
-    gpsLat: row.gpsLat ?? null,
-    gpsLon: row.gpsLon ?? null,
+    gpsLat: gps.lat,
+    gpsLon: gps.lon,
     gpsAccuracy: row.gpsAccuracy ?? null,
     gpsCapturedAt: row.gpsCapturedAt ?? null,
     // Trip diesel bills are automatically approved on trip completion; only manual bills can be pending
-    status: isTrip ? "Approved" : mapStatus(row.status),
+    status: row.deleted ? "Deleted" : isTrip ? "Approved" : mapStatus(row.status),
+    deleted: Boolean(row.deleted),
     createdDate: row.createdAt ?? "",
     createdBy: row.createdBy ?? "",
     approvedDate: row.approvedAt ?? undefined,
@@ -199,6 +204,7 @@ async function list(filters: FuelListFilters = {}): Promise<FuelListResult> {
         tripNo: filters.tripNo || undefined,
         billNo: filters.billNo || undefined,
         search: filters.search || undefined,
+        includeDeleted: filters.includeDeleted ? "true" : undefined,
       },
     });
     if (Array.isArray(data)) {

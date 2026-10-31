@@ -1,7 +1,7 @@
 // src/modules/operations/fuel-expenses/components/FuelEntryForm.tsx
 
 import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
-import { MapPin, Upload, X, Loader2, Fuel } from "lucide-react";
+import { CheckCircle2, ExternalLink, MapPin, Upload, X, Loader2, Fuel } from "lucide-react";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useI18n } from "../../../../i18n";
@@ -11,6 +11,10 @@ import { DatePicker } from "../../../../components/common/DatePicker";
 import { amountInWords } from "../../collections/utils/amountInWords";
 import SearchableSelect from "../../../../components/common/SearchableSelect";
 import { compressImageFile } from "../../../../utils/compressImage";
+import { captureGpsQuiet } from "../../vehicle-trips/utils/captureGps";
+import { reverseGeocode } from "../../vehicle-trips/utils/reverseGeocode";
+import { GpsAddressText } from "../../vehicle-trips/components/GpsAddressText";
+import { googleMapsUrl, isValidGps, resolveFuelGps } from "../utils/fuelGps";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
 
 interface Props {
@@ -20,6 +24,7 @@ interface Props {
   initialData?: FuelExpense | null;
   vehicles: Array<{ id: number; status?: string; vehicleNumber: string }>;
   drivers: Array<{ id: number; employeeName: string }>;
+  supervisors?: Array<{ id: number; employeeName: string }>;
   fuelBunks: BirdType[];
   onCancel?: () => void;
 }
@@ -35,6 +40,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   initialData,
   vehicles,
   drivers,
+  supervisors = [],
   fuelBunks,
   onCancel,
 }, ref) => {
@@ -47,6 +53,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [vehicleNo, setVehicleNo] = useState("");
   const [driverId, setDriverId] = useState<number>(0);
   const [driverName, setDriverName] = useState("");
+  const [supervisorId, setSupervisorId] = useState<number>(0);
+  const [supervisorName, setSupervisorName] = useState("");
   const [meterReading, setMeterReading] = useState<number>(0);
   const [minMeterReading, setMinMeterReading] = useState<number>(0);
   const [amount, setAmount] = useState<number>(0);
@@ -75,6 +83,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setVehicleNo(initialData.vehicleNo);
       setDriverId(initialData.driverId);
       setDriverName(initialData.driverName);
+      setSupervisorId(initialData.supervisorId ?? 0);
+      setSupervisorName(initialData.supervisorName ?? "");
       setMeterReading(initialData.meterReading);
       setMinMeterReading(initialData.meterReading);
       setAmount(initialData.amount);
@@ -82,11 +92,12 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setLitres(initialData.litres);
       setPetrolBunk(initialData.petrolBunk);
       setBunkSelection(fuelBunks.some((bunk) => bunk.birdType === initialData.petrolBunk) ? initialData.petrolBunk : "__OTHER__");
-      setGpsAddress(initialData.gpsAddress || "");
+      const initialGps = resolveFuelGps(initialData.gpsLat, initialData.gpsLon, initialData.gpsAddress);
+      setGpsAddress(initialGps.placeName);
       setImage(initialData.image || "");
       setImageName(initialData.imageName || "");
-      setGpsLat(initialData.gpsLat ?? null);
-      setGpsLon(initialData.gpsLon ?? null);
+      setGpsLat(initialGps.lat);
+      setGpsLon(initialGps.lon);
       setGpsAccuracy(initialData.gpsAccuracy ?? null);
       setGpsCapturedAt(initialData.gpsCapturedAt ?? null);
     }
@@ -106,6 +117,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setVehicleNo("");
     setDriverId(0);
     setDriverName("");
+    setSupervisorId(0);
+    setSupervisorName("");
     setMeterReading(0);
     setMinMeterReading(0);
     setAmount(0);
@@ -138,6 +151,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     value: String(d.id),
     label: localizeTripViewText(d.employeeName, language),
   }));
+  const supervisorOptions = supervisors.map((s) => ({
+    value: String(s.id),
+    label: localizeTripViewText(s.employeeName, language),
+  }));
 
   const bunkOptions = [
     ...fuelBunks.map((bunk) => ({ value: bunk.birdType, label: bunk.birdType })),
@@ -154,15 +171,22 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setGpsLon(null);
       setGpsAccuracy(null);
       setGpsCapturedAt(null);
+      void fetchGPSLocation();
       return;
     }
     const bunk = fuelBunks.find((item) => item.birdType === selectedValue);
+    const bunkGps = resolveFuelGps(bunk?.latitude, bunk?.longitude, bunk?.address);
     setPetrolBunk(bunk?.birdType ?? "");
-    setGpsAddress(bunk?.address ?? "");
-    setGpsLat(bunk?.latitude ?? null);
-    setGpsLon(bunk?.longitude ?? null);
-    setGpsAccuracy(bunk?.latitude != null && bunk.longitude != null ? 0 : null);
-    setGpsCapturedAt(bunk?.latitude != null && bunk.longitude != null ? new Date().toISOString() : null);
+    setGpsAddress(bunkGps.placeName);
+    setGpsLat(bunkGps.lat);
+    setGpsLon(bunkGps.lon);
+    setGpsAccuracy(bunkGps.lat != null && bunkGps.lon != null ? 0 : null);
+    setGpsCapturedAt(bunkGps.lat != null && bunkGps.lon != null ? new Date().toISOString() : null);
+    if (bunkGps.lat != null && bunkGps.lon != null && !bunkGps.placeName) {
+      void reverseGeocode(bunkGps.lat, bunkGps.lon).then(({ address }) => {
+        if (address) setGpsAddress(address);
+      });
+    }
   };
 
   const handleVehicleChange = (selectedValue: string) => {
@@ -213,52 +237,33 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   };
 
   const fetchGPSLocation = () => {
-    if (!navigator.geolocation) {
-      const msg = language === "te" ? "జియోలొకేషన్ మద్దతు లేదు." : "Geolocation is not supported.";
-      setGpsError(msg);
-      showNotification(msg, "error");
-      return;
-    }
     setIsFetchingLocation(true);
     setGpsError(null);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        setGpsLat(latitude);
-        setGpsLon(longitude);
-        setGpsAccuracy(accuracy);
-        setGpsCapturedAt(new Date().toISOString());
-        try {
-          const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`
-          );
-          const data = await response.json();
-          if (data && data.display_name) {
-            setGpsAddress(data.display_name);
-          }
-        } catch {
-          /* keep coordinates even if reverse geocode fails */
-        } finally {
-          setIsFetchingLocation(false);
-        }
-      },
-      (err) => {
-        const message =
-          err.code === err.PERMISSION_DENIED
-            ? (language === "te" ? "GPS అనుమతి నిరాకరించబడింది." : "GPS permission denied.")
-            : err.code === err.TIMEOUT
-              ? (language === "te" ? "GPS సమయం ముగిసింది." : "GPS timed out.")
-              : (language === "te" ? "GPS స్థానం అందుబాటులో లేదు." : "GPS location unavailable.");
+    void captureGpsQuiet({ timeoutMs: 8000 }).then(async (gps) => {
+      if (gps) {
+        setGpsLat(gps.latitude);
+        setGpsLon(gps.longitude);
+        setGpsAccuracy(gps.accuracy);
+        setGpsCapturedAt(gps.capturedAt);
+        const { address } = await reverseGeocode(gps.latitude, gps.longitude);
+        setGpsAddress(address || "");
+      } else {
+        const message = language === "te" ? "GPS స్థానం అందుబాటులో లేదు." : "GPS location unavailable.";
         setGpsError(message);
-        showNotification(message, "error");
-        setIsFetchingLocation(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+        showNotification(message, "info");
+      }
+      setIsFetchingLocation(false);
+    });
   };
 
-  const handleSubmit = () => {
-    if (!date || !vehicleId || !driverId || meterReading <= 0 || litres <= 0 || rate <= 0 || !petrolBunk.trim() || gpsLat == null || gpsLon == null || !gpsAddress.trim() || !image) {
+  const handleSubmit = async () => {
+    let place = gpsAddress.trim();
+    if (isValidGps(gpsLat, gpsLon) && !place) {
+      const { address } = await reverseGeocode(Number(gpsLat), Number(gpsLon));
+      place = address || "";
+      if (place) setGpsAddress(place);
+    }
+    if (!date || !vehicleId || !driverId || meterReading <= 0 || litres <= 0 || rate <= 0 || !petrolBunk.trim() || !isValidGps(gpsLat, gpsLon) || !image) {
       showNotification(
         language === "te" ? "దయచేసి అవసరమైన అన్ని ఇంధన బిల్లు వివరాలను పూరించండి." : "Please complete all required fuel bill details, GPS, and bill upload.",
         "error"
@@ -276,12 +281,14 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       vehicleNo,
       driverId,
       driverName,
+      supervisorId: supervisorId || undefined,
+      supervisorName: supervisorName || undefined,
       meterReading,
       amount,
       rate,
       litres,
       petrolBunk,
-      gpsAddress,
+      gpsAddress: place,
       image,
       imageName,
       gpsLat,
@@ -320,14 +327,26 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               {editingId ? t("ops.fuel.edit_bill") : t("ops.fuel.add_bill_manual")}
             </h3>
           </div>
-          {onCancel && (
+          <div className="flex items-center gap-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="group inline-flex h-9 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-xs transition-all hover:border-slate-300 hover:bg-slate-50"
+              >
+                <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" />
+                {t("common.cancel")}
+              </button>
+            )}
             <button
-              onClick={onCancel}
-              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition cursor-pointer"
+              type="button"
+              onClick={() => void handleSubmit()}
+              className="group inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-[0.97]"
             >
-              <X size={18} />
+              <CheckCircle2 size={15} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
+              {editingId ? t("ops.fuel.update_bill") : t("ops.fuel.save_bill")}
             </button>
-          )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -384,6 +403,32 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               placeholder={t("ops.fuel.select_driver")}
               searchable
               allowClear={false}
+              widthClass="w-full"
+            />
+          </div>
+
+          {/* Supervisor — same crew identity as Step 5 diesel bills */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              {t("common.supervisor")}
+            </label>
+            <SearchableSelect
+              label=""
+              options={supervisorOptions}
+              value={supervisorId ? String(supervisorId) : ""}
+              onChange={(selectedValue) => {
+                const person = supervisors.find((item) => String(item.id) === selectedValue);
+                if (person) {
+                  setSupervisorId(person.id);
+                  setSupervisorName(person.employeeName);
+                } else {
+                  setSupervisorId(0);
+                  setSupervisorName("");
+                }
+              }}
+              placeholder={t("common.supervisor")}
+              searchable
+              allowClear
               widthClass="w-full"
             />
           </div>
@@ -459,31 +504,48 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             {bunkSelection === "__OTHER__" && <input type="text" value={petrolBunk} maxLength={150} onChange={(e) => setPetrolBunk(e.target.value)} className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder={t("ops.fuel.enter_bunk")} />}
           </div>
 
-          {/* GPS */}
+          {/* GPS — same reverse-geocoded place name as Trip Entry Step 2 */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">GPS <span className="text-red-500">*</span></label>
             <div className="flex items-center gap-2">
+              <div className="flex h-[42px] min-w-0 flex-1 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-800">
+                {isValidGps(gpsLat, gpsLon) ? (
+                  <span className="min-w-0 truncate">
+                    <GpsAddressText lat={gpsLat} lon={gpsLon} fallback="ops.trip.location_captured" />
+                  </span>
+                ) : (
+                  <span className="text-xs font-normal text-slate-400">GPS: {t("ops.trip.not_captured")}</span>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={fetchGPSLocation}
                 disabled={isFetchingLocation || (bunkSelection !== "__OTHER__" && Boolean(bunkSelection))}
-                className="flex w-full items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60 cursor-pointer"
+                className="inline-flex h-[42px] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 text-xs font-semibold text-cyan-600 transition hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
-                <span className="hidden sm:inline">{bunkSelection && bunkSelection !== "__OTHER__" ? "Master GPS" : "GPS"}</span>
+                <span className="hidden sm:inline">{bunkSelection && bunkSelection !== "__OTHER__" ? "Master GPS" : t("ops.trip.get_gps")}</span>
               </button>
             </div>
-            {gpsLat != null && gpsLon != null ? (
-              <div className="text-[10px] text-emerald-700 mt-1">
-                {t("ops.fuel.gps_captured", { coords: `${gpsLat.toFixed(6)}, ${gpsLon.toFixed(6)}` })}
+            {isValidGps(gpsLat, gpsLon) ? (
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                <span className="font-mono font-semibold text-emerald-700">
+                  {Number(gpsLat).toFixed(6)}°N, {Number(gpsLon).toFixed(6)}°E
+                </span>
+                <a
+                  href={googleMapsUrl(Number(gpsLat), Number(gpsLon))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-emerald-700 hover:underline"
+                >
+                  <ExternalLink size={11} />
+                  {t("masters.shops.location.open_maps")}
+                </a>
               </div>
             ) : (
-              <div className="text-[10px] text-slate-400 mt-1">
-                {t("ops.fuel.gps_not_captured")}
-              </div>
+              <div className="mt-1 text-[10px] text-slate-400">{t("ops.fuel.gps_not_captured")}</div>
             )}
             {gpsError && <div className="text-[10px] text-red-600 mt-1">{gpsError}</div>}
-            {gpsAddress && <div className="mt-1 rounded-md bg-emerald-50 px-2 py-1 text-[10px] font-medium leading-4 text-emerald-700">{gpsAddress}</div>}
           </div>
 
           {/* Image Upload */}
@@ -522,16 +584,18 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             <button
               type="button"
               onClick={onCancel}
-              className="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+              className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-xs transition-all hover:border-slate-300 hover:bg-slate-50"
             >
+              <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" />
               {t("common.cancel")}
             </button>
           )}
           <button
             type="button"
-            onClick={handleSubmit}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-95 cursor-pointer"
+            onClick={() => void handleSubmit()}
+            className="group inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-[0.97]"
           >
+            <CheckCircle2 size={15} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
             {editingId ? t("ops.fuel.update_bill") : t("ops.fuel.save_bill")}
           </button>
         </div>

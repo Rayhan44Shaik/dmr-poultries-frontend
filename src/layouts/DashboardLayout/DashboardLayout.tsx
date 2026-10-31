@@ -125,13 +125,13 @@ function ShellFrame({ children }: DashboardLayoutProps) {
   return (
     <ShellContext.Provider value={true}>
     <div
-      className={`h-screen overflow-hidden bg-slate-100/80 transition-[padding] duration-300 ease-out dark:bg-slate-950 ${SIDEBAR_CONTENT_CLASS[sidebarMode]}`}
+      className={`h-screen overflow-hidden bg-[var(--ds-surface-app)] text-[var(--ds-text-primary)] transition-[padding] duration-300 ease-[var(--ds-ease)] dark:bg-slate-950 ${SIDEBAR_CONTENT_CLASS[sidebarMode]}`}
     >
       <div className="flex h-full min-w-0 flex-col">
         <Header onMenuClick={handleMenuClick} menuOpen={navOpen} onOpenCommand={() => setCommandOpen(true)} />
 
-        <main ref={mainRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto" id="app-scroll">
-          {children}
+        <main ref={mainRef} className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto scroll-smooth" id="app-scroll">
+          <div className="min-h-full animate-fade-in">{children}</div>
         </main>
       </div>
 

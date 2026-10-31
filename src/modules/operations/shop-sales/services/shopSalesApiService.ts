@@ -21,7 +21,7 @@
  * this phase. Only `useShopSales.ts` (the actual Shop Sales page hook)
  * is repointed at this file.
  */
-import { apiDelete, apiGet, apiPut } from "../../../../api";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../../../api";
 import type { ShopSale } from "../types/shopSale";
 import {
   mapApiSaleToShopSale,
@@ -77,13 +77,44 @@ export async function listShopSales(filters: {
 }
 
 export interface ShopSalePatch {
+  shopId?: number | null;
+  shopName?: string;
   birds?: number;
   weight?: number;
   mortality?: number;
+  mortalityWeight?: number;
+  deliveryMode?: "box" | "weight";
   remarks?: string;
   birdTypeId?: number | null;
   birdType?: string;
   rate?: number;
+}
+
+export interface CreateShopSaleInput {
+  tripId: number;
+  load: number;
+  shopId: number;
+  shopName: string;
+  birds: number;
+  weight: number;
+  mortality: number;
+  mortalityWeight: number;
+  deliveryMode: "box" | "weight";
+  rate: number;
+  remarks: string;
+}
+
+export async function updateShopSalesLoad(tripId: number, deliveries: Array<{
+  id?: number; load: number; shopId: number; birds: number; weight: number; mortality: number; mortalityWeight: number;
+  deliveryMode: "box" | "weight"; rate: number; remarks?: string;
+}>): Promise<ShopSale[]> {
+  const { data } = await apiPut<ApiShopSale[]>(`${SHOP_SALES_PATH}/trip/${tripId}/deliveries`, { deliveries });
+  return data.map(mapApiSaleToShopSale);
+}
+
+export async function createShopSale(input: CreateShopSaleInput): Promise<ShopSale> {
+  const { data } = await apiPost<ApiShopSale>(SHOP_SALES_PATH, input);
+  return mapApiSaleToShopSale(data);
 }
 
 /** PUT /operations/shop-sales/:id */

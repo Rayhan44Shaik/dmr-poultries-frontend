@@ -256,6 +256,12 @@ export interface Trip {
     birds: number;
     weight: number;
     amount: number;
+    dcWeight?: number;
+    boxMortality?: number;
+    boxMortalityWeight?: number;
+    weightMortality?: number;
+    weightMortalityWeight?: number;
+    weightLoss?: number;
   }>;
   version?: number;
   createdAt?: string;

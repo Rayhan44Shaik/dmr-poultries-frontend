@@ -40,6 +40,8 @@ export interface NotificationItem {
   readonly message: string;
   /** Optional secondary line (e.g. a record identifier). */
   readonly description?: string;
+  /** Optional fixed placement for workflows that must match page-level toasts. */
+  readonly placement?: "top-right";
   /** Epoch ms when it was first shown — used for stable ordering. */
   readonly createdAt: number;
 }
@@ -116,6 +118,8 @@ export interface PushOptions {
   duration?: number;
   /** Optional secondary line. */
   description?: string;
+  /** Keep this toast in the standard top-right stack even while a modal is open. */
+  placement?: "top-right";
 }
 
 /**
@@ -134,7 +138,7 @@ export function push(
   // Never render an empty toast.
   if (!text) return "";
 
-  const key = `${tone}::${text}`;
+  const key = `${tone}::${options.placement ?? "adaptive"}::${text}`;
   const existingId = keyToId.get(key);
 
   if (existingId !== undefined && items.some((i) => i.id === existingId)) {
@@ -151,6 +155,7 @@ export function push(
     tone,
     message: text,
     description: options.description,
+    placement: options.placement,
     createdAt: Date.now(),
   };
 

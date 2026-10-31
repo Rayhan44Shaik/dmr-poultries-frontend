@@ -435,7 +435,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
   return (
     <header
-      className={`dmr-app-header sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85`}
+      className={`dmr-app-header sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-[#e4ebe5] bg-white/92 px-4 shadow-[0_1px_2px_rgba(16,60,50,0.025)] backdrop-blur-xl sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/90`}
     >
       {/* Menu — every viewport, because it is the way back to a collapsed or
           hidden sidebar. Below `lg` it opens the floating popup; from `lg` up

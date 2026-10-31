@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2,
-  FileText, Calendar, Store, UserCog, CreditCard, IndianRupee, Activity, MessageSquareText,
+  Search, X, History, CheckCircle, ChevronDown, Eye, Pencil, Trash2,
+  FileText, Calendar, Store, UserCog, CreditCard, IndianRupee, MessageSquareText,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
@@ -11,7 +11,7 @@ import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDa
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { FilterResetButton, countActiveFilters } from "../../../../../ui";
 import { BrandRefreshButton } from "../../../../../ui";
-import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
+import { collectionStatusKey } from "../../utils/collectionStatusLabel";
 import {
   collectionShopKey,
   compareCollectionRecency,
@@ -25,7 +25,7 @@ interface Props {
   statusFilter: "Pending" | "Approved" | "Deleted";
   onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
   /** Optional: roles without approve rights simply never receive it. */
-  onApprove?: (id: string) => void;
+  onApproveMany?: (ids: string[]) => void | Promise<void>;
   onReject?: (id: string) => void;
   onDelete?: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
@@ -47,26 +47,12 @@ const inr = (n: number) =>
     maximumFractionDigits: 2,
   });
 
-function getStatusBadgeClass(status: string): string {
-  switch (status) {
-    case "Approved":
-      return "bg-emerald-50 text-emerald-700 border-emerald-200";
-    case "Pending Approval":
-      return "bg-orange-50 text-orange-700 border-orange-200";
-    case "Rejected":
-    case "Deleted":
-      return "bg-rose-50 text-rose-700 border-rose-200";
-    default:
-      return "bg-slate-50 text-slate-700 border-slate-200";
-  }
-}
-
 export default function RecentCollectionsTable({
   collections,
   isLoading = false,
   statusFilter,
   onStatusChange,
-  onApprove,
+  onApproveMany,
   onDelete,
   onEdit,
   onViewShop,
@@ -79,6 +65,7 @@ export default function RecentCollectionsTable({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
 
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
@@ -167,6 +154,11 @@ export default function RecentCollectionsTable({
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedData = displayedData.slice(startIndex, startIndex + pageSize);
+  const pendingPageIds = paginatedData.filter((row) => (row.rawStatus || row.status) === "Pending Approval").map((row) => row.id);
+  const allPendingChecked = pendingPageIds.length > 0 && pendingPageIds.every((id) => checkedIds.has(id));
+  const toggleChecked = (id: string) => setCheckedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  const toggleAllPending = () => setCheckedIds((current) => { const next = new Set(current); if (allPendingChecked) pendingPageIds.forEach((id) => next.delete(id)); else pendingPageIds.forEach((id) => next.add(id)); return next; });
+  const approveChecked = async () => { const ids = [...checkedIds]; if (!ids.length) return; await onApproveMany?.(ids); setCheckedIds(new Set()); };
 
 
   /**
@@ -270,6 +262,10 @@ export default function RecentCollectionsTable({
       case "Enter":
       case " ":
         event.preventDefault();
+        if (statusFilter === "Pending" && col.rawStatus === "Pending Approval" && onApproveMany) {
+          toggleChecked(col.id);
+          break;
+        }
         selectRow(selectedId === col.id ? null : col);
         break;
       case "Escape":
@@ -376,7 +372,7 @@ export default function RecentCollectionsTable({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           {/* Same compact search treatment as Recent Trip Activity: the icon
             * sits in its own tile and the input uses the identical height and
             * responsive width. */}
@@ -394,7 +390,7 @@ export default function RecentCollectionsTable({
                 onChange={(e) => updateSearch(e.target.value)}
                 placeholder={t("ops.collection.search_collections_placeholder")}
                 aria-label={t("ops.collection.search_collections_placeholder")}
-                className="h-8 w-full sm:w-44 md:w-52 min-w-0 px-2.5 pr-8 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all shadow-sm"
+                className="h-8 w-full sm:w-48 md:w-64 min-w-0 px-2.5 pr-8 text-xs border border-slate-200 rounded-xl bg-white text-slate-700 placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all shadow-sm"
               />
               {searchQuery && (
                 <button
@@ -413,6 +409,8 @@ export default function RecentCollectionsTable({
             count={countActiveFilters(searchQuery.trim() !== "")}
             onClick={resetTable}
           />
+
+          {onApproveMany && statusFilter === "Pending" && <button type="button" onClick={() => void approveChecked()} disabled={!checkedIds.size} className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40"><CheckCircle size={14} className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12"/>Approve selected{checkedIds.size ? ` (${checkedIds.size})` : ""}</button>}
 
           <div className="flex items-center gap-1" data-recent-collection-actions>
             <button
@@ -462,14 +460,13 @@ export default function RecentCollectionsTable({
       <div className="overflow-x-auto">
         <table className="min-w-[1460px] w-full table-fixed text-[13px] text-left border-collapse">
           <colgroup>
-            <col className="w-[4%]" />
+            <col className="w-[6%]" />
+            <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[15%]" />
             <col className="w-[14%]" />
             <col className="w-[11%]" />
             <col className="w-[14%]" />
-            <col className="w-[14%]" />
-            <col className="w-[9%]" />
-            <col className="w-[14%]" />
-            <col className="w-[6%]" />
             <col className="w-[14%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
@@ -477,7 +474,7 @@ export default function RecentCollectionsTable({
               {/* Each column is tagged with the same icon vocabulary Shop Sales
                 * uses, so a column means the same thing across the product. */}
               <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
-                #
+                <button type="button" onClick={toggleAllPending} disabled={!pendingPageIds.length || statusFilter !== "Pending"} aria-label={allPendingChecked ? "Clear selected collections" : "Select all pending collections"} title={allPendingChecked ? "Clear selection" : "Select all pending"} className="group inline-flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"><span>#</span><ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${allPendingChecked ? "rotate-180 text-amber-600" : "group-hover:translate-y-0.5"}`} /></button>
               </th>
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
@@ -521,18 +518,12 @@ export default function RecentCollectionsTable({
                   {t("table.remarks")}
                 </span>
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-center gap-1.5">
-                  <Activity size={14} className="shrink-0 text-orange-500" />
-                  {t("table.status")}
-                </span>
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center text-sm font-medium text-slate-400">
+                <td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
@@ -544,7 +535,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : displayedData.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-[13px] font-medium text-slate-400">
                   {getEmptyStateMessage()}
                 </td>
               </tr>
@@ -552,16 +543,7 @@ export default function RecentCollectionsTable({
               paginatedData.map((col, index) => {
                 const rawStatus = col.rawStatus || col.status;
                 const isSelected = selectedId === col.id;
-                const isPending = rawStatus === "Pending Approval";
-                const isDeleted = rawStatus === "Deleted";
-                const statusLabel = collectionStatusLabel(rawStatus, t);
-                const statusIcon = isDeleted ? (
-                  <AlertCircle size={12} />
-                ) : isPending ? (
-                  <Clock size={12} />
-                ) : (
-                  <CheckCircle size={12} />
-                );
+                const isChecked = checkedIds.has(col.id);
 
                 return (
                   <tr
@@ -576,12 +558,18 @@ export default function RecentCollectionsTable({
                       };
                     }}
                     tabIndex={index === activeRowIndex ? 0 : -1}
-                    onClick={() => selectRow(isSelected ? null : col)}
+                    onClick={() => {
+                      if (statusFilter === "Pending" && rawStatus === "Pending Approval" && onApproveMany) {
+                        toggleChecked(col.id);
+                        return;
+                      }
+                      selectRow(isSelected ? null : col);
+                    }}
                     onKeyDown={(event) => handleRowKeyDown(event, index, col)}
                     aria-selected={isSelected}
-                    className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
-                      isSelected
-                        ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
+                    className={`cursor-pointer outline-none transition-[background-color,box-shadow,border-color] duration-200 ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300 ${
+                      isSelected || isChecked
+                        ? "bg-amber-50/70 border-l-4 border-l-amber-300 ring-1 ring-inset ring-amber-100"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
@@ -604,42 +592,6 @@ export default function RecentCollectionsTable({
                     </td>
                     <td className="px-4 py-5 text-center text-[13px] font-normal text-slate-600">
                       <span className="block truncate" title={col.remarks || undefined}>{col.remarks || "—"}</span>
-                    </td>
-                    <td className="px-4 py-5 text-center" onClick={(event) => event.stopPropagation()}>
-                      {isPending && onApprove ? (
-                        <div className="group relative mx-auto w-[9rem]">
-                          <select
-                            value="Pending Approval"
-                            onChange={(event) => {
-                              if (event.target.value === "Approved") onApprove(col.id);
-                            }}
-                            aria-label={`${t("table.status")} — ${col.collectionNo}`}
-                            className="w-full cursor-pointer appearance-none rounded-xl border border-orange-200 bg-orange-50 px-3 py-1.5 pr-8 text-xs font-bold text-orange-700 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1"
-                          >
-                            <option value="Pending Approval" className="bg-white font-semibold text-orange-700">
-                              ⏳ {collectionStatusLabel("Pending Approval", t)}
-                            </option>
-                            <option value="Approved" className="bg-white font-semibold text-emerald-700">
-                              ✅ {collectionStatusLabel("Approved", t)}
-                            </option>
-                          </select>
-                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-0.5 px-2 text-slate-500">
-                            <span className={`inline-flex text-emerald-600 ${uiActionIconMotionClass.approve}`} aria-hidden="true">
-                              <CheckCircle size={13} />
-                            </span>
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </div>
-                        </div>
-                      ) : (
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm ${getStatusBadgeClass(rawStatus)}`}
-                        >
-                          {statusIcon}
-                          {statusLabel}
-                        </span>
-                      )}
                     </td>
                   </tr>
                 );

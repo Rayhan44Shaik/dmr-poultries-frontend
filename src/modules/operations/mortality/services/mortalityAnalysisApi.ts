@@ -10,6 +10,8 @@ export interface MortalityRow {
   farmBirds: number; farmWeight: number; deliveryShops: number;
   deliveredBirds: number; deliveredWeight: number; mortalityCount: number;
   mortalityWeight: number; weightLoss: number; weightLossPercentage: number;
+  boxMortalityCount: number; boxMortalityWeight: number;
+  weightModeMortalityCount: number; weightModeMortalityWeight: number;
   mortalityPercentage: number; survivalRate: number;
 }
 

@@ -1,4 +1,5 @@
-import React, { type ReactNode } from "react";
+import React, { useState, type FocusEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
 
 export type KpiTone = "blue" | "amber" | "emerald" | "violet" | "rose" | "cyan";
@@ -9,6 +10,8 @@ export interface KpiCardItem {
   value: ReactNode;
   /** Full, unshortened metric displayed when the operator hovers the card. */
   tooltip?: string;
+  /** Rich breakdown shown in the same fixed, unclipped style as table KPIs. */
+  tooltipContent?: ReactNode;
   Icon: LucideIcon;
   tone: KpiTone;
 }
@@ -139,6 +142,54 @@ const toneClasses: Record<KpiTone, { value: string; icon: string; glow: string; 
   },
 };
 
+function KpiCard({ item, density }: { item: KpiCardItem; density: keyof typeof densityClasses }) {
+  const { id, label, value, tooltip, tooltipContent, Icon, tone } = item;
+  const dense = densityClasses[density];
+  const classes = toneClasses[tone];
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+
+  const showTooltip = (target: HTMLElement) => {
+    if (!tooltipContent) return;
+    const rect = target.getBoundingClientRect();
+    const width = 260;
+    const left = Math.min(window.innerWidth - width - 12, Math.max(12, rect.left + rect.width / 2 - width / 2));
+    setPosition({ left, top: Math.min(window.innerHeight - 12, rect.bottom + 8) });
+  };
+
+  const handleFocus = (event: FocusEvent<HTMLDivElement>) => showTooltip(event.currentTarget);
+
+  return (
+    <div
+      key={id}
+      title={tooltipContent ? undefined : tooltip}
+      tabIndex={tooltipContent ? 0 : undefined}
+      onPointerEnter={(event) => showTooltip(event.currentTarget)}
+      onPointerLeave={() => setPosition(null)}
+      onFocus={handleFocus}
+      onBlur={() => setPosition(null)}
+      className={`group relative isolate overflow-hidden border border-slate-200/80 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${dense.card} ${tooltip || tooltipContent ? "cursor-help" : ""}`}
+    >
+      <span className={`pointer-events-none absolute rounded-full ${dense.glow} ${classes.glow}`} aria-hidden="true" />
+      <span className={`absolute inset-x-0 bottom-0 ${dense.accent} ${classes.accent}`} aria-hidden="true" />
+      <div className="relative flex h-full items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`font-bold uppercase tracking-wide text-slate-500 ${dense.label}`}>{label}</p>
+          <p className={`font-extrabold leading-none tracking-tight tabular-nums ${dense.value} ${classes.value}`}>{value}</p>
+        </div>
+        <span className={`inline-flex shrink-0 items-center justify-center border shadow-sm transition-transform duration-200 group-hover:scale-105 ${dense.iconTile} ${classes.icon}`} aria-hidden="true">
+          <Icon size={dense.iconSize} strokeWidth={2.25} />
+        </span>
+      </div>
+      {tooltipContent && position ? createPortal(
+        <div role="tooltip" style={position} className="pointer-events-none fixed z-[9999] w-[260px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl">
+          {tooltipContent}
+        </div>,
+        document.body,
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Shared KPI display surface for operational pages. It intentionally uses
  * restrained pastel tones, readable values, and recognisable icon tiles rather
@@ -152,33 +203,7 @@ export function KpiCardGrid({ items, gridClassName = "", ariaLabel, density = "d
       aria-label={ariaLabel}
       aria-live="polite"
     >
-      {items.map(({ id, label, value, tooltip, Icon, tone }) => {
-        const classes = toneClasses[tone];
-        return (
-          <div
-            key={id}
-            title={tooltip}
-            className={`group relative isolate overflow-hidden border border-slate-200/80 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${dense.card} ${tooltip ? "cursor-help" : ""}`}
-          >
-            <span className={`pointer-events-none absolute rounded-full ${dense.glow} ${classes.glow}`} aria-hidden="true" />
-            <span className={`absolute inset-x-0 bottom-0 ${dense.accent} ${classes.accent}`} aria-hidden="true" />
-            <div className="relative flex h-full items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className={`font-bold uppercase tracking-wide text-slate-500 ${dense.label}`}>{label}</p>
-                <p className={`font-extrabold leading-none tracking-tight tabular-nums ${dense.value} ${classes.value}`}>
-                  {value}
-                </p>
-              </div>
-              <span
-                className={`inline-flex shrink-0 items-center justify-center border shadow-sm transition-transform duration-200 group-hover:scale-105 ${dense.iconTile} ${classes.icon}`}
-                aria-hidden="true"
-              >
-                <Icon size={dense.iconSize} strokeWidth={2.25} />
-              </span>
-            </div>
-          </div>
-        );
-      })}
+      {items.map((item) => <KpiCard key={item.id} item={item} density={density} />)}
     </section>
   );
 }

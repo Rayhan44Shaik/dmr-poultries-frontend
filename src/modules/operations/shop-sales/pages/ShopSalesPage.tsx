@@ -11,11 +11,9 @@ import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import { Pagination } from "../../../../ui/Pagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
-import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
 import { useI18n } from "../../../../i18n";
-import ShopDeliveryTripViewModal from "../components/ShopDeliveryTripViewModal";
 import { exportShopSalesExcel, exportShopSalesPdf } from "../utils/exportShopSales";
 
 interface ShopSalesPageProps {
@@ -27,7 +25,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchInput, setSearchInput] = useState("");
-  const [tripViewSale, setTripViewSale] = useState<ShopSale | null>(null);
 
   const {
     sales,
@@ -44,7 +41,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     resetFilters,
     refreshSales,
     isLoading,
-    updateSale,
+    saveLoad,
   } = useShopSales();
 
   const { shops, refreshShops } = useShops();
@@ -95,43 +92,16 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     if (refreshed) showNotification(t("ops.shop_sales.refreshed"), "success");
   }, [refreshSales, showNotification, t]);
 
-  const handleUpdateSale = useCallback(
-    async (updatedSale: ShopSale) => {
-      try {
-        const saved = await updateSale(updatedSale);
-        // The server has updated the source Trip delivery/totals too. Notify
-        // an already-mounted Trip List to refetch that same authoritative row.
-        notifyTripDataChanged({ tripId: updatedSale.tripId, source: "shop-sales" });
-        await refreshSales({ silent: true });
-        if ((saved.unassignedBirds ?? 0) > 0) {
-          showNotification(
-            t("ops.shop_sales.reassignment_required", {
-              count: saved.unassignedBirds ?? 0,
-              trip: saved.tripNo,
-            }),
-            "info",
-          );
-        } else {
-          showNotification(t("ops.shop_sales.updated_success"), "success");
-        }
-      } catch (error) {
-        const apiError = toApiError(error);
-        const details = apiError.details as { error?: string; assignmentLockTripNo?: string; unassignedBirds?: number } | undefined;
-        if (details?.error === "trip_assignment_incomplete") {
-          showNotification(
-            t("ops.shop_sales.other_trips_locked", {
-              trip: details.assignmentLockTripNo ?? "",
-              count: details.unassignedBirds ?? 0,
-            }),
-            "error",
-          );
-        } else {
-          showNotification(t("ops.shop_sales.update_failed"), "error");
-        }
-      }
-    },
-    [updateSale, showNotification, refreshSales, t]
-  );
+  const handleSaveLoad = useCallback(async (tripId: number, rows: import("../components/ShopSaleEditModal").LoadSaleDraft[]) => {
+    try {
+      const saved = await saveLoad(tripId, rows);
+      notifyTripDataChanged({ tripId, source: "shop-sales" });
+      await refreshSales({ silent: true });
+      showNotification(`Trip saved with ${saved.length} shop deliveries. Trip List updated.`, "success");
+    } catch (error) {
+      showNotification(toApiError(error).message || "Could not save this trip load.", "error");
+    }
+  }, [saveLoad, refreshSales, showNotification]);
 
   // The API returns this trip-wide state on every related sale. Surface it
   // only once beside Search (rather than repeating the same warning per row).
@@ -139,12 +109,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const assignmentLock = sourceTripWithGap ?? sales.find((sale) => sale.assignmentLockTripId != null) ?? null;
   const assignmentNoticeBirds = sourceTripWithGap?.unassignedBirds ?? assignmentLock?.assignmentLockUnassignedBirds ?? null;
   const assignmentNoticeTripNo = sourceTripWithGap?.tripNo ?? assignmentLock?.assignmentLockTripNo ?? null;
-
-  const hasActiveFilters =
-    filter.fromDate !== "" ||
-    filter.toDate !== "" ||
-    filter.shopName.trim() !== "" ||
-    filter.search.trim() !== "";
 
   const exportFileName = `shop-sales-${new Date().toISOString().slice(0, 10)}`;
   const handleExportPdf = useCallback(() => {
@@ -179,12 +143,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         onRefresh={() => void handleRefresh()}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
+        exportEnabled={Boolean(filter.shopName.trim()) && filteredSales.length > 0 && !isLoading}
         refreshing={isLoading}
         unassignedBirds={assignmentNoticeBirds}
         assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}
       />
 
-      {hasActiveFilters && (
+      {(Boolean(filter.fromDate) || Boolean(filter.toDate) || Boolean(filter.shopName.trim())) && (
         <ShopSalesSummary
           summary={summary}
           isLoading={isLoading}
@@ -194,6 +159,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
         <ShopSalesTable
           sales={paginatedSales}
+          allSales={sales}
           isLoading={isLoading}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={filter.sortBy}
@@ -201,8 +167,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
             setFilter((current) => ({ ...current, sortBy }));
             setCurrentPage(1);
           }}
-          onUpdateSale={handleUpdateSale}
-          onViewTrip={setTripViewSale}
+          onSaveLoad={handleSaveLoad}
+          shops={shops}
         />
         {shouldShowPagination(filteredSales.length) && (
           <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
@@ -220,11 +186,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           </div>
         )}
       </div>
-      <ShopDeliveryTripViewModal
-        sale={tripViewSale}
-        deliveries={tripViewSale ? sales.filter((sale) => String(sale.tripId) === String(tripViewSale.tripId)) : []}
-        onClose={() => setTripViewSale(null)}
-      />
     </div>
   );
 

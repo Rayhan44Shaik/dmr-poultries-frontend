@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import { tripExpenseTotals } from "../utils/tripExpenseTotals";
+import { deliveryWeightLoss } from "./Step_4/deliveryKpis";
 
 interface Props {
   trip: Trip | null;
@@ -65,7 +66,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       const birds = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
       const weight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
       const mortality = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
-      const mortalityKg = rows.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
+      const mortalityKg = rows.reduce((sum, row) => sum + ((row.deliveryMode ?? "box") === "box" ? Number(row.mortKg || 0) : 0), 0);
       return {
         load: Number(leg.legIndex),
         dcWeight: Number(leg.dcWeight || 0),
@@ -74,7 +75,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
         weight,
         mortality,
         mortalityKg,
-        weightLoss: Math.max(0, Number(leg.dcWeight || 0) - weight - mortalityKg),
+        weightLoss: rows.reduce((sum, row) => sum + deliveryWeightLoss(row), 0),
       };
     });
   const hasMultipleLoads = completedLoads.length > 1;
@@ -94,11 +95,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   const mortalityWeight = deliveryTotals.totalMortalityKg;
 
   // ─── Weight Loss ──────────────────────────────────────────────────
-  const weightLoss = (() => {
-    const dcWeight = trip.dcWeight || 0;
-    const totalOut = deliveryTotals.totalWeight + mortalityWeight;
-    return Math.max(0, dcWeight - totalOut);
-  })();
+  const weightLoss = persistedDeliveries.reduce((sum, row) => sum + deliveryWeightLoss(row), 0);
 
   // ─── Distances (For Display) ────────────────────────────────────────
   const {

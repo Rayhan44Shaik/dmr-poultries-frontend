@@ -111,12 +111,15 @@ export async function sendTripDeliveryWhatsApps(
   options?: { forceRetryIds?: number[] }
 ): Promise<void> {
   if (trip.status !== "Completed") return;
+  const tripDeliveries: ShopDelivery[] = Array.isArray(trip.legs) && trip.legs.length
+    ? trip.legs.flatMap((leg) => (leg.deliveries ?? []).map((delivery) => ({ ...delivery, legIndex: leg.legIndex })))
+    : trip.deliveries || [];
   const statuses = await fetchDeliveryWhatsAppStatuses(trip.id).catch(() => [] as DeliveryWhatsAppRow[]);
   const byDelivery = new Map(statuses.map((s) => [s.deliveryId, s]));
   const force = new Set(options?.forceRetryIds ?? []);
 
   await Promise.all(
-    (trip.deliveries || []).map(async (delivery) => {
+    tripDeliveries.map(async (delivery) => {
       const current = byDelivery.get(delivery.id);
       if (current?.status === "sent") return;
       if (current?.status === "failed" && !force.has(delivery.id)) return;

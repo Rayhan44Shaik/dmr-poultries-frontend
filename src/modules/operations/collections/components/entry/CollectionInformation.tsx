@@ -1,11 +1,12 @@
 import React from "react";
-import { RotateCcw, BookOpen, Loader2, Calendar, UserCog, CreditCard, Hash, Store, History } from "lucide-react";
+import { RotateCcw, BookOpen, Loader2, Calendar, UserCog, CreditCard, Hash, Store, History, Upload } from "lucide-react";
 import type { Collection, CollectionEntry, CollectionErrors, PaymentMode } from "../../types/collection";
 import { DatePicker } from "../../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
+  opsImportButtonClass,
   opsSecondaryButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
@@ -25,6 +26,7 @@ interface Props {
   onReferenceChange: (value: string) => void;
   onViewLedger: () => void;
   onReset: () => void;
+  onImport: () => void;
   ledgerLoading?: boolean;
   latestTransaction?: Collection | null;
 }
@@ -48,6 +50,7 @@ function CollectionInformation({
   onReferenceChange,
   onViewLedger,
   onReset,
+  onImport,
   ledgerLoading = false,
   latestTransaction = null,
 }: Props) {
@@ -166,7 +169,7 @@ function CollectionInformation({
       {/* Row 2 — Shop Name is searchable and holds long trading names, so it
         * spans the width of the four fields above, with the actions alongside. */}
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 items-end pt-1">
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2">
           <label className={opsFilterLabelClass}>
             <Hash size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("operations.reference_no")}</span>
@@ -184,12 +187,12 @@ function CollectionInformation({
           {errors.referenceNo && <p id="referenceNo-error" className="mt-1 text-xs text-red-600">{errors.referenceNo}</p>}
         </div>
 
-        <div className="lg:col-span-6 min-w-0">
+        <div className="lg:col-span-5 min-w-0">
           <span className={opsFilterLabelClass}>
             <History size={17} className="shrink-0 text-blue-500" />
             {t("ops.collection.recent_collections")}
           </span>
-          <div className="flex h-9 min-w-0 w-full items-center gap-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 px-3 text-[13px] font-bold text-slate-800">
+          <div className="flex h-9 min-w-0 w-full items-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl border border-slate-200 bg-slate-50 px-2.5 text-xs font-bold text-slate-800">
             {latestTransaction ? (
               <>
                 <span className="shrink-0">{modeLabel(latestTransaction.paymentModeName || "Cash")}</span>
@@ -206,7 +209,7 @@ function CollectionInformation({
           </div>
         </div>
 
-        <div className="lg:col-span-3 flex items-center justify-end gap-2 flex-wrap">
+        <div className="lg:col-span-5 flex min-w-0 flex-nowrap items-center justify-end gap-2 whitespace-nowrap">
         <button
           type="button"
           onClick={onViewLedger}
@@ -255,6 +258,17 @@ function CollectionInformation({
             <RotateCcw size={14} />
           </span>
           {t("common.reset")}
+        </button>
+        <button
+          type="button"
+          onClick={onImport}
+          className={`group relative ${opsImportButtonClass}`}
+          aria-label="Import collection entries from Excel"
+        >
+          <span className="inline-flex transition-transform motion-safe:group-hover:-translate-y-0.5">
+            <Upload size={15} />
+          </span>
+          Import
         </button>
         </div>
       </div>

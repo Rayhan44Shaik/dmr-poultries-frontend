@@ -27,7 +27,6 @@ import {
   ListChecks,
   Loader2,
   LoaderCircle,
-  RotateCcw,
   Scale,
   Search,
   Square,
@@ -42,7 +41,13 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { makeT, useI18n, type Language } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
-import { AppShellModal, BrandRefreshButton, Pagination } from "../../../ui";
+import {
+  AppShellModal,
+  BrandRefreshButton,
+  FilterResetButton,
+  Pagination,
+  countActiveFilters,
+} from "../../../ui";
 import ViewLanguageToggle from "../../../ui/ViewLanguageToggle";
 import MasterDropdown, {
   type MasterDropdownOption,
@@ -52,7 +57,6 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../shared/ui/operationsStyles";
@@ -83,6 +87,7 @@ import { formatLedgerNumber, roundLedgerValue } from "../utils/shopLedgerRoundin
 import {
   filterStatementByType,
   recalculateStatementBalances,
+  scopeShopLedgersForPdf,
 } from "../utils/shopLedgerBalances";
 
 interface ShopLedgerProps {
@@ -129,14 +134,26 @@ const DEFAULT_PAGE_SIZE = PAGINATION_DEFAULT_PAGE_SIZE;
 type LedgerSortKey =
   "date" | "particulars" | "birds" | "weight" | "rate" | "debit" | "credit";
 
+/** Later sales/collections win on the same calendar day (id, then createdAt). */
+function recencyKey(tx: LedgerTransaction): number {
+  if (tx.id != null && tx.id > 0) return tx.id;
+  const created = tx.createdAt ? Date.parse(tx.createdAt) : NaN;
+  return Number.isFinite(created) ? created : 0;
+}
+
 /** Stable, direction-aware comparator for ledger rows (opening row excluded
- *  by the caller — it is pinned first and never sorted). */
+ *  by the caller — it is pinned first and never sorted). Date ties break on
+ *  recency so the latest sale/collection of that day stays first when newest
+ *  is requested. */
 function compareLedgerTx(
   a: LedgerTransaction,
   b: LedgerTransaction,
   key: LedgerSortKey,
 ): number {
-  if (key === "date") return a.date.localeCompare(b.date);
+  if (key === "date") {
+    const byDate = a.date.localeCompare(b.date);
+    return byDate !== 0 ? byDate : recencyKey(a) - recencyKey(b);
+  }
   if (key === "particulars")
     return a.particulars.localeCompare(b.particulars, undefined, {
       numeric: true,
@@ -172,6 +189,8 @@ const txParticulars = (row: ShopLedgerRow): string => {
 const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
   const isSale = row.type === "sale";
   return {
+    id: row.id,
+    createdAt: row.createdAt ?? undefined,
     date: row.date,
     particulars: txParticulars(row),
     birds: isSale ? row.birds : 0,
@@ -193,21 +212,6 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
     remarks: row.remarks?.trim() || undefined,
   };
 };
-
-/**
- * Fixed Shop Ledger reporting window requested for the current reconciliation.
- * Keep ISO values internally; the calendar renders these as 02/08/2026 and
- * 09/08/2026. Initial load, Reset, and clearing the date pill all use it.
- */
-function defaultWeekRange(): { from: string; to: string } {
-  return {
-    from: "2026-08-02",
-    to: "2026-08-09",
-  };
-}
-
-const toDateDefault = () => defaultWeekRange().to;
-const toWeekAgoDefault = () => defaultWeekRange().from;
 
 /** yyyy-MM-dd → dd-MM-yyyy (day-month-year) for table cells and exports. */
 const formatDisplayDate = (value: string): string => {
@@ -267,8 +271,8 @@ const round2 = (value: number): number => Math.round(value * 100) / 100;
  *  transactions would silently truncate at the server's page size. */
 async function fetchAllLedgerPages(filters: {
   shopId?: number;
-  fromDate: string;
-  toDate: string;
+  fromDate?: string;
+  toDate?: string;
 }): Promise<ShopLedgerResponse> {
   const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
   const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
@@ -478,8 +482,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return map;
   }, [shops]);
 
-  const [dateFrom, setDateFrom] = useState(toWeekAgoDefault);
-  const [dateTo, setDateTo] = useState(toDateDefault);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [selectedShop, setSelectedShop] = useState("All Shops");
   const [reportType, setReportType] = useState<ReportTypeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
@@ -489,8 +493,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   // Applied values are committed only when the user clicks Search. The input
   // controls above are draft values; changing them does not affect the table
   // or KPIs until Search is pressed.
-  const [appliedDateFrom, setAppliedDateFrom] = useState(toWeekAgoDefault);
-  const [appliedDateTo, setAppliedDateTo] = useState(toDateDefault);
+  const [appliedDateFrom, setAppliedDateFrom] = useState("");
+  const [appliedDateTo, setAppliedDateTo] = useState("");
   const [appliedSelectedShop, setAppliedSelectedShop] = useState("All Shops");
   const [appliedReportType, setAppliedReportType] =
     useState<ReportTypeFilter>("all");
@@ -500,11 +504,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedLedgerRowIndex, setSelectedLedgerRowIndex] = useState(-1);
   const ledgerRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
-  /** Trip-List style explicit sort — null means natural ledger order.
-   *  A ledger statement reads chronologically, so filtered results default to
-   *  oldest first. Users can still explicitly choose another sort afterward. */
-  const [sortBy, setSortBy] = useState<LedgerSortKey | null>("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  /** Null = natural table order: newest date first, latest sale/collection
+   *  of that day first. Reset count stays 0 until the user picks a sort. */
+  const [sortBy, setSortBy] = useState<LedgerSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
@@ -532,8 +535,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       shopId?: number,
     ): Promise<LedgerTransaction[]> => {
       const res = await fetchAllLedgerPages({
-        fromDate: from,
-        toDate: to,
+        fromDate: from || undefined,
+        toDate: to || undefined,
         shopId,
       });
 
@@ -667,7 +670,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    *  paginator and the Excel export all read, so they can never disagree. */
   const sortedBody = useMemo(() => {
     const body = filteredLedger.slice(1);
-    if (!sortBy) return body;
+    // No Sort By pick → newest day first (Oct 31 … Oct 1, then earlier
+    // months), and on the same day the latest sale/collection wins.
+    if (!sortBy) {
+      return [...body].sort((a, b) => compareLedgerTx(b, a, "date"));
+    }
     const dir = sortDir === "desc" ? -1 : 1;
     return [...body].sort((a, b) => compareLedgerTx(a, b, sortBy) * dir);
   }, [filteredLedger, sortBy, sortDir]);
@@ -841,16 +848,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           // separately loaded Shop Master request is still pending or failed.
           // Master metadata only enriches rows; it never decides whether a
           // valid backend ledger row exists.
-          const shopNames = new Set<string>([
-            ...shops.map((master) => master.shopName),
-            ...allRowsByShop.keys(),
-            ...(response.openingBalances ?? []).map((row) => row.shopName),
-          ]);
+          const shopNames = new Set<string>([...allRowsByShop.keys()]);
           return [...shopNames]
             .map((shop) => {
               const allRows = allRowsByShop.get(shop) ?? [];
-              return [shop, allRows.filter((row) => row.date <= to)] as const;
+              return [shop, to ? allRows.filter((row) => row.date <= to) : allRows] as const;
             })
+            .filter(([, periodRows]) => periodRows.length > 0)
             .sort(([a], [b]) =>
               a.localeCompare(b, "en", { sensitivity: "base" }),
             )
@@ -906,7 +910,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       return request;
     },
-    [refreshNonce, shopMasterMap, shops],
+    [refreshNonce, shopMasterMap],
   );
 
   const [cumulativeRows, setCumulativeRows] = useState<ShopLedgerCumulativeRow[]>([]);
@@ -918,8 +922,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const quantitiesPromise = appliedReportType === "collection"
         ? Promise.resolve([])
         : fetchShopLedgerCumulativeQuantities({
-            fromDate: appliedDateFrom,
-            toDate: appliedDateTo,
+            fromDate: appliedDateFrom || undefined,
+            toDate: appliedDateTo || undefined,
           });
       let rows: ShopLedgerCumulativeRow[];
       if (appliedSelectedShop === "All Shops") {
@@ -1116,6 +1120,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     urls.forEach((url) => URL.revokeObjectURL(url));
   };
 
+  const pdfFilterCaption = useMemo(() => {
+    const parts: string[] = [];
+    if (appliedReportType === "sales") parts.push("Sales");
+    if (appliedReportType === "collection") parts.push("Collections");
+    const search = appliedSearchTerm.trim();
+    if (search) parts.push(`Search: ${search}`);
+    return parts.join(" · ");
+  }, [appliedReportType, appliedSearchTerm]);
+
   // ─── PDF export → preview modal ────────────────────────────
   const handleExportPDF = useCallback(async () => {
     if (pdfGeneratingRef.current) return;
@@ -1129,7 +1142,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       // All Shops is one paginated bulk read, not one request per shop. For a
       // single shop, reuse the same filter-keyed cache as the visible table.
-      const allLedgers: ShopLedgerPdfEntry[] =
+      const rawLedgers: ShopLedgerPdfEntry[] =
         appliedSelectedShop === "All Shops"
           ? await getBulkPdfLedgers(appliedDateFrom, appliedDateTo)
           : await (async () => {
@@ -1151,6 +1164,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               ];
             })();
 
+      const allLedgers = scopeShopLedgersForPdf(rawLedgers, {
+        reportType: appliedReportType,
+        searchTerm: appliedSearchTerm,
+        keepEmptySelectedShop:
+          appliedSelectedShop === "All Shops" ? undefined : appliedSelectedShop,
+      });
+
       if (allLedgers.length === 0) {
         showNotification(t("shop_ledger.no_export_data"), "error");
         return;
@@ -1160,15 +1180,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       revokePdfUrls(pdfPreviewRef.current);
       const shopData = Object.fromEntries(
-        allLedgers.map((entry) => [
-          entry.shop,
-          filterStatementByType(entry.data, appliedReportType),
-        ]),
+        allLedgers.map((entry) => [entry.shop, entry.data]),
       );
       const files = allLedgers.map(({ shop }) => ({
         shop,
         url: null,
-        filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${formatDisplayDate(appliedDateFrom)}_to_${formatDisplayDate(appliedDateTo)}.pdf`,
+        filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${appliedDateFrom || appliedDateTo ? `${formatDisplayDate(appliedDateFrom || "start")}_to_${formatDisplayDate(appliedDateTo || "end")}` : "all"}.pdf`,
       }));
       const nextState: PdfPreviewState = {
         files,
@@ -1202,6 +1219,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     appliedDateFrom,
     appliedDateTo,
     appliedReportType,
+    appliedSearchTerm,
     showNotification,
     shopMasterMap,
     getCachedLedger,
@@ -1254,10 +1272,27 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       try {
         // Prefer the live ledger snapshot for this export; fall back to the
         // filter-keyed cache (already built for the combined document).
-        const ledger =
+        const rawLedger =
           current.shopData[shop] ??
           (await getCachedLedger(appliedDateFrom, appliedDateTo, shop)) ??
           [];
+        const [scoped] = scopeShopLedgersForPdf(
+          [
+            {
+              shop,
+              data: rawLedger,
+              ownerName: shopMasterMap.get(shop)?.ownerName || undefined,
+              mobile: shopMasterMap.get(shop)?.phoneNumber || undefined,
+              city: shopMasterMap.get(shop)?.city || undefined,
+            },
+          ],
+          {
+            reportType: appliedReportType,
+            searchTerm: appliedSearchTerm,
+            keepEmptySelectedShop: shop,
+          },
+        );
+        const ledger = scoped?.data ?? rawLedger;
         const master = shopMasterMap.get(shop);
         const assets = await prepareShopLedgerPdfAssets();
         const generated = await generateShopLedgerPDF(
@@ -1265,9 +1300,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             {
               shop,
               data: ledger,
-              ownerName: master?.ownerName || undefined,
-              mobile: master?.phoneNumber || undefined,
-              city: master?.city || undefined,
+              ownerName: master?.ownerName || scoped?.ownerName,
+              mobile: master?.phoneNumber || scoped?.mobile,
+              city: master?.city || scoped?.city,
             },
           ],
           appliedDateFrom,
@@ -1276,8 +1311,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           assets,
           undefined,
           {
-            includeCumulativeSummary: true,
-            cumulativeRows: cumulativeRows.filter((row) => row.shop === shop),
+            includeCumulativeSummary: false,
+            filterCaption: pdfFilterCaption || undefined,
           },
         );
         if (
@@ -1313,7 +1348,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       // appliedDateFrom/To pinned via useCallback deps
     },
-    [appliedDateFrom, appliedDateTo, shopMasterMap, getCachedLedger],
+    [
+      appliedDateFrom,
+      appliedDateTo,
+      appliedReportType,
+      appliedSearchTerm,
+      shopMasterMap,
+      getCachedLedger,
+      pdfFilterCaption,
+    ],
   );
 
   useEffect(() => {
@@ -1412,9 +1455,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       assets,
       undefined,
       {
-        includeCumulativeSummary: true,
-        cumulativeRows: cumulativeRows.filter((row) =>
-          current.selectedShops.includes(row.shop)),
+        includeCumulativeSummary: ledgers.length > 1,
+        cumulativeRows: visibleCumulativeRows.filter((row) =>
+          current.selectedShops.includes(row.shop),
+        ),
+        filterCaption: pdfFilterCaption || undefined,
       },
     );
     downloadFile(generated.url, generated.filename);
@@ -1443,10 +1488,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setAppliedSelectedShop(selectedShop);
     setAppliedReportType(reportType);
     setAppliedSearchTerm(searchValue);
-    // Every newly applied ledger filter starts in accounting order: earliest
-    // transaction first, latest transaction last.
-    setSortBy("date");
-    setSortDir("asc");
     resetPage();
   }, [
     dateFrom,
@@ -1461,33 +1502,29 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   ]);
 
   const handleReset = useCallback(() => {
-    const defaultFrom = toWeekAgoDefault();
-    const defaultTo = toDateDefault();
-
     const needsLedgerRead =
-      appliedDateFrom !== defaultFrom ||
-      appliedDateTo !== defaultTo ||
+      appliedDateFrom !== "" ||
+      appliedDateTo !== "" ||
       appliedSelectedShop !== "All Shops";
     if (needsLedgerRead) {
       setLedgerLoading(true);
       setCumulativeLoading(true);
     }
 
-    setDateFrom(defaultFrom);
-    setDateTo(defaultTo);
+    setDateFrom("");
+    setDateTo("");
     setSelectedShop("All Shops");
     setReportType("all");
     setSearchValue("");
 
-    setAppliedDateFrom(defaultFrom);
-    setAppliedDateTo(defaultTo);
+    setAppliedDateFrom("");
+    setAppliedDateTo("");
     setAppliedSelectedShop("All Shops");
     setAppliedReportType("all");
     setAppliedSearchTerm("");
 
-    // Reset returns to the page's standard chronological ledger order.
-    setSortBy("date");
-    setSortDir("asc");
+    setSortBy(null);
+    setSortDir("desc");
     setCurrentPage(1);
   }, [appliedDateFrom, appliedDateTo, appliedSelectedShop]);
 
@@ -1495,7 +1532,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const handleSortValueChange = useCallback((value: string) => {
     if (!value) {
       setSortBy(null);
-      setSortDir("asc");
+      setSortDir("desc");
       setCurrentPage(1);
       return;
     }
@@ -1513,12 +1550,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       // in-memory rows immediately and must never enter the network loader.
       if (which === "dates") {
         setLedgerLoading(true);
-        const defaultFrom = toWeekAgoDefault();
-        const defaultTo = toDateDefault();
-        setDateFrom(defaultFrom);
-        setDateTo(defaultTo);
-        setAppliedDateFrom(defaultFrom);
-        setAppliedDateTo(defaultTo);
+        setDateFrom("");
+        setDateTo("");
+        setAppliedDateFrom("");
+        setAppliedDateTo("");
       } else if (which === "shop") {
         setLedgerLoading(true);
         setSelectedShop("All Shops");
@@ -1618,10 +1653,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         "",
       ]);
       exportToExcel(
-        `Shop Ledger — Cumulative — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`,
+        `Shop Ledger — Cumulative — ${shopLabel}${appliedDateFrom || appliedDateTo ? ` (${appliedDateFrom && appliedDateTo ? `${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)}` : formatDisplayDate(appliedDateFrom || appliedDateTo)})` : ""}`,
         headers,
         data,
-        `Shop_Ledger_Cumulative_${safeShopFilename}_${appliedDateFrom}_to_${appliedDateTo}`,
+        `Shop_Ledger_Cumulative_${safeShopFilename}${appliedDateFrom || appliedDateTo ? `_${appliedDateFrom || "start"}_to_${appliedDateTo || "end"}` : "_all"}`,
       );
       showNotification(t("shop_ledger.excel_exported"), "success");
       return;
@@ -1661,8 +1696,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       roundLedgerValue(tx.credit),
       roundLedgerValue(tx.balance),
     ]);
-    const title = `Shop Ledger — Transactions — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
-    const filename = `Shop_Ledger_Transactions_${safeShopFilename}_${appliedDateFrom}_to_${appliedDateTo}`;
+    const title = `Shop Ledger — Transactions — ${shopLabel}${appliedDateFrom || appliedDateTo ? ` (${appliedDateFrom && appliedDateTo ? `${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)}` : formatDisplayDate(appliedDateFrom || appliedDateTo)})` : ""}`;
+    const filename = `Shop_Ledger_Transactions_${safeShopFilename}${appliedDateFrom || appliedDateTo ? `_${appliedDateFrom || "start"}_to_${appliedDateTo || "end"}` : "_all"}`;
     exportToExcel(title, headers, data, filename);
     showNotification(t("shop_ledger.excel_exported"), "success");
   }, [
@@ -2201,13 +2236,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       label: string;
       value: string;
     }[] = [];
-    const defaultFrom = toWeekAgoDefault();
-    const defaultTo = toDateDefault();
-    if (appliedDateFrom !== defaultFrom || appliedDateTo !== defaultTo) {
+    if (appliedDateFrom || appliedDateTo) {
       pills.push({
         key: "dates",
         label: t("common.date"),
-        value: `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}`,
+        value:
+          appliedDateFrom && appliedDateTo
+            ? `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}`
+            : formatDisplayDate(appliedDateFrom || appliedDateTo),
       });
     }
     if (appliedSelectedShop !== "All Shops") {
@@ -2284,6 +2320,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={dateFrom}
               onChange={setDateFrom}
               placeholder={t("placeholder.enter_date")}
+              hideClear={!dateFrom}
               className="w-full text-xs font-medium"
             />
           </div>
@@ -2297,6 +2334,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={dateTo}
               onChange={setDateTo}
               placeholder={t("placeholder.enter_date")}
+              hideClear={!dateTo}
               className="w-full text-xs font-medium"
             />
           </div>
@@ -2359,8 +2397,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-          <div className="lg:col-span-7">
+        <div className="flex flex-col gap-3.5 pt-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="w-full min-w-0 max-w-sm">
             <label className={opsFilterLabelClass}>
               <Search size={17} className="text-slate-400 flex-shrink-0" />
               <span>{t("common.search")}</span>
@@ -2394,7 +2432,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+          <div className="flex items-center gap-2 justify-end flex-wrap">
             <button
               type="button"
               onClick={handleSearch}
@@ -2406,17 +2444,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               </span>
               {t("common.search")}
             </button>
-            <button
-              type="button"
+            <FilterResetButton
+              count={countActiveFilters(
+                searchValue.trim() !== "",
+                selectedShop !== "All Shops",
+                reportType !== "all",
+                dateFrom !== "" || dateTo !== "",
+                sortBy !== null,
+              )}
               onClick={handleReset}
-              className={`group relative ${opsSecondaryButtonClass}`}
-              aria-label={t("common.reset")}
-            >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-                <RotateCcw size={14} />
-              </span>
-              {t("common.reset")}
-            </button>
+            />
             <BrandRefreshButton onClick={handleRefresh} />
             <button
               type="button"
@@ -2658,10 +2695,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 {t("shop_ledger.view.cumulative")}
               </span>
             </button>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
-              {formatDisplayDate(appliedDateFrom)} →{" "}
-              {formatDisplayDate(appliedDateTo)}
-            </span>
+            {(appliedDateFrom || appliedDateTo) && (
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
+                {appliedDateFrom && appliedDateTo
+                  ? `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}`
+                  : formatDisplayDate(appliedDateFrom || appliedDateTo)}
+              </span>
+            )}
             <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
               {(viewMode === "cumulative" ? visibleCumulativeRows.length : totalRows) === 0
                 ? t("shop_ledger.no_rows")
@@ -2674,28 +2714,28 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </span>
           </div>
         </div>
-        <div className={`${viewMode === "transactions" ? "block" : "hidden"} max-h-[70vh] overflow-auto`}>
-          <table className="w-full min-w-[1180px] table-fixed text-sm">
+        <div className={`${viewMode === "transactions" ? "block" : "hidden"} w-full overflow-x-auto`}>
+          <table className="w-full min-w-[1180px] table-fixed text-[13px] text-left border-collapse">
             {/* S.No and the combined Day/Date stay compact. The six operational
                 and amount columns retain their existing widths unchanged. */}
             <colgroup>
               <col className="w-[4%]" />
               <col className="w-[12%]" />
-              <col className="w-[17.34%]" />
-              <col className="w-[11.11%]" />
-              <col className="w-[11.11%]" />
-              <col className="w-[11.11%]" />
-              <col className="w-[11.11%]" />
-              <col className="w-[11.11%]" />
-              <col className="w-[11.12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
             </colgroup>
-            <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-sm">
+            <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
               <tr>
                 {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
-                <th className="px-2 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {t("shop_ledger.col.s_no")}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "date",
                     <CalendarDays
@@ -2705,14 +2745,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     t("shop_ledger.col.date_day"),
                   )}
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "particulars",
                     <Store size={16} className="text-emerald-500 shrink-0" />,
                     t("shop_ledger.col.particulars"),
                   )}
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "birds",
                     <Bird size={16} className="text-amber-500 shrink-0" />,
@@ -2720,7 +2760,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     true,
                   )}
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "weight",
                     <Weight size={16} className="text-cyan-500 shrink-0" />,
@@ -2728,7 +2768,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     true,
                   )}
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "rate",
                     <IndianRupee
@@ -2739,7 +2779,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     true,
                   )}
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "debit",
                     <ArrowUpRight
@@ -2750,7 +2790,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     true,
                   )}
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   {sortableHeader(
                     "credit",
                     <ArrowDownLeft
@@ -2763,7 +2803,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 </th>
                 {/* Balance is a running total — its order is defined by Date,
                       so it is the one column that never sorts. */}
-                <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                   <span className="inline-flex items-center gap-1.5 justify-center">
                     <Scale size={16} className="text-slate-500 shrink-0" />
                     {t("common.balance")}
@@ -2948,9 +2988,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         </div>
 
         {viewMode === "cumulative" && (
-          <div className="max-h-[70vh] overflow-auto animate-in fade-in slide-in-from-right-1 duration-200">
-            <table className="w-full min-w-[1550px] text-sm">
-              <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-200 text-slate-700 shadow-sm">
+          <div className="w-full overflow-x-auto animate-in fade-in slide-in-from-right-1 duration-200">
+            <table className="w-full min-w-[1550px] text-[13px] text-left border-collapse">
+              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
                 <tr className="text-xs font-bold uppercase tracking-wider">
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><ListChecks size={15} className="text-indigo-500" />{t("shop_ledger.col.s_no")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={15} className="text-emerald-500" />{t("common.shop")}</span></th>
@@ -3079,10 +3119,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {pdfT("shop_ledger.pdf_weekly_statement")}
                 </h3>
                 <p className="text-[11px] text-slate-400">
-                  {pdfT("shop_ledger.pdf_date_range", {
-                    from: formatDisplayDate(appliedDateFrom),
-                    to: formatDisplayDate(appliedDateTo),
-                  })}
+                  {appliedDateFrom || appliedDateTo
+                    ? pdfT("shop_ledger.pdf_date_range", {
+                        from: formatDisplayDate(appliedDateFrom || appliedDateTo),
+                        to: formatDisplayDate(appliedDateTo || appliedDateFrom),
+                      })
+                    : pdfT("common.all")}
                 </p>
               </div>
             </div>
@@ -3393,7 +3435,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     ? waT("common.all")
                     : waReportType === "Sales"
                       ? waT("shop_ledger.type.sales")
-                      : waT("shop_ledger.type.collection")} · {formatDisplayDate(waDateFrom)} – {formatDisplayDate(waDateTo)}
+                      : waT("shop_ledger.type.collection")}
+                  {waDateFrom || waDateTo
+                    ? ` · ${waDateFrom && waDateTo ? `${formatDisplayDate(waDateFrom)} – ${formatDisplayDate(waDateTo)}` : formatDisplayDate(waDateFrom || waDateTo)}`
+                    : ""}
                 </p>
               </div>
             </div>

@@ -9,6 +9,7 @@ import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useI18n } from "../../../../i18n";
 import { useShops } from "../../../masters/shops/hooks/useShops";
+import { push } from "../../../../ui/notifications/notificationStore";
 
 type EnterRateModalProps = ComponentProps<typeof EnterRateModal>;
 
@@ -77,7 +78,15 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
   useEffect(() => {
     const clearOutside = (event: PointerEvent) => {
-      if (!tableContainerRef.current?.contains(event.target as Node)) setSelectedRowId(null);
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      // The Rate Entry action lives in the filter card, outside the table
+      // container. Keep the row selected through pointerdown so its click can
+      // open the modal instead of being disabled before the click fires.
+      if (target.closest("[data-rate-entry-action]")) return;
+
+      if (!tableContainerRef.current?.contains(target)) setSelectedRowId(null);
     };
     document.addEventListener("pointerdown", clearOutside);
     return () => document.removeEventListener("pointerdown", clearOutside);
@@ -211,12 +220,21 @@ export default function RatesEntryPage({ embedded = false }: Props) {
           open={modalOpen}
           trip={selectedTrip}
           onClose={closeRateEntry}
-          onSave={saveTrip}
-          onSaveAndLock={saveAndLockTrip}
+          onSave={async (deliveries) => {
+            const ok = await saveTrip(deliveries);
+            if (ok !== false) push(t("ops.rate.modal.saved_title"), "success", { placement: "top-right" });
+            return ok;
+          }}
+          onSaveAndLock={async (deliveries) => {
+            const ok = await saveAndLockTrip(deliveries);
+            if (ok !== false) push(t("ops.rate.modal.locked_title"), "success", { placement: "top-right" });
+            return ok;
+          }}
           isSaving={isSaving}
           loadError={loadError}
         />
       )}
+
     </div>
   );
 }

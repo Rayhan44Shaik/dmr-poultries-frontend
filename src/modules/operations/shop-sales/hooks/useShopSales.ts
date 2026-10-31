@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ShopSale, ShopSaleFilter } from "../types/shopSale";
-import { listShopSales, updateShopSale, type ShopSalePatch } from "../services/shopSalesApiService";
+import { createShopSale, listShopSales, updateShopSale, updateShopSalesLoad, type CreateShopSaleInput, type ShopSalePatch } from "../services/shopSalesApiService";
 import { handleApiError } from "../../../../api";
 import {
   calculateSummary,
@@ -100,6 +100,13 @@ function useShopSales() {
       const patch: ShopSalePatch = {};
       if (updatedSale.totalBirds !== original.totalBirds) patch.birds = updatedSale.totalBirds;
       if (updatedSale.totalWeight !== original.totalWeight) patch.weight = updatedSale.totalWeight;
+      if (updatedSale.numericShopId !== original.numericShopId) {
+        patch.shopId = updatedSale.numericShopId ?? null;
+        patch.shopName = updatedSale.shopName;
+      }
+      if (updatedSale.mortality !== original.mortality) patch.mortality = updatedSale.mortality ?? 0;
+      if (updatedSale.mortalityWeight !== original.mortalityWeight) patch.mortalityWeight = updatedSale.mortalityWeight ?? 0;
+      if (updatedSale.deliveryMode !== original.deliveryMode) patch.deliveryMode = updatedSale.deliveryMode;
       if (updatedSale.rate !== original.rate && updatedSale.rate != null) patch.rate = updatedSale.rate;
       if (updatedSale.remark !== original.remark) patch.remarks = updatedSale.remark;
       if (Object.keys(patch).length === 0) {
@@ -121,6 +128,21 @@ function useShopSales() {
     },
     [sales, refreshSales]
   );
+
+  const addSale = useCallback(async (input: CreateShopSaleInput) => {
+    const saved = await createShopSale(input);
+    setSales((prev) => [...prev, saved]);
+    return saved;
+  }, []);
+
+  const saveLoad = useCallback(async (tripId: number, rows: Parameters<typeof updateShopSalesLoad>[1]) => {
+    const saved = await updateShopSalesLoad(tripId, rows);
+    setSales((previous) => {
+      const retained = previous.filter((sale) => sale.numericTripId !== tripId);
+      return [...retained, ...saved];
+    });
+    return saved;
+  }, []);
 
   const shopNames = useMemo(() => {
     return [...new Set(sales.map((x) => x.shopName))].sort();
@@ -166,6 +188,8 @@ function useShopSales() {
     refreshSales,
     isLoading,
     updateSale,
+    addSale,
+    saveLoad,
   };
 }
 

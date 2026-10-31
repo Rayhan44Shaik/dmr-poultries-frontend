@@ -17,9 +17,13 @@ interface Props {
 function ShopSalesSummary({ summary, isLoading = false }: Props) {
   const { t } = useI18n();
 
-  // Never briefly display a previous filter's figures while this page is
-  // waiting for its new server-backed result set.
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6" aria-label={t("ops.shop_sales.title")} aria-busy="true">
+        {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-[6.75rem] animate-pulse rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"><div className="h-3 w-20 rounded bg-slate-100" /><div className="mt-4 h-7 w-24 rounded bg-slate-100" /></div>)}
+      </section>
+    );
+  }
 
   const hasData =
     summary.totalShops > 0 ||
@@ -34,17 +38,26 @@ function ShopSalesSummary({ summary, isLoading = false }: Props) {
   const amount = compactKpiValue(summary.totalAmount, 2);
   const averageRate = compactKpiValue(summary.averageRate, 2);
   const averageWeight = compactKpiValue(summary.averageWeightPerBird, 2);
+  const tooltip = (label: string, value: string) => (
+    <>
+      <span className="block border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">{label}</span>
+      <span className="mt-2 flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-2 py-2">
+        <span className="text-slate-500">Total</span>
+        <span className="font-extrabold tabular-nums text-slate-900">{value}</span>
+      </span>
+    </>
+  );
 
   const cards: KpiCardItem[] = [
-    { id: "shops", label: t("ops.shop_sales.kpi.total_shops"), value: <KpiMetricValue metric={shops} />, tooltip: `${t("ops.shop_sales.kpi.total_shops")}: ${shops.exact}`, Icon: Store, tone: "blue" },
-    { id: "birds", label: t("ops.shop_sales.kpi.total_birds"), value: <KpiMetricValue metric={birds} />, tooltip: `${t("ops.shop_sales.kpi.total_birds")}: ${birds.exact}`, Icon: Bird, tone: "emerald" },
-    { id: "weight", label: t("ops.shop_sales.kpi.total_weight"), value: <KpiMetricValue metric={weight} unit="KG" />, tooltip: `${t("ops.shop_sales.kpi.total_weight")}: ${weight.exact} KG`, Icon: Scale, tone: "amber" },
-    { id: "amount", label: t("ops.shop_sales.kpi.total_amount"), value: <KpiMetricValue metric={amount} prefix="₹" />, tooltip: `${t("ops.shop_sales.kpi.total_amount")}: ₹${amount.exact}`, Icon: IndianRupee, tone: "emerald" },
-    { id: "rate", label: t("ops.shop_sales.kpi.average_rate"), value: <KpiMetricValue metric={averageRate} prefix="₹" />, tooltip: `${t("ops.shop_sales.kpi.average_rate")}: ₹${averageRate.exact}`, Icon: TrendingUp, tone: "violet" },
-    { id: "weight-per-bird", label: t("ops.shop_sales.kpi.average_weight_per_bird"), value: <KpiMetricValue metric={averageWeight} unit="KG" />, tooltip: `${t("ops.shop_sales.kpi.average_weight_per_bird")}: ${averageWeight.exact} KG`, Icon: Activity, tone: "cyan" },
+    { id: "shops", label: t("ops.shop_sales.kpi.total_shops"), value: <KpiMetricValue metric={shops} />, tooltipContent: tooltip(t("ops.shop_sales.kpi.total_shops"), shops.exact), Icon: Store, tone: "blue" },
+    { id: "birds", label: t("ops.shop_sales.kpi.total_birds"), value: <KpiMetricValue metric={birds} />, tooltipContent: tooltip(t("ops.shop_sales.kpi.total_birds"), birds.exact), Icon: Bird, tone: "emerald" },
+    { id: "weight", label: t("ops.shop_sales.kpi.total_weight"), value: <KpiMetricValue metric={weight} unit="KG" />, tooltipContent: tooltip(t("ops.shop_sales.kpi.total_weight"), `${weight.exact} KG`), Icon: Scale, tone: "amber" },
+    { id: "amount", label: t("ops.shop_sales.kpi.total_amount"), value: <KpiMetricValue metric={amount} prefix="₹" />, tooltipContent: tooltip(t("ops.shop_sales.kpi.total_amount"), `₹${amount.exact}`), Icon: IndianRupee, tone: "emerald" },
+    { id: "rate", label: t("ops.shop_sales.kpi.average_rate"), value: <KpiMetricValue metric={averageRate} prefix="₹" />, tooltipContent: tooltip(t("ops.shop_sales.kpi.average_rate"), `₹${averageRate.exact}`), Icon: TrendingUp, tone: "violet" },
+    { id: "weight-per-bird", label: t("ops.shop_sales.kpi.average_weight_per_bird"), value: <KpiMetricValue metric={averageWeight} unit="KG" />, tooltipContent: tooltip(t("ops.shop_sales.kpi.average_weight_per_bird"), `${averageWeight.exact} KG`), Icon: Activity, tone: "cyan" },
   ];
 
-  return <KpiCardGrid items={cards} gridClassName="lg:grid-cols-6" ariaLabel={t("ops.shop_sales.title")} />;
+  return <KpiCardGrid items={cards} gridClassName="lg:grid-cols-3 xl:grid-cols-6" ariaLabel={t("ops.shop_sales.title")} />;
 }
 
 export default React.memo(ShopSalesSummary);

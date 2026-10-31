@@ -81,7 +81,7 @@ const SUPERVISOR_ACCESS: RoleAccess = {
 const OFFICE_ACCESS: RoleAccess = {
   sections: ["operations", "fleet", "staff", "settings"],
   tabs: {
-    operations: ["trip-entry", "trip-list", "fuel-expenses"],
+    operations: ["trip-entry", "trip-list", "expenses", "fuel-expenses"],
     fleet: ["entry", "history", "permits", "emi"],
     staff: ["leaves", "duty-planner"],
     settings: ["profile"],
@@ -164,6 +164,7 @@ export function tabForLocation(pathname: string, search: string): string | null 
   if (pathname.includes("collections/report")) return "collection-report";
   if (pathname.includes("mortality")) return "mortality";
   if (pathname.includes("fuel-expenses")) return "fuel-expenses";
+  if (pathname.includes("expenses")) return "expenses";
   if (pathname.startsWith("/operations/orders")) return "orders";
   if (pathname.includes("duty-planner")) return "duty-planner";
   if (pathname.includes("salary-sheet")) return "salary-sheet";

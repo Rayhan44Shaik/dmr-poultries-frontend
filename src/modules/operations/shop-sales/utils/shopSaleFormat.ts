@@ -82,7 +82,7 @@ export interface SaleLockState {
 /**
  * Derive the display-only editability of a Shop Sale from the backend
  * response. The backend is the single authority: we never authorize editing
- * here because a date "looks" within 10 days. Only `sale.editable` decides;
+ * here because a date "looks" within 2 weeks of insert. Only `sale.editable` decides;
  * `lockReason` / `tripDeleted` / `correctionWindowExpired` are used purely to
  * explain why a sale is locked.
  */
@@ -103,7 +103,7 @@ export function shopSaleLockState(sale: Pick<ShopSale, "editable" | "lockReason"
     return {
       editable: false,
       label: "Locked",
-      message: "Edit window expired (10-day correction policy).",
+      message: "Edit window expired (2 weeks from insert).",
     };
   }
 

@@ -76,9 +76,12 @@ export async function fetchShopLedgerCumulativeQuantities(filters: {
   fromDate?: string;
   toDate?: string;
 } = {}): Promise<ShopLedgerCumulativeQuantity[]> {
+  const params: Record<string, string> = {};
+  if (filters.fromDate) params.fromDate = filters.fromDate;
+  if (filters.toDate) params.toDate = filters.toDate;
   const { data } = await apiGet<ShopLedgerCumulativeQuantity[]>(
     "/operations/shop-ledger/cumulative-quantities",
-    { params: filters },
+    { params },
   );
   return (data ?? []).map((row) => ({
     shopId: Number(row.shopId), shopName: String(row.shopName ?? ""),

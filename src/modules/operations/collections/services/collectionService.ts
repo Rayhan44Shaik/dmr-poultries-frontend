@@ -439,6 +439,32 @@ async function saveCollection(input: CollectionEntryInput): Promise<CollectionAp
   return saved;
 }
 
+export type CollectionImportInput = {
+  sourceRow: number;
+  collectionDate: string;
+  shopName: string;
+  collector: string;
+  paymentMode: string;
+  amount: number;
+  remarks: string;
+  referenceNo: string;
+};
+
+async function importCollections(batchId: string, rows: CollectionImportInput[]) {
+  const { data } = await apiPost<{ imported: number; entries: Record<string, unknown>[]; replayed: boolean }>(
+    `${COLLECTION_PATH}/import`,
+    { batchId, rows },
+  );
+  noteCollectionMutation();
+  await refreshFromBackend();
+  rows.forEach((row) => announceShopBalanceChange({ shopName: row.shopName }, "created"));
+  return {
+    imported: Number(data.imported ?? 0),
+    entries: (data.entries ?? []).map(mapRawEntry),
+    replayed: Boolean(data.replayed),
+  };
+}
+
 async function saveCollectionLegacy(entry: {
   collectionDate: string;
   shopName: string;
@@ -557,6 +583,18 @@ async function approveCollection(
   }
 }
 
+async function approveCollections(ids: string[]): Promise<boolean> {
+  try {
+    await apiPost(`${COLLECTION_PATH}/bulk-approve`, { ids: ids.map(Number) });
+    noteCollectionMutation();
+    await refreshFromBackend();
+    return true;
+  } catch (error) {
+    handleApiError(error);
+    return false;
+  }
+}
+
 async function rejectCollection(id: string, rejectedBy: string = "Admin", reason?: string): Promise<boolean> {
   try {
     const snapshot = findEntrySnapshot(id);
@@ -641,10 +679,13 @@ async function fetchWeeklySummaries(date: string): Promise<CollectionWeeklySumma
  * side. This is the authoritative source for the Pending Collection table
  * and view; recoveryPercentage must be read from here, not recomputed.
  */
-async function fetchPendingSummary(date: string): Promise<CollectionPendingSummaryResponse> {
+async function fetchPendingSummary(
+  date?: string,
+  range?: { fromDate?: string; toDate?: string },
+): Promise<CollectionPendingSummaryResponse> {
   const { data } = await apiGet<Record<string, unknown> | Record<string, unknown>[]>(
     `${COLLECTION_PATH}/pending-summary`,
-    { params: { date } }
+    { params: { date: date || undefined, fromDate: range?.fromDate, toDate: range?.toDate } }
   );
   const payload = Array.isArray(data) ? { shops: data, totals: null, weekStart: "", weekEnd: "" } : (data ?? {});
   const rawShops = (Array.isArray(payload.shops) ? payload.shops : []) as Record<string, unknown>[];
@@ -762,10 +803,12 @@ getShopSales,
   getPendingCollections,
   fetchRecentCollectionsForShop,
   saveCollection: saveCollectionLegacy,
+  importCollections,
   updateCollection,
   deleteCollection,
   deletePendingCollection,
   approveCollection,
+  approveCollections,
   rejectCollection,
   getRecentCollections,
   getPendingApprovalCount,

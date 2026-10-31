@@ -11,6 +11,7 @@ export interface FuelClientFilters {
   driverName?: string;
   petrolBunk?: string;
   masterBunkNames?: readonly string[];
+  includeMasterBunks?: boolean;
   sourceType?: string;
   quickTab?: FuelQuickTab;
   search?: string;
@@ -29,6 +30,7 @@ function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
     bill.tripNo,
     bill.vehicleNo,
     bill.driverName,
+    bill.supervisorName,
     bill.petrolBunk,
     bill.sourceType,
     bill.status,
@@ -99,6 +101,7 @@ export function filterFuelExpenses(
     driverName,
     petrolBunk,
     masterBunkNames = [],
+    includeMasterBunks = true,
     sourceType,
     quickTab = "ALL",
     search = "",
@@ -120,9 +123,11 @@ export function filterFuelExpenses(
 
     if (driverId != null && Number(bill.driverId) !== driverId) return false;
     if (driverName && driverName !== "All Drivers" && bill.driverName !== driverName) return false;
+    const masterNames = new Set(masterBunkNames.map((name) => name.trim().toLocaleLowerCase()));
+    const bunkName = String(bill.petrolBunk || "").trim().toLocaleLowerCase();
+    if (!includeMasterBunks && masterNames.has(bunkName)) return false;
     if (petrolBunk === "__OTHER__") {
-      const masterNames = new Set(masterBunkNames.map((name) => name.trim().toLocaleLowerCase()));
-      if (masterNames.has(String(bill.petrolBunk || "").trim().toLocaleLowerCase())) return false;
+      if (masterNames.has(bunkName)) return false;
     } else if (petrolBunk && petrolBunk !== "All Bunks" && bill.petrolBunk !== petrolBunk) return false;
 
     // Quick tab filtering:
@@ -177,6 +182,16 @@ export function sortFuelExpenses(
     "rate",
     "amount",
   ]);
+  if (sortBy === "supervisorName") {
+    const direction = sortDir === "desc" ? -1 : 1;
+    return [...bills].sort((left, right) => {
+      const leftValue = `${left.supervisorName ?? ""} ${left.driverName ?? ""}`;
+      const rightValue = `${right.supervisorName ?? ""} ${right.driverName ?? ""}`;
+      const comparison = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" });
+      if (comparison !== 0) return comparison * direction;
+      return String(left.billNo).localeCompare(String(right.billNo), undefined, { numeric: true }) * direction;
+    });
+  }
 
   const stringValue = (b: FuelExpense) => String(b[sortBy] ?? "");
 

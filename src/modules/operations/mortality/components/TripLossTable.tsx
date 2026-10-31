@@ -20,9 +20,8 @@
 // footer all live INSIDE it, so the grid never disappears.
 
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  ArrowDown,
-  ArrowUp,
   Bird,
   Calendar,
   ChevronDown,
@@ -39,7 +38,7 @@ import {
 } from "lucide-react";
 import type { LossSort, TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import type { SortBy } from "../services/mortalityAnalysisApi";
-import { formatNumber, formatWeight } from "../../../../utils/format";
+import { formatNumber } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { Pagination } from "../../../../ui";
@@ -210,21 +209,51 @@ const COLUMNS: Column[] = [
   },
 ];
 
-/** Paired ↑↓ arrows — identical to the Trip List header indicator. */
-function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
-  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
-  const on = "text-emerald-600";
-  const off = "text-slate-400 group-hover/sort:text-slate-600";
-  return (
-    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
-      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
-      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
-    </span>
-  );
-}
-
 const alignClass = (align?: Align) =>
   align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
+
+/** Fixed, unclipped mortality breakdown — the same hover model as KPI cards. */
+function MortalityBreakdownCell({ record, t }: { record: TripLossAnalysis; t: (key: string, values?: Record<string, unknown>) => string }) {
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const show = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const width = 280;
+    setPosition({ left: Math.min(window.innerWidth - width - 12, Math.max(12, rect.left + rect.width / 2 - width / 2)), top: rect.bottom + 8 });
+  };
+  const weight = (value: number) => Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (
+    <td
+      tabIndex={0}
+      onPointerEnter={(event) => show(event.currentTarget)}
+      onPointerLeave={() => setPosition(null)}
+      onFocus={(event) => show(event.currentTarget)}
+      onBlur={() => setPosition(null)}
+      className="cursor-help whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300"
+    >
+      {formatNumber(record.mortalityCount)}
+      {position ? createPortal(
+        <div role="tooltip" style={position} className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl">
+          <p className="border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">{t("ops.mortality.tooltip.title")}</p>
+          <div className="mt-2 space-y-1.5">
+            {[
+              [t("ops.mortality.tooltip.box_mode"), record.boxMortalityCount, record.boxMortalityWeight],
+              [t("ops.mortality.tooltip.weight_mode"), record.weightModeMortalityCount, record.weightModeMortalityWeight],
+            ].map(([label, birds, mortalityWeight]) => (
+              <div key={String(label)} className="grid grid-cols-[1fr_auto] gap-x-3 rounded-lg px-2 py-1.5 odd:bg-slate-50">
+                <span className="font-semibold text-slate-600">{String(label)}</span>
+                <span className="font-bold tabular-nums text-orange-700">{formatNumber(Number(birds))} {t("common.birds")}</span>
+                <span className="text-slate-400">{t("common.weight")}</span>
+                <span className="font-bold tabular-nums text-slate-700">{weight(Number(mortalityWeight))}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between border-t border-slate-100 px-2 pt-2 font-bold"><span>{t("common.total")}</span><span className="tabular-nums text-orange-700">{formatNumber(record.mortalityCount)} {t("common.birds")}</span></div>
+          <p className="mt-2 text-[10px] leading-4 text-slate-400">{t("ops.mortality.tooltip.helper")}</p>
+        </div>, document.body,
+      ) : null}
+    </td>
+  );
+}
 
 export default function TripLossTable({
   records,
@@ -372,7 +401,6 @@ export default function TripLossTable({
           <col.icon size={14} className={`shrink-0 ${col.tone ? ICON_TONES[col.tone] : "text-slate-400"}`} />
         )}
         <span>{col.labelKey ? t(col.labelKey) : col.label}</span>
-        {col.sortKey && <SortArrows active={active} dir={sort.dir} />}
       </>
     );
     const innerClass = `flex w-full items-center gap-1.5 ${alignClass(col.align)} ${
@@ -404,6 +432,10 @@ export default function TripLossTable({
 
   const showEmptyAll = !loading && emptyAll;
   const showEmptyFiltered = !loading && filtersApplied && records.length === 0;
+  const tableWeight = (value: number) => Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-xs shadow-sm md:text-sm">
@@ -442,13 +474,13 @@ export default function TripLossTable({
       </div>
 
       <div ref={scrollRef} className="w-full overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-[13px]" aria-busy={reloading}>
+        <table className="min-w-full border-collapse text-left text-[13px] font-normal" aria-busy={reloading}>
           <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
             <tr className="whitespace-nowrap">
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-3 py-3 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
+                  className={`px-4 py-4 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
                     col.align
                   )} ${col.key === "serial" ? "w-12" : ""}`}
                 >
@@ -538,7 +570,7 @@ export default function TripLossTable({
                         isOpen ? "bg-emerald-50/70" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      <td className="w-12 px-3 py-3.5">
+                      <td className="w-12 px-4 py-5">
                         <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
@@ -554,70 +586,68 @@ export default function TripLossTable({
                           >
                             {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           </button>
-                          <span className="text-[12.5px] font-medium tabular-nums text-slate-400">
+                          <span className="text-[13px] font-medium tabular-nums text-slate-500">
                             {formatNumber(serialNo)}
                           </span>
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 font-bold text-indigo-600">
+                      <td className="whitespace-nowrap px-4 py-5 text-[13px] font-bold text-indigo-600">
                         {localizeTripViewText(r.tripNo, language)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 font-medium text-slate-600">
+                      <td className="whitespace-nowrap px-4 py-5 text-[13px] font-medium text-slate-600">
                         {formatTripListDay(r.tripDate, language)}
                       </td>
 
                       <td
-                        className="max-w-[170px] truncate px-3 py-3.5 font-medium text-slate-700"
+                        className="max-w-[170px] truncate px-4 py-5 text-[13px] font-medium text-slate-700"
                         title={r.sourceFarm || undefined}
                       >
                         {localizeTripViewText(r.sourceFarm, language) || "—"}
                       </td>
 
                       <td
-                        className="max-w-[130px] truncate px-3 py-3.5 text-slate-600"
+                        className="max-w-[130px] truncate px-4 py-5 text-[13px] font-normal text-slate-600"
                         title={r.supervisorName || undefined}
                       >
                         {localizeTripViewText(r.supervisorName, language) || "—"}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700">
                         {formatNumber(r.farmBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-amber-700">
-                        {formatWeight(r.farmWeight, weightUnit)}
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700">
+                        {tableWeight(r.farmWeight)}
                       </td>
 
                       {/* Plain number — the ShoppingBag glyph already names this
                           column in the header; repeating a badge on every row
                           is what made the grid noisy. */}
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-slate-700">
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-slate-700">
                         {formatNumber(r.deliveryShops)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700">
                         {formatNumber(r.deliveredBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-sky-700">
-                        {formatWeight(r.deliveredWeight, weightUnit)}
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700">
+                        {tableWeight(r.deliveredWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-orange-600">
-                        {formatNumber(r.mortalityCount)}
+                      <MortalityBreakdownCell record={r} t={t} />
+
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600">
+                        {tableWeight(r.mortalityWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-orange-600">
-                        {formatWeight(r.mortalityWeight, weightUnit)}
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600">
+                        {tableWeight(r.weightLoss)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-rose-600">
-                        {formatWeight(r.weightLoss, weightUnit)}
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600">
                         {r.weightLossPercentage.toFixed(2)}%
                       </td>
                     </tr>

@@ -5,28 +5,24 @@ import {
   Percent,
   Search,
   Store,
+  FileDown,
+  FileSpreadsheet,
 } from "lucide-react";
 import { DatePicker } from "../../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
+  opsExcelButtonClass,
+  opsPdfButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../../ui";
-import { weekRange } from "../../../../../utils/businessDate";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../../masters/components/MasterDropdown";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import type { PendingShopSortDir, PendingShopSortKey } from "../../types/collection";
-
-/** The default window is THIS week (Mon → Sun); anything else counts as a filter. */
-const isDefaultWeek = (fromDate: string, toDate: string) => {
-  if (!fromDate && !toDate) return true;
-  const { from, to } = weekRange();
-  return fromDate === from && toDate === to;
-};
 
 interface Props {
   fromDate: string;
@@ -47,6 +43,9 @@ interface Props {
   setSearchQuery: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
+  onExportPdf?: () => void;
+  onExportExcel?: () => void;
+  exportEnabled?: boolean;
   /** True while a refresh is reading — the brand pill dances, the page stays. */
   refreshing?: boolean;
 }
@@ -83,6 +82,9 @@ function PendingCollectionsFilters({
   setSearchQuery,
   onReset,
   onRefresh,
+  onExportPdf,
+  onExportExcel,
+  exportEnabled = false,
   refreshing = false,
 }: Props) {
   const { t, language } = useI18n();
@@ -150,6 +152,7 @@ function PendingCollectionsFilters({
             value={fromDate}
             onChange={setFromDate}
             placeholder={t("placeholder.enter_date")}
+            hideClear={!fromDate}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -163,6 +166,7 @@ function PendingCollectionsFilters({
             value={toDate}
             onChange={setToDate}
             placeholder={t("placeholder.enter_date")}
+            hideClear={!toDate}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -225,6 +229,8 @@ function PendingCollectionsFilters({
             options={sortOptions}
             onChange={setSortValue}
             searchable
+            allowClear
+            placeholder={t("ops.trip.no_sorting")}
             className="w-full"
           />
         </div>
@@ -251,13 +257,15 @@ function PendingCollectionsFilters({
         </div>
 
         <div className="lg:col-span-4 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" onClick={onExportPdf} disabled={!exportEnabled} className={`${opsPdfButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} title={exportEnabled ? "Export filtered pending collections as PDF" : "No filtered data to export"}><FileDown size={15} />PDF</button>
+          <button type="button" onClick={onExportExcel} disabled={!exportEnabled} className={`${opsExcelButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} title={exportEnabled ? "Export filtered pending collections as Excel" : "No filtered data to export"}><FileSpreadsheet size={15} />Excel</button>
           <FilterResetButton
             count={countActiveFilters(
               searchQuery.trim() !== "",
               shopName !== "",
               recoveryThreshold !== 0,
-              !(sortBy === "shopName" && sortDir === "asc"),
-              !isDefaultWeek(fromDate, toDate),
+              sortBy !== null,
+              fromDate !== "" || toDate !== "",
             )}
             onClick={onReset}
           />

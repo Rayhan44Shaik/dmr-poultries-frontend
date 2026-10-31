@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
-  X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
+  X, Save, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
   FileDown, Trash2, Store, Activity, Wallet, Clock, UserCog, Search, Settings2,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
@@ -544,30 +544,26 @@ export function EditCollectionModal({
       >
         {/* Header — matches the Trip view: gradient strip, gradient icon tile,
           * title + status line, circular close button. */}
-        <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl">
-          <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/40">
+          <div className="flex flex-col gap-3 px-6 py-3.5 md:px-8 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-400/20 text-white shrink-0">
-                {isView ? <Eye className="w-6 h-6" /> : <Save className="w-6 h-6" />}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+                {isView ? <Wallet className="h-5 w-5" /> : <Save className="h-5 w-5" />}
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
+                <h2 className="truncate text-base font-bold tracking-tight text-slate-800">
                   {isView ? t("ops.collection.view_collection") : t("ops.collection.edit_collection")}
                 </h2>
-                <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
-                    {tr(shopName)}
-                  </span>
-                  {isView && (
-                    <span className="text-xs font-medium text-slate-400">{t("ops.collection.read_only")}</span>
-                  )}
-                </div>
+                <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-semibold text-slate-500"><Store size={13} className="shrink-0 text-slate-400" />{tr(shopName)}</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
               {isView && (
                 <>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
+                    <Activity size={13} />{collectionStatusLabel(selected?.status || "Approved", t)}
+                  </span>
                   {/* Download PDF — same red PDF affordance and hover
                     * animation the Trip List view uses. */}
                   <button
@@ -575,7 +571,7 @@ export function EditCollectionModal({
                     onClick={() => void handleDownloadPdf()}
                     disabled={pdfBusy}
                     aria-label={t("ops.collection.download_pdf")}
-                    className="group relative inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95 disabled:opacity-50"
+                    className="hidden"
                   >
                     {pdfBusy ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -602,15 +598,130 @@ export function EditCollectionModal({
 
         {/* Body — scrolls inside the panel, which is what makes the modal the
           * same height regardless of content, exactly like the Trip view. */}
-        <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto flex-1">
+        <div className={isView ? "min-h-0 flex-1 overflow-hidden" : "flex-1 overflow-y-auto px-4 py-6 md:px-8 md:py-8"}>
           {isView ? (
             <>
+            {/* Maintenance Record layout: a fixed history rail on the left and
+              * the selected collection's complete label/value record on the right. */}
+            <div className="flex h-full min-h-0 flex-col lg:flex-row">
+              <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
+                <div className="flex items-center justify-between px-4 pt-4">
+                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <FileText size={13} className="shrink-0 text-slate-400" />
+                    All collection records
+                  </p>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-500 ring-1 ring-slate-200">
+                    {filteredCredits.length}
+                  </span>
+                </div>
+                <div className="px-3 pt-2.5">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={creditSearch}
+                      onChange={(event) => handleCreditSearchChange(event.target.value)}
+                      placeholder={t("ops.collection.search_collections_placeholder")}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-medium outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none">
+                  {creditsLoading ? (
+                    <p className="px-2 py-8 text-center text-xs text-slate-400"><Loader2 size={15} className="mx-auto mb-2 animate-spin" />{t("common.loading")}</p>
+                  ) : filteredCredits.length === 0 ? (
+                    <p className="px-2 py-8 text-center text-xs text-slate-400">{t("ops.collection.no_collections_for_shop")}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {filteredCredits.map((col) => {
+                        const active = selected != null && String(selected.id) === String(col.id);
+                        return (
+                          <button
+                            key={col.id}
+                            type="button"
+                            onClick={() => setPickedId(String(col.id))}
+                            className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}
+                          >
+                            <p className="truncate text-xs font-bold text-slate-700">{formatTripListDay(col.collectionDate, language)}</p>
+                            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500">
+                              <span className="truncate">{col.collectionNo || "—"}</span>
+                              <span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatCurrency(Number(col.amount) || 0)}</span>
+                            </div>
+                            <p className="mt-0.5 truncate text-[10px] text-slate-400">{tr(col.paymentMode) || "—"}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </aside>
+
+              <div key={String(selected?.id ?? "empty")} className="min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
+                <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up">
+                  <p className="flex items-center gap-1.5 bg-slate-50/80 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    <Store size={13} className="shrink-0 text-emerald-500" /> Shop details
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2">
+                    {([
+                      [t("table.shop"), tr(shopName) || "—"],
+                      [t("common.status"), collectionStatusLabel(selected?.status || "", t) || "—"],
+                    ] as [string, string][]).map(([label, value], index) => (
+                      <div key={label} className={`flex items-center justify-between gap-4 bg-white px-4 py-3 ${index === 0 ? "border-b border-slate-100 sm:border-b-0 sm:border-r" : ""}`}>
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+                        <span className="text-right text-[13px] font-bold text-slate-800">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                    {(() => {
+                      const rows: [string, string][] = [
+                        [t("ops.collection.collection_no_label"), formData.collectionNo || "—"],
+                        [t("common.date"), formatTripListDay(formData.collectionDate, language)],
+                        [t("operations.amount_received"), formatCurrency(formData.amount)],
+                        [t("common.collector"), tr(formData.collectorName) || "—"],
+                        [t("operations.payment_mode"), tr(formData.paymentModeName) || "—"],
+                        [t("operations.reference_no"), formData.referenceNo || "—"],
+                        [t("common.status"), collectionStatusLabel(selected?.status || "", t) || "—"],
+                        [t("common.remarks"), tr(formData.remarks) || "—"],
+                      ];
+                      const half = Math.ceil(rows.length / 2);
+                      const column = (items: [string, string][]) => (
+                        <dl className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {items.map(([label, value], index) => (
+                            <div key={label} className={`flex items-start justify-between gap-4 px-4 py-3 transition-colors hover:bg-slate-50/60 ${index > 0 ? "border-t border-slate-100" : ""}`}>
+                              <dt className="w-32 shrink-0 pt-0.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</dt>
+                              <dd className={`min-w-0 flex-1 break-words text-right text-[13px] font-bold ${label === t("operations.amount_received") ? "text-emerald-700" : "text-slate-800"}`}>{value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      );
+                      return <>{column(rows.slice(0, half))}{column(rows.slice(half))}</>;
+                    })()}
+                  </div>
+                </section>
+
+                <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
+                  <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 px-4 py-3">
+                    <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700"><IndianRupee size={15} />Amount received</span>
+                    <span className="text-lg font-bold tabular-nums text-emerald-700">{formatCurrency(formData.amount)}</span>
+                  </div>
+                </section>
+              </div>
+            </div>
+
+            {/* Retain the former card/table view only as implementation history;
+              * it is not rendered. */}
+            <div className="hidden">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)] xl:items-start">
               {/* ── Selected entry, shown first ───────────────────────────
                 * The row the user clicked is the reason this modal opened.
                 * Every field gets an equally readable, colour-coded card;
                 * numbers remain in Latin digits in both languages. */}
-              <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100/70 px-5 py-3">
+              <div className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-sm xl:col-start-2 xl:row-start-1">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/60 px-5 py-3">
                   <div className="flex items-center gap-2">
                     <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
                       <Wallet size={15} />
@@ -641,14 +752,14 @@ export function EditCollectionModal({
                 {/* Every selected-entry field is a self-contained, colour-coded
                   * box. The uniform grid makes the value scan one field at a
                   * time without the old amount/metadata spacing imbalance. */}
-                <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-2">
                   {[
                     {
                       key: "amount",
                       label: t("operations.amount_received"),
                       value: formatCurrency(formData.amount),
                       icon: IndianRupee,
-                      surface: "border-emerald-200 bg-emerald-50/65",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-emerald-100 text-emerald-700 ring-emerald-200",
                       valueClass: "text-lg text-emerald-800 tabular-nums",
                     },
@@ -657,7 +768,7 @@ export function EditCollectionModal({
                       label: t("ops.collection.collection_no_label"),
                       value: formData.collectionNo || "-",
                       icon: FileText,
-                      surface: "border-teal-200 bg-teal-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-teal-100 text-teal-700 ring-teal-200",
                       valueClass: "text-slate-800",
                     },
@@ -666,7 +777,7 @@ export function EditCollectionModal({
                       label: t("common.day"),
                       value: formatTripListDay(formData.collectionDate, language),
                       icon: Calendar,
-                      surface: "border-blue-200 bg-blue-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-blue-100 text-blue-700 ring-blue-200",
                       valueClass: "text-slate-800 tabular-nums",
                     },
@@ -675,7 +786,7 @@ export function EditCollectionModal({
                       label: t("table.shop"),
                       value: tr(shopName) || "-",
                       icon: Store,
-                      surface: "border-amber-200 bg-amber-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-amber-100 text-amber-700 ring-amber-200",
                       valueClass: "text-slate-800",
                     },
@@ -684,7 +795,7 @@ export function EditCollectionModal({
                       label: t("common.collector"),
                       value: tr(formData.collectorName) || "-",
                       icon: UserCog,
-                      surface: "border-violet-200 bg-violet-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-violet-100 text-violet-700 ring-violet-200",
                       valueClass: "text-slate-800",
                     },
@@ -693,7 +804,7 @@ export function EditCollectionModal({
                       label: t("operations.payment_mode"),
                       value: tr(formData.paymentModeName) || "-",
                       icon: CreditCard,
-                      surface: "border-sky-200 bg-sky-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-sky-100 text-sky-700 ring-sky-200",
                       valueClass: "text-slate-800",
                     },
@@ -702,7 +813,7 @@ export function EditCollectionModal({
                       label: t("operations.reference_no"),
                       value: formData.referenceNo || "-",
                       icon: Hash,
-                      surface: "border-indigo-200 bg-indigo-50/60",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-indigo-100 text-indigo-700 ring-indigo-200",
                       valueClass: "text-slate-800 tabular-nums",
                     },
@@ -711,14 +822,14 @@ export function EditCollectionModal({
                       label: t("common.remarks"),
                       value: tr(formData.remarks) || "-",
                       icon: FileText,
-                      surface: "border-slate-200 bg-slate-50/80",
+                      surface: "border-slate-200 bg-white",
                       iconClass: "bg-white text-slate-600 ring-slate-200",
                       valueClass: "text-slate-800",
                     },
                   ].map(({ key, label, value, icon: Icon, surface, iconClass, valueClass }) => (
                     <div
                       key={key}
-                      className={`flex min-h-[76px] min-w-0 items-start gap-2.5 rounded-xl border p-3 shadow-sm ${surface}`}
+                      className={`flex min-h-[68px] min-w-0 items-start gap-2.5 rounded-xl border p-3 shadow-sm transition-shadow hover:shadow-md ${surface}`}
                     >
                       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${iconClass}`}>
                         <Icon size={16} strokeWidth={2.25} />
@@ -737,7 +848,7 @@ export function EditCollectionModal({
               </div>
 
               {/* Recent 10 Shop Credits — backend-sourced, newest first */}
-              <div className="mt-5 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="mt-5 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm xl:col-start-1 xl:row-start-1 xl:mt-0">
                 {/* Header sits flush on the table: one surface, one border. */}
                 <div className="flex flex-col gap-3 border-b border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-emerald-50/40 px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
                   <h4 className="flex items-center gap-2 text-sm font-extrabold tracking-tight text-slate-800">
@@ -972,6 +1083,8 @@ export function EditCollectionModal({
                   </div>
                 )}
               </div>
+            </div>
+            </div>
             </>
           ) : (
             // Edit mode – unchanged
@@ -1043,6 +1156,17 @@ export function EditCollectionModal({
 
         {/* Footer — same gradient bar and pill buttons as the Trip view. */}
         <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3 rounded-b-2xl">
+          {isView && (
+            <button
+              type="button"
+              onClick={() => void handleDownloadPdf()}
+              disabled={pdfBusy}
+              className="group relative inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-2.5 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-50 active:scale-95 disabled:opacity-50"
+            >
+              {pdfBusy ? <Loader2 size={15} className="animate-spin" /> : <FileDown size={15} className={uiActionIconMotionClass.pdf} />}
+              PDF
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

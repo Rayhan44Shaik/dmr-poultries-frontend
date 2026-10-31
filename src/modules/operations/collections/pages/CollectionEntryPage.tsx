@@ -10,6 +10,7 @@ import RecentCollectionsTable from "../components/entry/RecentCollectionsTable";
 import type { Collection, RecentCollection } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { CAPABILITIES, useCan } from "../../../auth/permissions";
+import CollectionImportModal from "../components/entry/CollectionImportModal";
 
 type Props = {
   embedded?: boolean;
@@ -23,6 +24,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editMode, setEditMode] = useState<"view" | "edit">("view");
+  const [isImportOpen, setIsImportOpen] = useState(false);
   /**
    * The row highlighted in the recent table. Keeping it here lets the view
    * modal open on exactly the entry the user selected — by mouse, Enter or
@@ -82,7 +84,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
       <CollectionInformation
         entry={vm.entry}
         errors={vm.errors}
-        shops={vm.shops}
+        shops={vm.importShops}
         collectors={vm.collectors}
         paymentModes={vm.paymentModes}
         onDateChange={vm.changeCollectionDate}
@@ -92,6 +94,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onReferenceChange={vm.changeReference}
         onViewLedger={vm.viewLedger}
         onReset={vm.resetEntry}
+        onImport={() => setIsImportOpen(true)}
         ledgerLoading={vm.ledgerLoading}
         latestTransaction={latestShopTransaction}
       />
@@ -145,7 +148,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         isLoading={vm.loading}
         statusFilter={vm.statusFilter}
         onStatusChange={vm.changeStatusFilter}
-        onApprove={can(CAPABILITIES.COLLECTION_APPROVE) ? vm.approveCollection : undefined}
+        onApproveMany={can(CAPABILITIES.COLLECTION_APPROVE) ? vm.approveCollections : undefined}
         onReject={can(CAPABILITIES.COLLECTION_REJECT) ? vm.rejectCollection : undefined}
         onDelete={can(CAPABILITIES.COLLECTION_DELETE) ? vm.deleteCollection : undefined}
         onEdit={vm.editCollection}
@@ -164,6 +167,16 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         collection={selectedCollection}
         onRefresh={vm.refreshPage}
         allowDelete={can(CAPABILITIES.COLLECTION_DELETE)}
+      />
+
+      <CollectionImportModal
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        shops={vm.shops}
+        collectors={vm.collectors}
+        modes={vm.paymentModes.map((mode) => mode.name)}
+        existingReferences={(vm.allCollections || []).map((collection: Collection) => collection.referenceNo).filter(Boolean)}
+        onImported={vm.refreshPage}
       />
     </div>
   );

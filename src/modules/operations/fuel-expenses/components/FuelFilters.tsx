@@ -54,6 +54,7 @@ interface Props {
   onRefresh?: () => void;
   onExportExcel?: () => void;
   hasFilters?: boolean;
+  refreshing?: boolean;
 }
 
 function FuelFilters({
@@ -84,6 +85,7 @@ function FuelFilters({
   onRefresh,
   onExportExcel,
   hasFilters = false,
+  refreshing = false,
 }: Props) {
   const { t, language } = useI18n();
 
@@ -296,7 +298,7 @@ function FuelFilters({
         />
 
         {/* 2. Refresh */}
-        {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
+        {onRefresh && <BrandRefreshButton onClick={onRefresh} loading={refreshing} />}
 
         {/* 3. Add Fuel Bill */}
         {onAddFuelBill && (

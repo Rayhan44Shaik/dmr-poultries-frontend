@@ -158,6 +158,7 @@ function OperationsPages() {
     const pathname = location.pathname;
     if (pathname.includes("trip-entry")) return "trip-entry";
     if (pathname.includes("trip-list")) return "trip-list";
+    if (pathname.includes("fuel-expenses")) return "fuel-expenses";
     if (pathname.includes("expenses")) return "expenses";
     if (pathname.includes("rate-entry")) return "rate-entry";
     if (pathname.includes("shop-sales")) return "shop-sales";
@@ -165,7 +166,6 @@ function OperationsPages() {
     if (pathname.includes("collections/pending")) return "pending-collections";
     if (pathname.includes("collections/report")) return "collection-report";
     if (pathname.includes("mortality")) return "mortality";
-    if (pathname.includes("fuel-expenses")) return "fuel-expenses";
     // Orders is its own module with its own routes under /operations/orders/*.
     // All three pages resolve to this one entry on purpose: the module keeps
     // every page it has opened mounted (shared day data, pending work, filters),

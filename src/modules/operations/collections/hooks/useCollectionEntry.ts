@@ -57,6 +57,7 @@ export default function useCollectionEntry() {
 
   // ---- All useState hooks ----
   const [shops, setShops] = useState<string[]>([]);
+  const [importShops, setImportShops] = useState<string[]>([]);
   const [collectors, setCollectors] = useState<string[]>([]);
   const [paymentModes, setPaymentModes] = useState<PaymentMode[]>([]);
   const [pendingCollections, setPendingCollections] = useState<PendingCollection[]>([]);
@@ -99,7 +100,9 @@ export default function useCollectionEntry() {
       collectionService.refreshFromBackend(),
     ])
       .then(() => {
-        const shopNames = shopService.getAll().map((s) => s.shopName).sort();
+        const allShops = shopService.getAll();
+        const shopNames = allShops.filter((s) => s.status === "Active").map((s) => s.shopName).sort();
+        setImportShops(allShops.map((s) => s.shopName).sort());
         setShops(shopNames);
         // Collector is strictly the Collection department from the Employee
         // master. There is deliberately NO fallback to the full employee list:
@@ -506,6 +509,22 @@ export default function useCollectionEntry() {
     }
   }
 
+  async function approveCollections(ids: string[]) {
+    if (!ids.length) return;
+    const approved = await collectionService.approveCollections(ids);
+    if (approved) {
+      showNotification(
+        ids.length === 1
+          ? translate("ops.collection.approved_success")
+          : `${ids.length} collections approved successfully.`,
+        "success",
+      );
+      await refreshPage();
+    } else {
+      showNotification(translate("ops.collection.failed_approve"), "error");
+    }
+  }
+
   async function deleteCollection(id: string) {
     const confirmed = await confirmDialog({
       title: translate("ops.collection.delete_confirm_title"),
@@ -698,6 +717,7 @@ export default function useCollectionEntry() {
     saveCollection: saveOrUpdateCollection,
     cancelCollection,
     approveCollection,
+    approveCollections,
     rejectCollection,
     deleteCollection,
     editCollection,
@@ -732,6 +752,7 @@ export default function useCollectionEntry() {
     statistics,
     pageReady,
     shops,
+    importShops,
     collectors,
     paymentModes,
     pendingCollections,
@@ -797,6 +818,7 @@ export default function useCollectionEntry() {
     saveCollection: saveOrUpdateCollection,
     cancelCollection,
     approveCollection,
+    approveCollections,
     rejectCollection,
     deleteCollection,
     editCollection,

@@ -125,6 +125,9 @@ function approximateRegionLabel(lat: number, lon: number): string {
   if (lat >= 16.4 && lat <= 16.7 && lon >= 80.5 && lon <= 80.8) {
     return `Near Vijayawada, Andhra Pradesh (${lat.toFixed(5)}, ${lon.toFixed(5)})`;
   }
+  if (lat >= 16.5 && lat <= 16.85 && lon >= 80.2 && lon <= 80.55) {
+    return `Near Vijayawada–Gannavaram, Krishna District, Andhra Pradesh (${lat.toFixed(5)}, ${lon.toFixed(5)})`;
+  }
   if (lat >= 16.8 && lat <= 17.2 && lon >= 79.7 && lon <= 80.2) {
     return `Near Kodad, Suryapet District, Telangana (${lat.toFixed(5)}, ${lon.toFixed(5)})`;
   }

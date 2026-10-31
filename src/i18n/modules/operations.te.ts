@@ -1088,6 +1088,10 @@ export default {
   // Weight unit printed beside every figure on this page. Telugu in either
   // language on purpose — the floor reads కేజీ, not the Latin 'Kg'.
   'ops.mortality.weight_unit': 'కేజీ',
+  'ops.mortality.tooltip.title': 'మరణాల వివరాలు',
+  'ops.mortality.tooltip.box_mode': 'బాక్స్ మోడ్ మరణాలు',
+  'ops.mortality.tooltip.weight_mode': 'బరువు మోడ్ మరణాలు',
+  'ops.mortality.tooltip.helper': 'ప్రతి షాప్ ఎంట్రీలో సేవ్ చేసిన డెలివరీ మోడ్ ఆధారంగా మరణాలు చూపబడతాయి.',
 
   'ops.mortality.detail.delivered': 'డెలివరీ',
   'ops.mortality.detail.weight_summary': 'బరువులు',
@@ -1178,6 +1182,8 @@ export default {
   'ops.rate.modal.total_weight': 'మొత్తం బరువు (కేజీ)',
   'ops.rate.modal.saved_title': 'రేట్లు విజయవంతంగా సేవ్ అయ్యాయి!',
   'ops.rate.modal.saved_desc': 'సర్వర్‌లో సేవ్ అయ్యాయి. రిఫ్రెష్ చేసినా ఈ రేట్లు ఉంటాయి.',
+  'ops.rate.modal.locked_title': 'రేట్లు సేవ్ చేసి లాక్ చేశారు!',
+  'ops.rate.modal.locked_desc': 'ట్రిప్ లాక్ అయి షాప్ అమ్మకాలకు తరలించబడింది.',
   'ops.rate.modal.locking_title': 'ఈ ట్రిప్‌ను లాక్ చేస్తున్నారు',
   'ops.rate.modal.locking_desc': 'సేవ్ & లాక్ తర్వాత రేట్ ఎంట్రీలో రేట్లు సవరించలేరు. ఈ ట్రిప్ పెండింగ్ జాబితా నుంచి షాప్ అమ్మకాలకు వెళ్తుంది.',
   'ops.rate.modal.locking': 'లాక్ అవుతోంది...',
@@ -1224,6 +1230,9 @@ export default {
   // Fuel Expenses
   'ops.fuel.title': 'ఇంధన ఖర్చులు',
   'ops.fuel.table_title': 'ఇంధన బిల్లుల పట్టిక',
+  'ops.fuel.trip_details': 'ట్రిప్ వివరాలు',
+  'ops.fuel.fuel_details': 'ఇంధన ఖర్చు వివరాలు',
+  'ops.fuel.bunk_details': 'బంక్ వివరాలు',
   'ops.fuel.add_bill': 'ఇంధన బిల్లు జోడించండి',
   'ops.fuel.hide_form': 'ఫారం దాచండి',
   'ops.fuel.edit_bill': 'ఇంధన బిల్లు సవరించండి',

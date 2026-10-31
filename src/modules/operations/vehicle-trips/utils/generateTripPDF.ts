@@ -328,20 +328,18 @@ export async function generateTripReportPDF(
   }
 
   // ─── STEP 4 — SHOP DELIVERIES ───────────────────────────────────────
-  const deliveries: ShopDelivery[] = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+  const deliveries: ShopDelivery[] = Array.isArray(trip.legs) && trip.legs.length
+    ? trip.legs.flatMap((leg) => (leg.deliveries ?? []).map((row) => ({ ...row, legIndex: leg.legIndex })))
+    : Array.isArray(trip.deliveries) ? trip.deliveries : [];
   drawSectionBand("STEP 4 — SHOP DELIVERIES", `${deliveries.length} Shop(s)`);
   if (deliveries.length) {
     const deliveryBody = deliveries.map((row, index) => {
-      const boxNos = Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length
-        ? row.selectedBoxIds.join(", ")
-        : row.boxNo != null && row.boxNo > 0
-          ? String(row.boxNo)
-          : "--";
       const mortality = `${row.mortality ?? 0}${row.mortKg ? ` / ${Number(row.mortKg).toFixed(2)} kg` : ""}`;
       return [
         String(index + 1),
         row.shopName || "--",
-        row.birdType || "--",
+        row.legIndex != null ? `Load ${row.legIndex}` : "--",
+        row.deliveryMode === "weight" ? "Weight" : "Box",
         String(
           Array.isArray(row.selectedBoxIds) && row.selectedBoxIds.length
             ? row.selectedBoxIds.length
@@ -352,16 +350,15 @@ export async function generateTripReportPDF(
         String(row.birds ?? 0),
         Number(row.weight || 0).toFixed(2),
         mortality,
-        row.autoCaptureTime || "--",
-        boxNos,
+        Number(row.rate || 0).toFixed(2),
       ];
     });
     simpleTable(
-      ["S.No", "Shop", "Bird Type", "Boxes", "Birds", "Weight (KG)", "Mortality", "Captured Time", "Box Numbers"],
+      ["S.No", "Shop / delivery destination", "Load", "Mode", "Boxes", "Delivered birds", "Delivered wt (KG)", "Mortality", "Rate (₹/kg)"],
       deliveryBody,
       {
-        fontSize: 7.5,
-        widths: [10, 42, 26, 12, 14, 18, 22, 24, 26],
+        fontSize: 7,
+        widths: [8, 42, 12, 14, 10, 18, 22, 20, 20],
       }
     );
   } else {

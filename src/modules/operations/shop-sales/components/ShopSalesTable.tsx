@@ -1,24 +1,20 @@
 // Shop Sales table. Rows are backend-authoritative: the edit/lock state comes
 // exclusively from the API response, and the table only presents that state.
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Bird,
   Calendar,
-  Check,
-  Pencil,
   FileText,
   Hash,
-  IndianRupee,
   Lock,
+  IndianRupee,
   Scale,
   Store,
-  X,
 } from "lucide-react";
 import type { ShopSale } from "../types/shopSale";
-import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import {
   formatSaleAmount,
   formatSaleRate,
@@ -27,19 +23,23 @@ import {
   shopSaleLockState,
 } from "../utils/shopSaleFormat";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
-import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
-import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { formatShopWithSubShop } from "../../vehicle-trips/utils/shopDisplayName";
 import { useI18n } from "../../../../i18n";
+import type { Shop } from "../../../masters/shops/types/shop";
+import ShopSaleEditModal from "./ShopSaleEditModal";
+import type { LoadSaleDraft } from "./ShopSaleEditModal";
 
 interface Props {
   sales: ShopSale[];
+  /** Full filtered backend result, independent of the currently visible page. */
+  allSales?: ShopSale[];
   isLoading?: boolean;
   /** Number of rows before this page, so serial numbers do not restart at 1. */
   startIndex?: number;
   sortBy?: string;
   onSortChange?: (sortBy: string) => void;
-  onUpdateSale?: (updatedSale: ShopSale) => void | Promise<void>;
-  onViewTrip?: (sale: ShopSale) => void;
+  onSaveLoad?: (tripId: number, rows: LoadSaleDraft[]) => Promise<void>;
+  shops: Shop[];
 }
 
 type SortColumn = "saleNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
@@ -69,37 +69,32 @@ function SortArrows({ active, direction }: { active: boolean; direction?: "asc" 
 
 function ShopSalesTable({
   sales,
+  allSales = sales,
   isLoading = false,
   startIndex = 0,
   sortBy = "latest",
   onSortChange,
-  onUpdateSale,
-  onViewTrip,
+  onSaveLoad,
+  shops,
 }: Props) {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Partial<ShopSale>>({});
+  const [editingSale, setEditingSale] = useState<ShopSale | null>(null);
   const [saving, setSaving] = useState(false);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const tableRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const clearOutside = (event: PointerEvent) => {
-      if (!tableRootRef.current?.contains(event.target as Node) && !editingId && !saving) setSelectedId(null);
+      if (!tableRootRef.current?.contains(event.target as Node) && !editingSale && !saving) setSelectedId(null);
     };
     document.addEventListener("pointerdown", clearOutside);
     return () => document.removeEventListener("pointerdown", clearOutside);
-  }, [editingId, saving]);
+  }, [editingSale, saving]);
 
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
+  const editingTripDeliveries = useMemo(() => editingSale ? allSales.filter((row) => row.numericTripId === editingSale.numericTripId) : [], [allSales, editingSale]);
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
-  const selectedBirdLimit = Number(selectedSale?.maxEditableBirds);
-  const hasSelectedBirdLimit =
-    selectedSale?.maxEditableBirds != null &&
-    Number.isSafeInteger(selectedBirdLimit) &&
-    selectedBirdLimit >= 0;
-
   const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
     const values = SORT_VALUES[column];
     if (sortBy === values.asc) return "asc";
@@ -128,87 +123,22 @@ function ShopSalesTable({
   const startEditingSale = useCallback((sale: ShopSale) => {
     if (!sale.editable || saving) return;
     setSelectedId(sale.id);
-    setEditingId(sale.id);
-    setEditData({
-      totalBirds: sale.totalBirds,
-      totalWeight: sale.totalWeight,
-      rate: sale.rate,
-    });
+    setEditingSale(sale);
   }, [saving]);
 
-  const startEditing = useCallback(() => {
-    if (!selectedSale) return;
-    startEditingSale(selectedSale);
-  }, [selectedSale, startEditingSale]);
-
-  const cancelEditing = useCallback(() => {
-    setEditingId(null);
-    setEditData({});
-  }, []);
-
-  const handleInputChange = useCallback((field: keyof ShopSale, value: number) => {
-    setEditData((previous) => ({ ...previous, [field]: value }));
-  }, []);
-
-  const saveEditing = useCallback(async () => {
-    if (!onUpdateSale || !editingId || saving) return;
-    const originalSale = sales.find((sale) => sale.id === editingId);
-    if (!originalSale) return;
-
-    const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
-    const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
-    const newRate = editData.rate ?? originalSale.rate ?? 0;
-    const birdsChanged = newBirds !== originalSale.totalBirds;
-    const weightChanged = newWeight !== originalSale.totalWeight;
-
-    // Validate only the quantity the operator actually changed. A rate-only
-    // correction must not be blocked by legacy/multi-load capacity metadata
-    // (for example maxEditableBirds = 0 on an already-delivered row).
-    if (birdsChanged && (!Number.isInteger(newBirds) || newBirds < 0)) {
-      globalNotify.error(t("ops.shop_sales.birds_integer"));
-      return;
-    }
-    if (weightChanged && (!Number.isFinite(newWeight) || newWeight < 0)) {
-      globalNotify.error(t("ops.shop_sales.invalid_weight"));
-      return;
-    }
-    if (!Number.isFinite(newRate) || newRate < 50 || newRate > 300) {
-      globalNotify.error("Rate must be between ₹50 and ₹300");
-      return;
-    }
-    const maximumBirds = Number(originalSale.maxEditableBirds);
-    if (birdsChanged && Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
-      globalNotify.error(t("ops.shop_sales.max_birds_error", { maximum: maximumBirds }));
-      return;
-    }
-
+  const saveEditing = useCallback(async (tripId: number, rows: LoadSaleDraft[]) => {
+    if (!onSaveLoad || saving) return;
     setSaving(true);
-    try {
-      await onUpdateSale({
-        ...originalSale,
-        totalBirds: newBirds,
-        totalWeight: newWeight,
-        rate: newRate,
-      });
-      setEditingId(null);
-      setEditData({});
-    } catch {
-      // The parent reloads the backend-authoritative data after a failed edit.
-      setEditingId(null);
-      setEditData({});
-    } finally {
-      setSaving(false);
-    }
-  }, [editData, editingId, onUpdateSale, sales, saving, t]);
+    try { await onSaveLoad(tripId, rows); setEditingSale(null); }
+    finally { setSaving(false); }
+  }, [onSaveLoad, saving]);
 
   const handleRowSelect = useCallback((sale: ShopSale) => {
     if (saving) return;
+    // Selecting/focusing a table row must never open the Add Shop dialog.
     setSelectedId(sale.id);
-    if (editingId && editingId !== sale.id) {
-      setEditingId(null);
-      setEditData({});
-    }
-  }, [editingId, saving]);
+    if (editingSale && editingSale.id !== sale.id) setEditingSale(null);
+  }, [editingSale, saving]);
 
   const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -229,7 +159,6 @@ function ShopSalesTable({
     requestAnimationFrame(() => rowRefs.current.get(nextSale.id)?.focus());
   }, [handleRowSelect, sales]);
 
-  const canEditSelectedSale = Boolean(selectedSale && selectedLock?.editable && !saving);
   const selectedBlockedByAssignment = Boolean(
     selectedSale &&
       selectedSale.assignmentLockTripId != null &&
@@ -256,71 +185,7 @@ function ShopSalesTable({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {editingId ? (
-            <>
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
-                <Bird size={13} className="text-cyan-600" />
-                <input
-                  type="number"
-                  aria-label={t("ops.shop_sales.birds")}
-                  value={editData.totalBirds ?? 0}
-                  onChange={(event) => handleInputChange("totalBirds", parseFloat(event.target.value) || 0)}
-                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-blue-700 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  min={0}
-                  max={hasSelectedBirdLimit ? selectedBirdLimit : undefined}
-                  step={1}
-                />
-                {hasSelectedBirdLimit ? (
-                  <span className="hidden whitespace-nowrap text-[10px] font-medium text-slate-500 lg:inline">{t("ops.shop_sales.max_birds", { maximum: selectedBirdLimit })}</span>
-                ) : null}
-                <Scale size={13} className="text-orange-600" />
-                <input
-                  type="number"
-                  aria-label={t("ops.shop_sales.weight")}
-                  value={editData.totalWeight ?? 0}
-                  onChange={(event) => handleInputChange("totalWeight", parseFloat(event.target.value) || 0)}
-                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-orange-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  min={0}
-                  step={0.01}
-                />
-                <IndianRupee size={13} className="text-violet-600" />
-                <input
-                  type="number"
-                  aria-label={t("ops.shop_sales.rate")}
-                  value={editData.rate ?? 0}
-                  onChange={(event) => handleInputChange("rate", Number(event.target.value))}
-                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-violet-600 shadow-2xs outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                  min={50}
-                  max={300}
-                  step={0.01}
-                />
-              </div>
-              <button type="button" onClick={saveEditing} disabled={saving} aria-label={t("ops.shop_sales.save_sale")} className="group inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white shadow-xs transition-all hover:bg-emerald-700 disabled:opacity-50">
-                <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><Check size={14} /></span>
-              </button>
-              <button type="button" onClick={cancelEditing} disabled={saving} aria-label={t("ops.shop_sales.cancel_editing")} className="group inline-flex items-center justify-center rounded-lg bg-rose-100 p-2 text-rose-700 transition-all hover:bg-rose-200 disabled:opacity-50">
-                <span className={`inline-flex ${uiActionIconMotionClass.reject}`}><X size={14} /></span>
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Always present, exactly like Recent Trip Activity. It becomes
-                  active only after an editable row is selected. */}
-              <button
-                type="button"
-                onClick={startEditing}
-                disabled={!canEditSelectedSale}
-                aria-label={t("ops.shop_sales.edit_selected")}
-                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
-                  canEditSelectedSale
-                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
-                    : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
-                }`}
-              >
-                <span className={`inline-flex ${canEditSelectedSale ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
-                <span className="hidden md:inline">{t("common.edit")}</span>
-              </button>
-              {selectedSale && selectedLock && !selectedLock.editable ? (
+          {selectedSale && selectedLock && !selectedLock.editable ? (
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
                     <Lock size={14} /> {selectedBlockedByAssignment ? t("ops.shop_sales.assignment_locked") : selectedLock.label}
@@ -334,9 +199,7 @@ function ShopSalesTable({
                       : selectedLock.message}
                   </span>
                 </div>
-              ) : null}
-            </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -355,19 +218,16 @@ function ShopSalesTable({
               <th className="px-4 py-4 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
               <th className="px-4 py-4 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
               <th className="px-4 py-4 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
-              <th className="px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                <div className="flex items-center justify-center gap-1.5"><Pencil size={14} className="text-emerald-500" /><span>Action</span></div>
-              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={10} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
+              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={10} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
+              <tr><td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
-              const isEditing = editingId === sale.id;
+              const isEditing = editingSale?.id === sale.id;
               const lock = shopSaleLockState(sale);
               return (
                 <tr
@@ -386,50 +246,34 @@ function ShopSalesTable({
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
                   <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">{startIndex + index + 1}</td>
-                  <td className="px-4 py-5 text-[13px] font-semibold text-emerald-600 whitespace-nowrap">
+                  <td className="px-4 py-5 text-[13px] font-semibold whitespace-nowrap">
                     <button
                       type="button"
-                      onClick={(event) => { event.stopPropagation(); onViewTrip?.(sale); }}
-                      className="font-semibold text-emerald-600 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-                    >
-                      {sale.saleNo || sale.tripNo || "—"}
-                    </button>
+                      disabled={!lock.editable || saving}
+                      onClick={(event) => { event.stopPropagation(); startEditingSale(sale); }}
+                      aria-label={`${t("common.edit")} ${sale.saleNo || sale.tripNo || "shop sale"}`}
+                      title={lock.editable ? "Edit trip shop deliveries" : lock.message}
+                      className={`rounded-md text-emerald-700 underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${lock.editable && !saving ? "cursor-pointer hover:text-emerald-900 hover:underline" : "cursor-not-allowed text-slate-400"}`}
+                    >{sale.saleNo || sale.tripNo || "—"}</button>
                   </td>
                   <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
                   <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">
-                    <div>{cleanDeliveryShopName(sale.shopName) || "—"}</div>
-                    {sale.subShopName?.trim() ? <div className="mt-0.5 text-[11px] font-semibold text-indigo-600">{sale.subShopName.trim()}</div> : null}
+                    <div className="whitespace-nowrap" title={formatShopWithSubShop(sale.shopName, sale.subShopName) || undefined}>
+                      {formatShopWithSubShop(sale.shopName, sale.subShopName) || "—"}
+                    </div>
                   </td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
                   <td className="max-w-[260px] px-4 py-5 text-[13px] text-slate-600"><span className="block whitespace-normal break-words font-medium leading-5 text-slate-700" title={sale.remark || undefined}>{formatSaleRemark(sale.remark)}</span></td>
-                  <td className="px-4 py-5 text-center">
-                    <button
-                      type="button"
-                      disabled={!lock.editable || saving}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        startEditingSale(sale);
-                      }}
-                      aria-label={`${t("common.edit")} ${sale.saleNo || sale.tripNo || "shop sale"}`}
-                      title={lock.editable ? t("common.edit") : lock.message}
-                      className={`group inline-flex h-7 w-7 items-center justify-center rounded-lg border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
-                        lock.editable && !saving
-                          ? "border-emerald-200/80 bg-emerald-50/70 text-emerald-600 shadow-xs hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-sm active:scale-95"
-                          : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
-                      }`}
-                    >
-                      <span className={`inline-flex ${lock.editable && !saving ? uiActionIconMotionClass.edit : ""}`}><Pencil size={12} strokeWidth={2.25} /></span>
-                    </button>
-                  </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+      {editingSale ? <ShopSaleEditModal key={editingSale.id} sale={editingSale} shops={shops} deliveries={editingTripDeliveries} saving={saving} onClose={() => setEditingSale(null)} onSaveLoad={saveEditing} /> : null}
     </div>
   );
 }

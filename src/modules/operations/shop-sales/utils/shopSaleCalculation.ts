@@ -67,7 +67,8 @@ export function filterShopSales(
 
       x =>
 
-        x.shopName.toLowerCase().includes(search)
+        x.shopName.toLowerCase().includes(search) ||
+        String(x.subShopName ?? "").toLowerCase().includes(search)
 
     );
 
@@ -86,11 +87,13 @@ export function filterShopSales(
       const saleNo = String(x.saleNo ?? "").toLowerCase();
       const tripNo = String(x.tripNo ?? "").toLowerCase();
       const shopName = String(x.shopName ?? "").toLowerCase();
+      const subShopName = String(x.subShopName ?? "").toLowerCase();
       const remark = String(x.remark ?? "").toLowerCase();
       return (
         saleNo.includes(query) ||
         tripNo.includes(query) ||
         shopName.includes(query) ||
+        subShopName.includes(query) ||
         remark.includes(query)
       );
     });

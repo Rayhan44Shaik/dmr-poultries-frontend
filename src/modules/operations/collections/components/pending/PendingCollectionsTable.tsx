@@ -1,7 +1,7 @@
 import React from "react";
 import {
   ArrowDown, ArrowUp, Calendar, Clock3, CreditCard, Eye, Hash, LoaderCircle,
-  ShoppingBag, TrendingUp,
+  ShoppingBag, Trash2, TrendingUp,
 } from "lucide-react";
 import type {
   PendingOverallTotals,
@@ -11,6 +11,7 @@ import type {
 } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -52,8 +53,12 @@ interface Props {
   selectedShopName: string | null;
   onSelectShop: (shopName: string | null) => void;
   onView: (shopName: string) => void;
+  onOpenShop?: (shopName: string) => void;
+  allowDelete?: boolean;
   totalShops: number;
+  startIndex?: number;
   isLoading?: boolean;
+  refreshing?: boolean;
   /** Active column order — the same state the filter bar's Sort By reads. */
   sortBy: PendingShopSortKey | null;
   sortDir: PendingShopSortDir;
@@ -89,8 +94,12 @@ function PendingCollectionsTable({
   selectedShopName,
   onSelectShop,
   onView,
+  onOpenShop,
+  allowDelete = false,
   totalShops,
+  startIndex = 0,
   isLoading = false,
+  refreshing = false,
   sortBy,
   sortDir,
   onSortChange,
@@ -143,7 +152,7 @@ function PendingCollectionsTable({
   return (
     <>
       {/* Header — the Rate Entry / Trip List header, at the same size. */}
-      <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-orange-50/40">
+      <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-orange-50/60 via-white to-orange-50/40">
         <div className="flex items-center gap-3">
           <div className="h-9 w-9 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-500 shadow-inner">
             <Clock3 className="w-5 h-5" />
@@ -160,8 +169,35 @@ function PendingCollectionsTable({
             )}
           </h3>
         </div>
+        {selectedShop ? (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onView(selectedShop.shopName)}
+              className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 text-xs font-semibold text-emerald-700"
+            >
+              <span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={13} /></span>
+              {t("common.view")}
+            </button>
+            {allowDelete && (
+              <button
+                type="button"
+                onClick={() => (onOpenShop ?? onView)(selectedShop.shopName)}
+                className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.delete}`}><Trash2 size={13} /></span>
+                {t("common.delete")}
+              </button>
+            )}
+          </div>
+        ) : null}
       </div>
 
+      {refreshing && !isLoading ? (
+        <div aria-hidden="true" className="h-0.5 overflow-hidden bg-transparent">
+          <div className="h-full w-full animate-pulse bg-orange-300/80" />
+        </div>
+      ) : null}
       {isLoading ? (
         <div className="py-16 text-center text-sm font-medium text-slate-400">
           <span className="inline-flex items-center gap-2">
@@ -278,7 +314,7 @@ function PendingCollectionsTable({
                             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           </span>
                         )}
-                        {index + 1}
+                        {startIndex + index + 1}
                       </td>
                       {/* One line per record: a long shop name used to wrap over
                           three lines and push the money columns out of
@@ -310,13 +346,26 @@ function PendingCollectionsTable({
                         )}
                       </td>
                       <td className="px-3.5 py-3 text-center">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
-                          aria-label={t("ops.collection.view_details")}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
-                        >
-                          <Eye size={18} />
-                        </button>
+                        <div className="inline-flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
+                            aria-label={t("ops.collection.view_details")}
+                            className="group inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
+                          >
+                            <Eye size={16} className={uiActionIconMotionClass.view} />
+                          </button>
+                          {allowDelete && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); (onOpenShop ?? onView)(shop.shopName); }}
+                              aria-label={t("common.delete")}
+                              className="group inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 transition"
+                            >
+                              <Trash2 size={16} className={uiActionIconMotionClass.delete} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

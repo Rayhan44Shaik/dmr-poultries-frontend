@@ -88,10 +88,10 @@ describe("shopSaleLockState", () => {
     assert.match(state.message, /read-only/);
   });
 
-  it("expired-window sales are locked with the 10-day message", () => {
+  it("expired-window sales are locked with the 2-week-from-insert message", () => {
     const state = shopSaleLockState({ editable: false, lockReason: "Editing period has expired.", tripDeleted: false, correctionWindowExpired: true });
     assert.equal(state.editable, false);
-    assert.match(state.message, /Edit window expired/);
+    assert.match(state.message, /Edit window expired \(2 weeks from insert\)/);
   });
 
   it("falls back to the backend lock reason when present", () => {

@@ -10,6 +10,7 @@ import jsPDF from "jspdf";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import type { FuelExpense } from "../types/fuelExpense";
+import { googleMapsUrl, resolveFuelGps } from "./fuelGps";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -50,16 +51,9 @@ function buildSheet(
   const statusBg = isDeleted ? "#fef2f2" : isApproved ? "#ecfdf5" : "#fffbeb";
   const statusBorder = isDeleted ? "#fecaca" : isApproved ? "#a7f3d0" : "#fde68a";
 
-  const hasGps =
-    record.gpsLat != null &&
-    record.gpsLon != null &&
-    Number.isFinite(Number(record.gpsLat)) &&
-    Number.isFinite(Number(record.gpsLon)) &&
-    !(Number(record.gpsLat) === 0 && Number(record.gpsLon) === 0);
-
-  const mapsUrl = hasGps
-    ? `https://www.google.com/maps?q=${Number(record.gpsLat).toFixed(6)},${Number(record.gpsLon).toFixed(6)}`
-    : "";
+  const gps = resolveFuelGps(record.gpsLat, record.gpsLon, record.gpsAddress);
+  const hasGps = gps.lat != null && gps.lon != null;
+  const mapsUrl = gps.lat != null && gps.lon != null ? googleMapsUrl(gps.lat, gps.lon) : "";
 
   const day = (d: string | undefined) => formatTripListDay(d, language);
 
@@ -154,8 +148,13 @@ function buildSheet(
         ? `<div style="margin:14px 24px 0;border:1px solid #bbf7d0;background:#f0fdf4;border-radius:8px;padding:10px 14px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <span style="font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#166534;">GPS LOCATION &amp; MAP LINK</span>
-          <span style="font-size:11px;font-weight:700;color:#047857;font-family:monospace;">${Number(record.gpsLat).toFixed(6)}°N, ${Number(record.gpsLon).toFixed(6)}°E</span>
+          <span style="font-size:11px;font-weight:700;color:#047857;font-family:monospace;">${gps.lat!.toFixed(6)}°N, ${gps.lon!.toFixed(6)}°E</span>
         </div>
+        ${
+          gps.placeName
+            ? `<div style="margin-top:4px;font-size:11px;font-weight:600;color:#14532d;word-break:break-word;">${esc(gps.placeName)}</div>`
+            : ""
+        }
         <div style="margin-top:4px;font-size:11px;font-weight:600;color:#14532d;word-break:break-word;">
           Google Maps URL: <a href="${esc(mapsUrl)}" style="color:#0284c7;text-decoration:underline;">${esc(mapsUrl)}</a>
         </div>

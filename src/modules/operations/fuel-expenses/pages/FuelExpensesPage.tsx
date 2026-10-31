@@ -36,6 +36,7 @@ type FuelExpensesPageProps = { embedded?: boolean };
 const ALL_VEHICLES = "All Vehicles";
 const ALL_DRIVERS = "All Drivers";
 const ALL_BUNKS = "All Bunks";
+const isGenericOtherBunk = (value: string) => /^others?$/i.test(value.trim());
 
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const { t, language } = useI18n();
@@ -48,6 +49,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const {
     expenses,
     loading,
+    refreshing,
     refresh,
     saveExpense,
     updateExpense,
@@ -71,6 +73,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<FuelSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [includeMasterBunks, setIncludeMasterBunks] = useState(true);
 
   // ── Pagination State ──
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,17 +127,25 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   }, [masterEmployees]);
 
   const bunkOptions = useMemo<MasterDropdownOption[]>(() => {
-    const names = new Set<string>();
-    fuelBunks.forEach((item) => { if (item.birdType.trim()) names.add(item.birdType.trim()); });
-    deduplicatedExpenses.forEach((item) => { if (item.petrolBunk.trim()) names.add(item.petrolBunk.trim()); });
+    const names = new Map<string, string>();
+    fuelBunks.forEach((item) => {
+      const name = item.birdType.trim();
+      if (!name || isGenericOtherBunk(name)) return;
+      const key = name.toLocaleLowerCase();
+      if (!names.has(key)) names.set(key, name);
+    });
     return [
-      ...[...names].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name, searchText: name })),
-      { value: "__OTHER__", label: "Other (Non-master)", searchText: "other custom non-master" },
+      { value: "__OTHER__", label: "Other", searchText: "other others custom non-master" },
+      ...[...names.values()].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name, searchText: name })),
     ];
-  }, [deduplicatedExpenses, fuelBunks]);
+  }, [fuelBunks]);
 
   const driversList = useMemo(
     () => masterEmployees.filter((e) => (e.department || e.role || "").toLowerCase().includes("driver")),
+    [masterEmployees]
+  );
+  const supervisorsList = useMemo(
+    () => masterEmployees.filter((e) => `${e.department} ${e.secondaryDepartment ?? ""} ${e.role ?? ""}`.toLowerCase().includes("supervisor")),
     [masterEmployees]
   );
 
@@ -159,11 +170,14 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       vehicleNo: vehicle === ALL_VEHICLES ? "" : vehicle,
       driverName: driver === ALL_DRIVERS ? "" : driver,
       petrolBunk: bunk === ALL_BUNKS ? "" : bunk,
-      masterBunkNames: fuelBunks.map((item) => item.birdType),
+      masterBunkNames: fuelBunks
+        .map((item) => item.birdType.trim())
+        .filter((name) => name && !isGenericOtherBunk(name)),
       sourceType: sourceType === "All" ? "" : sourceType,
+      includeMasterBunks,
       search,
     });
-  }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, bunk, sourceType, search, fuelBunks]);
+  }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, bunk, sourceType, search, fuelBunks, includeMasterBunks]);
 
   // ── Live Tab Counts (All, Pending, Approved, Deleted) ──
   const tabCounts = useMemo(() => {
@@ -246,11 +260,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Sort Handlers ──
   const handleSortChange = useCallback((key: FuelSortKey) => {
+    const numeric = key === "meterReading" || key === "litres" || key === "rate" || key === "amount";
     if (sortBy !== key) {
       setSortBy(key);
-      setSortDir("asc");
-    } else if (sortDir === "asc") {
-      setSortDir("desc");
+      setSortDir(numeric ? "desc" : "asc");
+    } else if (sortDir === (numeric ? "desc" : "asc")) {
+      setSortDir(numeric ? "asc" : "desc");
     } else {
       setSortBy(null);
       setSortDir("asc");
@@ -276,6 +291,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setSearch("");
     setSortBy(null);
     setSortDir("asc");
+    setIncludeMasterBunks(true);
     setCurrentPage(1);
     setSelectedId(null);
     showNotification(t("ops.fuel.filters_reset"), "info");
@@ -460,8 +476,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   }, [allFilteredBills, showNotification, t]);
 
   const handleRefreshClick = useCallback(() => {
-    void refresh().then(() => {
-      showNotification(t("ops.fuel.refreshed"), "success");
+    void refresh(true).then((ok) => {
+      if (ok) showNotification(t("ops.fuel.refreshed"), "success");
     });
   }, [refresh, showNotification, t]);
 
@@ -500,6 +516,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}
         hasFilters={hasFilters}
+        refreshing={refreshing}
       />
 
       {/* ── KPI Summary Cards (Appear smoothly ONLY when filter is active) ── */}
@@ -536,6 +553,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
             initialData={editingData}
             vehicles={masterVehicles}
             drivers={driversList}
+            supervisors={supervisorsList}
             fuelBunks={fuelBunks}
             onCancel={() => {
               setShowForm(false);
@@ -549,11 +567,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       {/* ── Fuel Bill Table Card matching Trip List Header, Tabs, Count, and Typography ── */}
       <div
         ref={tableContainerRef}
-        className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm"
+        className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-[13px] shadow-sm"
       >
         <FuelBillTable
           bills={paginatedBills}
           isLoading={loading}
+          refreshing={refreshing}
           selectedId={selectedId}
           onSelect={setSelectedId}
           onView={handleView}
@@ -567,6 +586,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           activeTab={quickTab}
           onTabChange={(tab) => { setQuickTab(tab); setCurrentPage(1); }}
           tabCounts={tabCounts}
+          includeMasterBunks={includeMasterBunks}
+          onIncludeMasterBunksChange={(next) => { setIncludeMasterBunks(next); setCurrentPage(1); }}
         />
 
         <PendingDeleteNotification items={pendingItems} onCancel={cancel} />

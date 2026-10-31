@@ -33,6 +33,8 @@ export interface RateEntryDeliveryDto {
   birdType: string;
   birds: number;
   weight: number;
+  farmWeight?: number | null;
+  dcWeight?: number;
   mortality: number;
   mortKg: number | null;
   rate: number | null;
@@ -80,6 +82,12 @@ export interface RateEntryTripDto {
     birds: number;
     weight: number;
     amount: number;
+    dcWeight?: number;
+    boxMortality?: number;
+    boxMortalityWeight?: number;
+    weightMortality?: number;
+    weightMortalityWeight?: number;
+    weightLoss?: number;
   }>;
   deliveries: RateEntryDeliveryDto[];
   marketRatesWindow?: Array<{
@@ -157,6 +165,7 @@ export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Tr
           birdType: d.birdType,
           birds: num(d.birds),
           weight: num(d.weight),
+          farmWeight: d.farmWeight == null ? undefined : num(d.farmWeight),
           mortality: num(d.mortality),
           mortKg: num(d.mortKg),
           rate: d.rate,

@@ -13,6 +13,9 @@ export interface ShopSale {
 
   tripNo: string | number;
 
+  /** Persisted trip load containing this delivery (Load 1, Load 2, etc.). */
+  load?: number;
+
   tripDate: string;
 
   /** Backend delivery timestamp used to assign this trip's S01, S02… sequence. */
@@ -49,11 +52,14 @@ amount: number;
   numericId?: number;
   numericTripId?: number | null;
   numericShopId?: number | null;
+  numericBirdTypeId?: number | null;
   mortality?: number;
   mortalityWeight?: number;
   /** Persisted Step 4 delivery facts supplied by the backend. */
   deliveryMode?: "box" | "weight";
   selectedBoxCount?: number;
+  dcBirds?: number;
+  dcWeight?: number;
   /** Server-reported pickup quantity for the sale's source trip. */
   tripPickupBirds?: number | null;
   /** Server-computed maximum birds for this shop after all other deliveries
@@ -71,7 +77,7 @@ amount: number;
   assignmentLockUnassignedBirds?: number | null;
   birdTypeId?: number | null;
   /** Whether the backend currently allows editing/deleting this sale
-   * (Rate Entry locked + within the 10-day window). Backend remains the
+   * (Rate Entry locked + within 2 weeks of insert). Backend remains the
    * authority on every actual mutation — this is display-only. */
   editable?: boolean;
   windowExpiresAt?: string | null;
@@ -81,7 +87,7 @@ amount: number;
   /** Backend-authoritative, user-friendly reason a sale is not editable
    * (e.g. "Original trip no longer exists.", "Editing period has expired."). */
   lockReason?: string | null;
-  /** Backend-authoritative Rate Entry lock / 10-day correction state. */
+  /** Backend-authoritative Rate Entry lock / 2-week-from-insert correction state. */
   rateCompleted?: boolean;
   rateLockedAt?: string | null;
   rateLockedBy?: string | null;

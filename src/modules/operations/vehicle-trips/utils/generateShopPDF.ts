@@ -261,6 +261,7 @@ export async function generateShopPDFBlob(
       (row as any).weight ??
       0
     );
+    const shopDeliveredBirds = Math.max(0, toNum((row as any).birds) || 0);
 
     const selectedIds: number[] = (row.selectedBoxIds || [])
       .map((id: any) => toNum(id))
@@ -326,11 +327,15 @@ export async function generateShopPDFBlob(
         totalWeight += weightEach;
       });
     } else {
-      tableRows.push(["—", "—", "—"]);
+      // Shop Sales may assign a delivery directly to a destination without
+      // physical boxes. Keep the destination quantity visible on this receipt.
+      tableRows.push(["No box allocation", shopDeliveredBirds.toLocaleString(), shopDeliveredWeight.toFixed(2)]);
+      totalBirds = shopDeliveredBirds;
+      totalWeight = shopDeliveredWeight;
     }
 
-    const hasPlaceholder = tableRows.length === 1 && tableRows[0][0] === "—";
-    const boxCount = hasPlaceholder ? 0 : tableRows.length;
+    const hasDirectAllocation = tableRows.length === 1 && tableRows[0][0] === "No box allocation";
+    const boxCount = hasDirectAllocation ? 0 : tableRows.length;
 
     if (!isBoxMode && boxCount > 0) {
       tableRows.push([
@@ -414,15 +419,15 @@ export async function generateShopPDFBlob(
 
       // totalBirds/totalWeight are gross farm values in Box Mode.
       // Delivered figures = gross - mortality, exactly as computed in Step 4.
-      const finalBirdsVal = Math.max(0, totalBirds - mortalityBirdsVal);
-      const finalWeightVal = Math.max(0, totalWeight - mortalityWeightVal);
+      const finalBirdsVal = hasDirectAllocation ? shopDeliveredBirds : Math.max(0, totalBirds - mortalityBirdsVal);
+      const finalWeightVal = hasDirectAllocation ? shopDeliveredWeight : Math.max(0, totalWeight - mortalityWeightVal);
 
       const summaryHeaders = ["Boxes", "Birds", "Weight(Kg)", "Mortality", "Mortality(KG)"];
       const summaryRows = [
         [
           boxCount,
-          totalBirds.toLocaleString(),
-          totalWeight.toFixed(2),
+          (hasDirectAllocation ? shopDeliveredBirds : totalBirds).toLocaleString(),
+          (hasDirectAllocation ? shopDeliveredWeight : totalWeight).toFixed(2),
           mortalityBirdsVal,
           mortalityWeightVal.toFixed(2)
         ],

@@ -44,6 +44,7 @@ import { ScopedI18nProvider, useI18n, translateStatus } from "../../../../i18n";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import { uiActionIconMotionClass, uiPdfButtonClass } from "../../../../shared/ui/uiTokens";
 import { generateFuelPdf } from "../utils/generateFuelPdf";
+import { googleMapsUrl, resolveFuelGps } from "../utils/fuelGps";
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 
 export interface FuelViewModalProps {
@@ -219,16 +220,10 @@ function FuelViewModalContent({
     <Clock size={13} className="text-blue-500" />
   );
 
-  const hasGpsCoords =
-    currentRecord.gpsLat != null &&
-    currentRecord.gpsLon != null &&
-    Number.isFinite(Number(currentRecord.gpsLat)) &&
-    Number.isFinite(Number(currentRecord.gpsLon)) &&
-    !(Number(currentRecord.gpsLat) === 0 && Number(currentRecord.gpsLon) === 0);
-
-  const mapsLocationUrl = hasGpsCoords
-    ? `https://www.google.com/maps?q=${Number(currentRecord.gpsLat).toFixed(6)},${Number(currentRecord.gpsLon).toFixed(6)}`
-    : "";
+  const currentGps = resolveFuelGps(currentRecord.gpsLat, currentRecord.gpsLon, currentRecord.gpsAddress);
+  const hasGpsCoords = currentGps.lat != null && currentGps.lon != null;
+  const mapsLocationUrl =
+    currentGps.lat != null && currentGps.lon != null ? googleMapsUrl(currentGps.lat, currentGps.lon) : "";
 
   const handleCopyMapsUrl = () => {
     if (!mapsLocationUrl) return;
@@ -334,7 +329,8 @@ function FuelViewModalContent({
                 vehicleHistory.map((rec) => {
                   const isSelected = String(rec.id) === String(currentRecord.id);
                   const isRecTrip = rec.sourceType === "TRIP" || !!rec.tripNo;
-                  const hasGps = rec.gpsLat != null && rec.gpsLon != null && !(Number(rec.gpsLat) === 0 && Number(rec.gpsLon) === 0);
+                  const recGps = resolveFuelGps(rec.gpsLat, rec.gpsLon, rec.gpsAddress);
+                  const hasGps = recGps.lat != null && recGps.lon != null;
                   const hasImg = Boolean(rec.image);
 
                   return (
@@ -402,7 +398,7 @@ function FuelViewModalContent({
                           {hasGps && (
                             <span 
                               className="inline-flex items-center text-emerald-600 bg-emerald-50 rounded p-0.5 border border-emerald-100" 
-                              title={`GPS: ${Number(rec.gpsLat).toFixed(4)}°N, ${Number(rec.gpsLon).toFixed(4)}°E`}
+                              title={`GPS: ${recGps.lat!.toFixed(4)}°N, ${recGps.lon!.toFixed(4)}°E`}
                             >
                               <MapPin size={11} />
                             </span>
@@ -545,14 +541,14 @@ function FuelViewModalContent({
                   <div className="space-y-1.5 pt-1">
                     <p className="text-[13px] font-semibold text-slate-800 break-words leading-relaxed">
                       <GpsAddressText
-                        lat={currentRecord.gpsLat}
-                        lon={currentRecord.gpsLon}
+                        lat={currentGps.lat}
+                        lon={currentGps.lon}
                         fallback={t("ops.trip.location_captured")}
                       />
                     </p>
                     <div className="flex flex-wrap items-center gap-3 text-[11px] pt-1 border-t border-slate-100">
                       <div className="font-mono text-emerald-700 font-semibold">
-                        GPS: {Number(currentRecord.gpsLat).toFixed(6)}°N, {Number(currentRecord.gpsLon).toFixed(6)}°E
+                        GPS: {currentGps.lat!.toFixed(6)}°N, {currentGps.lon!.toFixed(6)}°E
                       </div>
                       <span className="text-slate-300">·</span>
                       <a

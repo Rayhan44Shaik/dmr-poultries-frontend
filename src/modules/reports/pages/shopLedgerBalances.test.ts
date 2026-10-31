@@ -4,6 +4,8 @@ import type { LedgerTransaction } from "../components/ShopLedgerPDF";
 import {
   filterStatementByType,
   recalculateStatementBalances,
+  scopeShopLedgersForPdf,
+  shopLedgerHasPrintableActivity,
 } from "../utils/shopLedgerBalances";
 
 const row = (overrides: Partial<LedgerTransaction>): LedgerTransaction => ({
@@ -64,4 +66,48 @@ test("report type keeps opening and calculates the requested cumulative closing"
 
   const all = filterStatementByType(statement, "all");
   assert.equal(all[all.length - 1]?.balance, 120, "opening + sales - collections");
+});
+
+test("PDF scope follows applied filters, not shop-only or empty dates", () => {
+  const opening = row({ particulars: "Opening Balance", balance: 80 });
+  const entries = [
+    {
+      shop: "Hari Shop",
+      data: [
+        opening,
+        row({ particulars: "Hari Sale", debit: 40, birds: 10, weight: 20 }),
+        row({ type: "collection", particulars: "Hari Cash", credit: 15 }),
+      ],
+    },
+    {
+      shop: "Quiet Shop",
+      data: [row({ particulars: "Opening Balance", balance: 0 })],
+    },
+    {
+      shop: "Farm Gate",
+      data: [
+        opening,
+        row({ particulars: "Farm Sale", debit: 25, birds: 8, weight: 16 }),
+      ],
+    },
+  ];
+
+  const allShops = scopeShopLedgersForPdf(entries, { reportType: "all" });
+  assert.deepEqual(allShops.map((item) => item.shop), ["Hari Shop", "Farm Gate"]);
+  assert.equal(shopLedgerHasPrintableActivity(entries[1].data), false);
+
+  const salesOnly = scopeShopLedgersForPdf(entries, { reportType: "sales" });
+  assert.ok(salesOnly.every((item) => item.data.slice(1).every((tx) => tx.type === "sale")));
+
+  const searched = scopeShopLedgersForPdf(entries, {
+    reportType: "all",
+    searchTerm: "farm",
+  });
+  assert.deepEqual(searched.map((item) => item.shop), ["Farm Gate"]);
+
+  const keptEmpty = scopeShopLedgersForPdf(entries, {
+    reportType: "all",
+    keepEmptySelectedShop: "Quiet Shop",
+  });
+  assert.ok(keptEmpty.some((item) => item.shop === "Quiet Shop"));
 });

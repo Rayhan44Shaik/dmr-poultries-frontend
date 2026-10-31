@@ -1039,9 +1039,13 @@ export default {
   // Expanded detail
   'ops.mortality.detail.trip_overview': 'Trip Details',
   'ops.mortality.detail.farm': 'Farm',
-  // Weight unit printed beside every figure on this page. Telugu in either
-  // language on purpose — the floor reads కేజీ, not the Latin 'Kg'.
-  'ops.mortality.weight_unit': 'కేజీ',
+  // Weight unit follows the active language: English uses KG, while the
+  // Telugu catalogue supplies కేజీ.
+  'ops.mortality.weight_unit': 'KG',
+  'ops.mortality.tooltip.title': 'Mortality breakdown',
+  'ops.mortality.tooltip.box_mode': 'Box Mode MOR',
+  'ops.mortality.tooltip.weight_mode': 'Weight Mode MOR',
+  'ops.mortality.tooltip.helper': 'Mortality is grouped by the delivery mode saved for each shop entry.',
 
   'ops.mortality.detail.delivered': 'Delivered',
   'ops.mortality.detail.weight_summary': 'Weights',
@@ -1171,6 +1175,8 @@ export default {
   'ops.rate.modal.total_weight': 'Total Weight (KG)',
   'ops.rate.modal.saved_title': 'Rates Saved Successfully!',
   'ops.rate.modal.saved_desc': 'Saved to the server. Refresh will keep these rates.',
+  'ops.rate.modal.locked_title': 'Rates Saved & Locked!',
+  'ops.rate.modal.locked_desc': 'The trip is locked and moved to Shop Sales.',
   'ops.rate.modal.locking_title': 'Locking this trip',
   'ops.rate.modal.locking_desc': 'After Save & Lock, rates cannot be edited in Rate Entry. This trip will leave the pending list and move to Shop Sales.',
   'ops.rate.modal.locking': 'Locking...',
@@ -1217,6 +1223,9 @@ export default {
   // Fuel Expenses
   'ops.fuel.title': 'Fuel Expenses',
   'ops.fuel.table_title': 'Fuel Bill Table',
+  'ops.fuel.trip_details': 'Trip Details',
+  'ops.fuel.fuel_details': 'Fuel Expense Details',
+  'ops.fuel.bunk_details': 'Bunk Details',
   'ops.fuel.add_bill': 'Add Fuel Bill',
   'ops.fuel.hide_form': 'Hide Fuel Form',
   'ops.fuel.edit_bill': 'Edit Fuel Bill',

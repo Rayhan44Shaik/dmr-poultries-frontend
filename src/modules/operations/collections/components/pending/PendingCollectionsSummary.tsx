@@ -22,9 +22,8 @@ interface Props {
  * (`₹1,48,74,969.98`) — digits and ₹ only, so the strip stays readable in
  * Telugu too.
  *
- * NOTHING on this strip is a hover tooltip. Every figure is the whole figure,
- * written out, and the one number that could be read two ways — recovery — says
- * its own formula in its label.
+ * Each card exposes one consistent, total-only tooltip. There are no Load 1 /
+ * Load 2 rows: the hover value is exactly the metric represented by the card.
  */
 function PendingCollectionsSummary({
   totalOutstanding,
@@ -54,12 +53,22 @@ function PendingCollectionsSummary({
   // No sales this week → no base to recover against, so the card says so with
   // a dash rather than printing a 0.00 % that claims nothing came in.
   const recovery = weeklySales > 0 ? `${Number(recoveryPercentage || 0).toFixed(2)}%` : "—";
+  const tooltip = (label: string, value: string) => (
+    <>
+      <span className="block border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">{label}</span>
+      <span className="mt-2 flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-2 py-2">
+        <span className="text-slate-500">Total</span>
+        <span className="font-extrabold tabular-nums text-slate-900">{value}</span>
+      </span>
+    </>
+  );
 
   const cards: KpiCardItem[] = [
     {
       id: "outstanding",
       label: t("ops.collection.total_outstanding"),
       value: <span className="tabular-nums">{outstanding}</span>,
+      tooltipContent: tooltip(t("ops.collection.total_outstanding"), outstanding),
       Icon: IndianRupee,
       tone: "rose",
     },
@@ -67,6 +76,7 @@ function PendingCollectionsSummary({
       id: "sales",
       label: t("ops.collection.this_week_sales"),
       value: <span className="tabular-nums">{sales}</span>,
+      tooltipContent: tooltip(t("ops.collection.this_week_sales"), sales),
       Icon: ShoppingBag,
       tone: "blue",
     },
@@ -74,6 +84,7 @@ function PendingCollectionsSummary({
       id: "collections",
       label: t("ops.collection.this_week_collections"),
       value: <span className="tabular-nums">{collections}</span>,
+      tooltipContent: tooltip(t("ops.collection.this_week_collections"), collections),
       Icon: CreditCard,
       tone: "emerald",
     },
@@ -81,6 +92,7 @@ function PendingCollectionsSummary({
       id: "recovery",
       label: t("ops.collection.recovery_formula"),
       value: <span className="tabular-nums">{recovery}</span>,
+      tooltipContent: tooltip(t("ops.collection.recovery_formula"), recovery),
       Icon: TrendingUp,
       tone: "violet",
     },

@@ -229,9 +229,9 @@
   /* -----------------------------------------------------------------------
    * 3. SURFACES — layered hierarchy (app bg → content → elevated)
    * --------------------------------------------------------------------- */
-  --color-surface-app: #f8fafc;
+  --color-surface-app: #f5f8f5;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #f1f5f9;
+  --color-surface-sunken: #eaf4ee;
   --color-surface-dark-app: #020617;
   --color-surface-dark-raised: #0f172a;
 
@@ -297,7 +297,7 @@
   /* -----------------------------------------------------------------------
    * 6. MOTION — short, subtle, purposeful
    * --------------------------------------------------------------------- */
-  --ease-ds: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-ds: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in-out-soft: cubic-bezier(0.4, 0, 0.2, 1);
   --default-transition-duration: 150ms;
   --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -817,10 +817,13 @@
   --dmr-font-scale: 1;
 
   /* --- colour ----------------------------------------------------------- */
-  --ds-color-primary: var(--color-emerald-600);
-  --ds-color-primary-hover: var(--color-emerald-700);
-  --ds-color-primary-active: var(--color-emerald-800);
-  --ds-color-primary-soft: var(--color-emerald-50);
+  --ds-color-primary: #176b50;
+  --ds-color-primary-hover: #145c46;
+  --ds-color-primary-active: #103c32;
+  --ds-color-primary-soft: #eaf4ee;
+  --ds-color-sidebar: #103c32;
+  --ds-color-sidebar-hover: #194d40;
+  --ds-color-sidebar-active: #f2fbf5;
   --ds-color-success: var(--color-emerald-600);
   --ds-color-success-soft: var(--color-emerald-50);
   --ds-color-danger: var(--color-rose-600);
@@ -831,14 +834,14 @@
   --ds-color-info: var(--color-sky-600);
   --ds-color-info-soft: var(--color-sky-50);
 
-  --ds-text-primary: var(--color-slate-900);
-  --ds-text-secondary: var(--color-slate-600);
-  --ds-text-muted: var(--color-slate-500);
+  --ds-text-primary: #1d2b25;
+  --ds-text-secondary: #56645c;
+  --ds-text-muted: #738078;
   --ds-text-faint: var(--color-slate-400);
   --ds-text-disabled: var(--color-slate-400);
   --ds-text-inverse: #ffffff;
 
-  --ds-border: var(--color-slate-200);
+  --ds-border: #e4ebe5;
   --ds-border-strong: var(--color-slate-300);
   --ds-border-subtle: var(--color-slate-100);
 
@@ -891,9 +894,9 @@
   --ds-shadow-overlay: var(--shadow-overlay);
 
   /* --- motion ------------------------------------------------------------ */
-  --ds-duration-fast: 120ms;
-  --ds-duration-base: 160ms;
-  --ds-duration-slow: 220ms;
+  --ds-duration-fast: 140ms;
+  --ds-duration-base: 180ms;
+  --ds-duration-slow: 280ms;
   --ds-ease: var(--ease-ds);
 
   /* --- z-index scale (prevents overlay/dialog/picker stacking fights) ---- */

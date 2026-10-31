@@ -60,7 +60,7 @@ export default function AppShellModal({
           controls (search, language, notifications) stay clickable while a view
           is open instead of dismissing it. */}
       <div
-        className="fixed inset-0 animate-fade-in bg-black/20 sm:top-16"
+        className="fixed inset-0 animate-fade-in bg-[#103c32]/16 sm:top-16"
         style={{
           zIndex,
         }}
@@ -83,7 +83,7 @@ export default function AppShellModal({
         }}
       >
         <div
-          className={`relative flex w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${panelClassName}`}
+          className={`relative flex w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-[#e4ebe5] bg-white shadow-[0_24px_70px_-28px_rgba(16,60,50,0.38)] animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${panelClassName}`}
           style={{
             maxWidth: "min(96rem, calc(100vw - 2rem))",
             maxHeight: "calc(100vh - 64px - 2rem)",

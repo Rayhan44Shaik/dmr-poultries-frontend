@@ -169,6 +169,20 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
       tone: "text-sky-700",
     },
     {
+      label: t("ops.mortality.tooltip.box_mode"),
+      birds: formatNumber(record.boxMortalityCount),
+      weight: formatWeight(record.boxMortalityWeight, weightUnit),
+      pct: record.farmBirds > 0 ? `${((record.boxMortalityCount / record.farmBirds) * 100).toFixed(2)}%` : "0.00%",
+      tone: "text-orange-600",
+    },
+    {
+      label: t("ops.mortality.tooltip.weight_mode"),
+      birds: formatNumber(record.weightModeMortalityCount),
+      weight: formatWeight(record.weightModeMortalityWeight, weightUnit),
+      pct: record.farmBirds > 0 ? `${((record.weightModeMortalityCount / record.farmBirds) * 100).toFixed(2)}%` : "0.00%",
+      tone: "text-violet-600",
+    },
+    {
       label: t("ops.mortality.detail.mortality"),
       birds: formatNumber(record.mortalityCount),
       weight: formatWeight(record.mortalityWeight, weightUnit),
@@ -232,6 +246,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
               tone="rose"
               title={t("ops.mortality.detail.weight_summary")}
               colSpan={4}
+              action={<span className="hidden max-w-xl text-right text-[10px] font-medium normal-case tracking-normal text-slate-400 lg:block">{t("ops.mortality.tooltip.helper")}</span>}
             />
             <tr>
               <th scope="col" className="w-1/4 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900">

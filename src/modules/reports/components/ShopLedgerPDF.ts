@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatLedgerNumber } from "../utils/shopLedgerRounding";
+import { pdfStatementParticulars } from "../utils/shopLedgerPdfParticulars";
 import henImage from "../../../assets/dmr-hen.jpg";
 import {
   drawPreparedDmrPoultryHeader,
@@ -9,6 +10,8 @@ import {
 } from "../../../utils/drawDmrPoultryHeader";
 
 export interface LedgerTransaction {
+  id?: number;
+  createdAt?: string;
   date: string;
   particulars: string;
   birds: number;
@@ -98,26 +101,34 @@ export const formatPdfDate = (value: string): string => {
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
 };
 
-const normalizePaymentMode = (value?: string): string => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "";
-  if (/upi/i.test(raw)) return "UPI";
-  if (/union/i.test(raw)) return "Union";
-  if (/\bsbi\b/i.test(raw) || /state bank/i.test(raw)) return "SBI";
-  if (/bank/i.test(raw)) return "Bank Transfer";
-  if (/cheque|check/i.test(raw)) return "Cheque";
-  if (/credit/i.test(raw)) return "Credit";
-  if (/cash/i.test(raw)) return "Cash";
-  return raw;
+export const formatPdfDateRange = (from: string, to: string): string => {
+  if (from && to) return `${formatPdfDate(from)} to ${formatPdfDate(to)}`;
+  if (from) return `From ${formatPdfDate(from)}`;
+  if (to) return `Until ${formatPdfDate(to)}`;
+  return "All dates";
 };
 
-const saleParticulars = (transaction: LedgerTransaction): string => {
-  const subShops = String(transaction.subShopName ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (subShops.length) return subShops.map((name) => `${name} Sale`).join(" / ");
-  return `${transaction.particulars.trim()} Sale`.trim();
+const printableCumulativeRows = (
+  rows: ShopLedgerCumulativeRow[],
+): ShopLedgerCumulativeRow[] =>
+  rows.filter(
+    (row) =>
+      row.birds !== 0 ||
+      row.weight !== 0 ||
+      row.sale !== 0 ||
+      row.collection !== 0 ||
+      row.openingBalance !== 0 ||
+      row.closingBalance !== 0 ||
+      row.mortalityBirds !== 0 ||
+      row.mortalityWeight !== 0 ||
+      row.weightLoss !== 0,
+  );
+
+const formatPdfDateRangeFile = (from: string, to: string): string => {
+  if (from && to) return `${formatPdfDate(from)}_to_${formatPdfDate(to)}`;
+  if (from) return `from_${formatPdfDate(from)}`;
+  if (to) return `to_${formatPdfDate(to)}`;
+  return "all";
 };
 
 const formatAmount = (value: number): string =>
@@ -151,6 +162,7 @@ const drawStatementChrome = (
   dateFrom: string,
   dateTo: string,
   assets: DmrPoultryHeaderAssets,
+  filterCaption?: string,
 ): void => {
   const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -217,7 +229,9 @@ const drawStatementChrome = (
     tableTop + rowHeight * 2,
     tableWidth,
     "Date Range: ",
-    `${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`,
+    filterCaption
+      ? `${formatPdfDateRange(dateFrom, dateTo)}  ·  ${filterCaption}`
+      : formatPdfDateRange(dateFrom, dateTo),
   );
 
   const dividerY = tableTop + rowHeight * 3 + 2.5;
@@ -276,15 +290,31 @@ export const generateShopLedgerPDF = async (
   selectedShop: string,
   preparedAssets?: DmrPoultryHeaderAssets,
   onProgress?: (done: number, total: number) => void,
-  options?: { includeCumulativeSummary?: boolean; cumulativeRows?: ShopLedgerCumulativeRow[] },
+  options?: {
+    includeCumulativeSummary?: boolean;
+    cumulativeRows?: ShopLedgerCumulativeRow[];
+    filterCaption?: string;
+  },
 ): Promise<GeneratedShopLedgerPdf> => {
   // Prepare the letterhead hen once per call (canvas cut-out); callers that
   // generate many PDFs in a batch pass their own prepared assets.
   const assets =
     preparedAssets ?? (await prepareShopLedgerPdfAssets());
 
-  // Setup A4 Portrait
-  const doc = new jsPDF({ orientation: options?.includeCumulativeSummary ? "landscape" : "portrait", unit: "mm", format: "a4", compress: true });
+  const requestedSummary = Boolean(options?.includeCumulativeSummary);
+  const suppliedSummary = printableCumulativeRows(options?.cumulativeRows ?? []);
+  const summaryRowsSource =
+    suppliedSummary.length > 0
+      ? suppliedSummary
+      : printableCumulativeRows(buildShopLedgerCumulativeRows(allLedgers));
+  const showSummary = requestedSummary && summaryRowsSource.length > 0;
+
+  const doc = new jsPDF({
+    orientation: showSummary ? "landscape" : "portrait",
+    unit: "mm",
+    format: "a4",
+    compress: true,
+  });
 
   doc.setProperties({
     title: "Weekly Statement",
@@ -295,8 +325,8 @@ export const generateShopLedgerPDF = async (
 
   const headers = ["Date", "Particulars", "Birds", "Weight", "Rate", "Debit", "Credit", "Balance"];
 
-  if (options?.includeCumulativeSummary && allLedgers.length > 0) {
-    const cumulative = options.cumulativeRows ?? buildShopLedgerCumulativeRows(allLedgers);
+  if (showSummary) {
+    const cumulative = summaryRowsSource;
     const totals = cumulative.reduce(
       (sum, row) => ({
         birds: sum.birds + row.birds,
@@ -361,7 +391,11 @@ export const generateShopLedgerPDF = async (
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       doc.setTextColor(40, 40, 40);
-      doc.text(`${formatPdfDate(dateFrom)} to ${formatPdfDate(dateTo)}`, pageWidth / 2, 53, { align: "center" });
+      const rangeLabel = formatPdfDateRange(dateFrom, dateTo);
+      const caption = options?.filterCaption
+        ? `${rangeLabel}  ·  ${options.filterCaption}`
+        : rangeLabel;
+      doc.text(caption, pageWidth / 2, 53, { align: "center" });
     };
 
     autoTable(doc, {
@@ -398,7 +432,7 @@ export const generateShopLedgerPDF = async (
     });
     // The cumulative report owns page one. Detailed shop statements begin on
     // a clean second page, avoiding overlap regardless of the number of shops.
-    doc.addPage("a4", "portrait");
+    if (allLedgers.length > 0) doc.addPage("a4", "portrait");
   }
 
   const renderShopSection = (entry: ShopLedgerPdfEntry): void => {
@@ -407,32 +441,9 @@ export const generateShopLedgerPDF = async (
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // ─── Build Rows ───
-    // Particulars shows only the entry kind (Sale / Collection - mode /
-    // Correction) — the shop is already named in the header of the statement.
+    // Particulars is short on purpose: the shop is already in the header.
     const rows = data.map((t) => {
-      let label = t.particulars;
-      if (t.particulars !== "Opening Balance") {
-        if (t.type === "sale") {
-          label = saleParticulars(t);
-          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
-        } else if (t.type === "collection") {
-          const paymentMode = normalizePaymentMode(t.paymentMode);
-          const collectionLabel = paymentMode
-            ? `Collection - ${paymentMode}`
-            : "Collection";
-          label = [t.particulars, t.subShopName, collectionLabel]
-            .map((value) => value?.trim())
-            .filter(Boolean)
-            .join(", ");
-          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
-        } else {
-          label = [t.particulars, t.subShopName, "Sale"]
-            .map((value) => value?.trim())
-            .filter(Boolean)
-            .join(", ");
-          if (t.remarks?.trim()) label += ` — ${t.remarks.trim()}`;
-        }
-      }
+      const label = pdfStatementParticulars(t);
 
       return [
         formatPdfDate(t.date),
@@ -499,22 +510,20 @@ export const generateShopLedgerPDF = async (
           hookData.cell.styles.fontStyle = "bold";
         }
       },
-      // Column widths sum to 186mm — the printable width of A4 portrait with
-      // 12mm margins (same margins as the branded letterhead). Particulars is
-      // compact since it carries only the entry kind.
+      // 186mm printable width — eight equal columns (23.25mm each).
       columnStyles: {
-        0: { cellWidth: 20, halign: "center" }, // Date
-        1: { cellWidth: 30, halign: "left" },   // Particulars
-        2: { cellWidth: 14, halign: "center" }, // Birds
-        3: { cellWidth: 18, halign: "right" },  // Weight
-        4: { cellWidth: 14, halign: "right" },  // Rate
-        5: { cellWidth: 30, halign: "right" },  // Debit
-        6: { cellWidth: 30, halign: "right" },  // Credit
-        7: { cellWidth: 30, halign: "right" },  // Balance
+        0: { cellWidth: 23.25, halign: "center" }, // Date
+        1: { cellWidth: 23.25, halign: "left" },   // Particulars
+        2: { cellWidth: 23.25, halign: "right" },  // Birds
+        3: { cellWidth: 23.25, halign: "right" },  // Weight
+        4: { cellWidth: 23.25, halign: "right" },  // Rate
+        5: { cellWidth: 23.25, halign: "right" },  // Debit
+        6: { cellWidth: 23.25, halign: "right" },  // Credit
+        7: { cellWidth: 23.25, halign: "right" },  // Balance
       },
       didDrawPage: (data) => {
         // Letterhead + title + shop details on every page of the statement.
-        drawStatementChrome(doc, entry, dateFrom, dateTo, assets);
+        drawStatementChrome(doc, entry, dateFrom, dateTo, assets, options?.filterCaption);
 
         const pageHeight2 = doc.internal.pageSize.getHeight();
         doc.setFont("helvetica", "normal");
@@ -541,7 +550,7 @@ export const generateShopLedgerPDF = async (
     if (index < allLedgers.length - 1) await yieldToBrowser();
   }
 
-  const filename = `WeeklyStatement_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDate(dateFrom)}_to_${formatPdfDate(dateTo)}.pdf`;
+  const filename = `WeeklyStatement_${selectedShop === "All Shops" ? "AllShops" : selectedShop.replace(/\s+/g, "_")}_${formatPdfDateRangeFile(dateFrom, dateTo)}.pdf`;
   const blob = doc.output("blob");
   return { blob, url: URL.createObjectURL(blob), filename };
 };
