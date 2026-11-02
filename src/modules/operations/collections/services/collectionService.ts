@@ -450,6 +450,23 @@ export type CollectionImportInput = {
   referenceNo: string;
 };
 
+export type CollectionImportMasters = {
+  shops: string[];
+  collectors: string[];
+  modes: string[];
+  existingReferences: string[];
+};
+
+async function fetchCollectionImportMasters(): Promise<CollectionImportMasters> {
+  const { data } = await apiGet<CollectionImportMasters>(`${COLLECTION_PATH}/import-masters`);
+  return {
+    shops: Array.isArray(data.shops) ? data.shops : [],
+    collectors: Array.isArray(data.collectors) ? data.collectors : [],
+    modes: Array.isArray(data.modes) ? data.modes : ["Cash"],
+    existingReferences: Array.isArray(data.existingReferences) ? data.existingReferences : [],
+  };
+}
+
 async function importCollections(batchId: string, rows: CollectionImportInput[]) {
   const { data } = await apiPost<{ imported: number; entries: Record<string, unknown>[]; replayed: boolean }>(
     `${COLLECTION_PATH}/import`,
@@ -463,6 +480,14 @@ async function importCollections(batchId: string, rows: CollectionImportInput[])
     entries: (data.entries ?? []).map(mapRawEntry),
     replayed: Boolean(data.replayed),
   };
+}
+
+async function validateCollectionImport(batchId: string, rows: CollectionImportInput[]) {
+  const { data } = await apiPost<{ issues: Array<{ sourceRow: number; fields: string[] }> }>(
+    `${COLLECTION_PATH}/import-validate`,
+    { batchId, rows },
+  );
+  return Array.isArray(data.issues) ? data.issues : [];
 }
 
 async function saveCollectionLegacy(entry: {
@@ -539,10 +564,10 @@ async function deleteCollection(id: string): Promise<boolean> {
 }
 
 /**
- * Pending Collection's own delete — a DIFFERENT endpoint from Collection
- * Entry's deleteCollection() above. Enforces the backend's 7-day window
- * (CURRENT_DATE <= collection_date + 7); rejects with 409 outside it. The
- * Pending Collection UI must call this and must never call deleteCollection().
+ * Pending-approval delete — a DIFFERENT endpoint from deleteCollection().
+ * Never-approved rows only; the backend keeps a 7-day entry-date window.
+ * Approved collections in the shop view use deleteCollection() so the
+ * ledger credit is reversed, gated by the 14-day post-approval window.
  */
 async function deletePendingCollection(id: string): Promise<{ success: boolean; message?: string }> {
   try {
@@ -584,8 +609,28 @@ async function approveCollection(
 }
 
 async function approveCollections(ids: string[]): Promise<boolean> {
+  const uniqueIds = [...new Set(ids.map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!uniqueIds.length) return false;
+
   try {
-    await apiPost(`${COLLECTION_PATH}/bulk-approve`, { ids: ids.map(Number) });
+    // Use the exact same proven status endpoint for one row and select-all.
+    // The former bulk route could fail before its first row (and a very large
+    // request could time out), leaving the button looking as if it did
+    // nothing. Bounded groups keep pressure predictable while each approval
+    // remains independently transactional and idempotent on the backend.
+    const concurrency = 6;
+    for (let offset = 0; offset < uniqueIds.length; offset += concurrency) {
+      const group = uniqueIds.slice(offset, offset + concurrency);
+      await Promise.all(
+        group.map((id) =>
+          apiPatch(
+            `${COLLECTION_PATH}/${id}/status`,
+            { status: "Approved" },
+            { timeout: 120_000 },
+          ),
+        ),
+      );
+    }
     noteCollectionMutation();
     await refreshFromBackend();
     return true;
@@ -804,6 +849,8 @@ getShopSales,
   fetchRecentCollectionsForShop,
   saveCollection: saveCollectionLegacy,
   importCollections,
+  validateCollectionImport,
+  fetchCollectionImportMasters,
   updateCollection,
   deleteCollection,
   deletePendingCollection,

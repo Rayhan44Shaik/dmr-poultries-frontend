@@ -88,6 +88,18 @@ test("Trip List applies the selected vehicle filter", () => {
   assert.deepEqual(filterTripListTrips(rows, { vehicleId: 2 }).map(({ id }) => id), [2, 3]);
 });
 
+test("Trip List filters rental and owned vehicles independently", () => {
+  const ownershipRows = [
+    trip(1),
+    trip(2, { isRentedVehicle: true }),
+    trip(3, { isRentedVehicle: false }),
+  ];
+
+  assert.deepEqual(filterTripListTrips(ownershipRows, { vehicleOwnership: "rental" }).map(({ id }) => id), [2]);
+  assert.deepEqual(filterTripListTrips(ownershipRows, { vehicleOwnership: "owned" }).map(({ id }) => id), [1, 3]);
+  assert.deepEqual(filterTripListTrips(ownershipRows, { vehicleOwnership: "all" }).map(({ id }) => id), [1, 2, 3]);
+});
+
 test("Trip List global search matches vehicle plates with or without spaces", () => {
   assert.deepEqual(
     filterTripListTrips(rows, { search: "TS 07 UB 1222" }).map(({ id }) => id),

@@ -167,7 +167,7 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       // make this queue disagree with the register (and with the backend).
       listPayments().catch(() => []),
       fleetSharedGet('permits:list', () => permitApi.list()).catch(() => []),
-      listPendingApprovalCollections(),
+      listPendingApprovalCollections().catch(() => []),
       // Every pending leave, whatever month it was raised in — the queue the
       // owner has to clear is not scoped to the month the Staff page filters to.
       listLeaves({ status: 'Pending', limit: cap }),

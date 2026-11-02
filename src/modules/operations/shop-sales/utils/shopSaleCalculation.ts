@@ -4,6 +4,22 @@ import type {
   ShopSaleFilter
 } from "../types/shopSale";
 
+/** Unique Trip Numbers ordered by their newest Shop Sale trip date. */
+export function listTripNumbersNewestFirst(sales: readonly ShopSale[]): string[] {
+  const newestDateByTrip = new Map<string, string>();
+  sales.forEach((sale) => {
+    const tripNo = String(sale.tripNo ?? "").trim();
+    if (!tripNo) return;
+    const tripDate = String(sale.tripDate ?? "");
+    const previousDate = newestDateByTrip.get(tripNo) ?? "";
+    if (tripDate > previousDate) newestDateByTrip.set(tripNo, tripDate);
+  });
+
+  return [...newestDateByTrip].sort(([tripNoA, dateA], [tripNoB, dateB]) =>
+    dateB.localeCompare(dateA) || tripNoB.localeCompare(tripNoA, undefined, { numeric: true }),
+  ).map(([tripNo]) => tripNo);
+}
+
 /* =========================================
    Filter Shop Sales
 ========================================= */
@@ -72,6 +88,11 @@ export function filterShopSales(
 
     );
 
+  }
+
+  /* Exact trip selected from the searchable trip-number dropdown. */
+  if (filter.tripNo.trim() !== "") {
+    data = data.filter((x) => String(x.tripNo ?? "") === filter.tripNo);
   }
 
   /* Search — Shop Sales No, Shop Name, Trip No (and remarks, like the
@@ -172,6 +193,10 @@ export function filterShopSales(
       break;
 
     case "latest":
+
+      data.sort((a, b) => byDate(b, a, 1));
+
+      break;
 
     default:
 

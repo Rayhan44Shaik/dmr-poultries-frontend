@@ -172,6 +172,26 @@ function formHasEdits(form: Step1FormState): boolean {
   );
 }
 
+/**
+ * Distinguish a fully loaded existing Step 1 from the temporary blank trip
+ * used while the edit API request is in flight. The default trip date alone
+ * is not proof of a user edit and must never block server hydration.
+ */
+function hasPersistedStartDetails(trip: Trip): boolean {
+  return Boolean(
+    trip.vehicleId ||
+    trip.vehicleNo ||
+    trip.driverId ||
+    trip.driverName ||
+    trip.supervisorId ||
+    trip.supervisorName ||
+    trip.openingMeter != null ||
+    trip.advanceAmount != null ||
+    trip.helpers?.length ||
+    trip.loaders?.length
+  );
+}
+
 function formToTripPatch(form: Step1FormState): Partial<Trip> {
   return {
     tripDate: form.tripDate,
@@ -696,6 +716,7 @@ function StepStart({
   const [previewTripNo, setPreviewTripNo] = useState<string>("");
 
   const loadedTripIdRef = useRef(tripId);
+  const headerLoadingRef = useRef(headerLoading);
   const formRef = useRef(form);
   useEffect(() => { formRef.current = form; }, [form]);
   const submitLockRef = useRef(false);
@@ -800,7 +821,20 @@ function StepStart({
   );
 
   useEffect(() => {
-    if (loadedTripIdRef.current === tripId) return;
+    const finishedHeaderLoad = headerLoadingRef.current && !headerLoading;
+    headerLoadingRef.current = headerLoading;
+
+    // An edit can mount while the API request is already loading the same
+    // trip id. Hydrate again when that request finishes, because the initial
+    // snapshot may only contain the date (or a lightweight table row).
+    if (loadedTripIdRef.current === tripId) {
+      if (finishedHeaderLoad && tripId > 0 && hasPersistedStartDetails(loadSnapshot)) {
+        const loadedForm = tripToForm(loadSnapshot);
+        formRef.current = loadedForm;
+        setForm(loadedForm);
+      }
+      return;
+    }
     const previousId = loadedTripIdRef.current;
     loadedTripIdRef.current = tripId;
 
@@ -811,7 +845,12 @@ function StepStart({
       return;
     }
 
-    if (previousId === 0 && tripId !== 0 && formHasEdits(formRef.current)) {
+    if (
+      previousId === 0 &&
+      tripId !== 0 &&
+      formHasEdits(formRef.current) &&
+      !hasPersistedStartDetails(loadSnapshot)
+    ) {
       return;
     }
 
@@ -820,7 +859,7 @@ function StepStart({
       formRef.current = loadedForm;
       setForm(loadedForm);
     }
-  }, [tripId, loadSnapshot]);
+  }, [tripId, loadSnapshot, headerLoading]);
 
   useEffect(() => {
     updateTrip(formToTripPatch(form));

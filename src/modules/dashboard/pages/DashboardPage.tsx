@@ -64,11 +64,9 @@ const todayMidnight = (): Date => {
   return d;
 };
 
-// The overview always opens on the complete Monday–Sunday business week that
-// contains calendar today. `weekRange` is the shared calendar source used across
-// the app.
+// The overview opens on the last fully completed Monday–Sunday business week.
 const getDefaultWeekRange = (anchor = todayMidnight()) => {
-  const { from, to } = weekRange(anchor);
+  const { from, to } = weekRange(addDays(anchor, -7));
   return {
     startDate: parseInputDateString(from) ?? anchor,
     endDate: parseInputDateString(to) ?? anchor,

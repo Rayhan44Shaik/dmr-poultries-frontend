@@ -1,27 +1,20 @@
 /**
- * Collection deletion window — one definition of the 10-day rule.
+ * Collection deletion window.
  *
- * A collection may only be deleted within 10 days of its ENTRY DATE (the
- * collection date). Day 0 is the entry date itself, so the last permissible
- * day is entry date + 10. After that the delete affordance is disabled and
- * must stay disabled; there is no override in the UI.
+ * Pending (never-approved) entries may be deleted on their entry day only.
+ * Approved entries follow Shop Sales: 14 days from the moment of approval
+ * (`approvedAt`), never from the original collection date.
  *
- * The backend re-checks the same window on DELETE and answers 409
- * `delete_window_closed`, so this module is a convenience for disabling the
- * button and explaining why — never the enforcement point.
+ * The backend re-checks the same window on DELETE and answers 409, so this
+ * module is a convenience for disabling the button and explaining why —
+ * never the enforcement point.
  */
 
-/**
- * Inclusive number of days after the entry date during which delete is allowed.
- *
- * APPROVED entries get the full 10-day window. PENDING entries get the entry
- * day ONLY: they are still awaiting a decision, so a same-day correction is
- * reasonable but a silent removal days later is not.
- */
-export const COLLECTION_DELETE_WINDOW_DAYS = 10;
-
-/** Pending entries may only be deleted on the day they were entered. */
+/** Inclusive calendar window for pending entries: the entry day only. */
 export const PENDING_DELETE_WINDOW_DAYS = 0;
+
+/** Two weeks after approval, matching Shop Sales' 14-day edit window. */
+export const COLLECTION_DELETE_WINDOW_DAYS = 14;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -41,6 +34,15 @@ function startOfDayUtc(value: string | Date): number | null {
   return Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
 }
 
+function asTimestamp(value: string | Date | null | undefined): number | null {
+  if (value == null || value === "") return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.getTime();
+  }
+  const parsed = new Date(String(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
 /** Whole days elapsed since the entry date. Negative for future-dated entries. */
 export function daysSinceEntry(entryDate: string | Date, now: Date = new Date()): number | null {
   const from = startOfDayUtc(entryDate);
@@ -50,18 +52,18 @@ export function daysSinceEntry(entryDate: string | Date, now: Date = new Date())
 }
 
 export interface DeleteWindowState {
-  /** True only while the entry is inside the 10-day window. */
+  /** True only while the entry is inside the delete window. */
   canDelete: boolean;
-  /** Whole days since the entry date, or null when the date is unusable. */
+  /** Whole days since the window start, or null when the date is unusable. */
   ageInDays: number | null;
-  /** Days still remaining, clamped at 0. 0 means today is the last day. */
+  /** Days still remaining, clamped at 0. 0 with canDelete means today is the last day. */
   daysRemaining: number;
   /** Last date on which deletion is permitted, as `YYYY-MM-DD`. */
   deadline: string | null;
 }
 
 /**
- * Resolve the delete window for one collection.
+ * Resolve a calendar-day delete window from an entry date.
  *
  * An unparseable or missing date is treated as NOT deletable: when we cannot
  * prove the entry is inside the window, the safe answer is to refuse.
@@ -69,7 +71,6 @@ export interface DeleteWindowState {
 export function getDeleteWindow(
   entryDate: string | Date | null | undefined,
   now: Date = new Date(),
-  /** Window length in days. Defaults to the 10-day approved rule. */
   windowDays: number = COLLECTION_DELETE_WINDOW_DAYS,
 ): DeleteWindowState {
   if (!entryDate) {
@@ -84,7 +85,6 @@ export function getDeleteWindow(
   const deadline =
     from == null ? null : new Date(from + windowDays * MS_PER_DAY).toISOString().slice(0, 10);
 
-  // Future-dated entries (ageInDays < 0) are still inside the window.
   const canDelete = ageInDays <= windowDays;
   const daysRemaining = Math.max(0, windowDays - Math.max(0, ageInDays));
 
@@ -92,19 +92,41 @@ export function getDeleteWindow(
 }
 
 /**
+ * 14-day window from the approval instant — Shop Sales' exclusive end:
+ * `now < approvedAt + 14 days`. Missing timestamps refuse deletion.
+ */
+export function getApprovedDeleteWindow(
+  approvedAt: string | Date | null | undefined,
+  now: Date = new Date(),
+): DeleteWindowState {
+  const start = asTimestamp(approvedAt);
+  if (start == null) {
+    return { canDelete: false, ageInDays: null, daysRemaining: 0, deadline: null };
+  }
+  const expires = start + COLLECTION_DELETE_WINDOW_DAYS * MS_PER_DAY;
+  const remainingMs = expires - now.getTime();
+  const canDelete = remainingMs > 0;
+  const ageInDays = Math.max(0, Math.floor((now.getTime() - start) / MS_PER_DAY));
+  const daysRemaining = canDelete ? Math.max(0, Math.ceil(remainingMs / MS_PER_DAY)) : 0;
+  const deadline = new Date(expires - MS_PER_DAY).toISOString().slice(0, 10);
+  return { canDelete, ageInDays, daysRemaining, deadline };
+}
+
+/**
  * Window for one collection, chosen by its status.
  *
- * Pending → the entry day only. Approved → 10 days.
+ * Pending → the entry day only. Approved → 14 days from `approvedAt`
+ * (falls back to the entry date for legacy rows without an approval stamp).
  */
 export function getDeleteWindowForStatus(
   entryDate: string | Date | null | undefined,
   status: string | null | undefined,
   now: Date = new Date(),
+  approvedAt?: string | Date | null,
 ): DeleteWindowState {
   const isPending = String(status ?? "").toLowerCase().startsWith("pending");
-  return getDeleteWindow(
-    entryDate,
-    now,
-    isPending ? PENDING_DELETE_WINDOW_DAYS : COLLECTION_DELETE_WINDOW_DAYS,
-  );
+  if (isPending) {
+    return getDeleteWindow(entryDate, now, PENDING_DELETE_WINDOW_DAYS);
+  }
+  return getApprovedDeleteWindow(approvedAt ?? entryDate, now);
 }

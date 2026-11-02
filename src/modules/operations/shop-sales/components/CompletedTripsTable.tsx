@@ -214,7 +214,7 @@ function CompletedTripsTable({
                   className={`${onRowClick || onRowSelect ? "cursor-pointer" : ""} outline-none border-t transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isSelected
                       ? "bg-emerald-50/60 border-l-4 border-l-emerald-300 ring-1 ring-inset ring-emerald-200"
-                      : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
+                      : `border-l-4 border-l-transparent ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
                   }`}
                 >
                   <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-10">
@@ -225,9 +225,8 @@ function CompletedTripsTable({
                   <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                  <td className={`px-4 py-4 pl-9 text-[13px] font-medium whitespace-nowrap ${trip.isRentedVehicle ? "font-bold text-orange-600" : "text-slate-700"}`}>
                     {displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}
-                    {trip.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                   </td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}

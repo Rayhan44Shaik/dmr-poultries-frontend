@@ -213,7 +213,7 @@ const alignClass = (align?: Align) =>
   align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
 /** Fixed, unclipped mortality breakdown — the same hover model as KPI cards. */
-function MortalityBreakdownCell({ record, t }: { record: TripLossAnalysis; t: (key: string, values?: Record<string, unknown>) => string }) {
+function MortalityBreakdownCell({ record, t }: { record: TripLossAnalysis; t: (key: string, values?: Record<string, string | number>) => string }) {
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const show = (element: HTMLElement) => {
     const rect = element.getBoundingClientRect();

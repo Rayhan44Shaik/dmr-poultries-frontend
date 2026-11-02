@@ -403,16 +403,14 @@ export function EditCollectionModal({
   }, [shopName, visibleCredits, language, t]);
 
   /* --------------------------------------------------------------------
-   * Delete — permitted ONLY within 10 days of the entry date. The window is
-   * computed from the collection date; the backend re-checks it and answers
-   * 409 outside the window, so this is purely the affordance.
-   *
-   * Confirming starts a visible countdown instead of deleting straight away,
-   * which gives an undo window for a destructive, balance-changing action.
+   * Delete — approved collections stay deletable for 14 days from approval.
+   * The backend re-checks the same window and answers 409 outside it.
    * ------------------------------------------------------------------ */
   const deleteWindow = getDeleteWindowForStatus(
     selected?.collectionDate ?? formData.collectionDate,
     selected?.status,
+    new Date(),
+    selected?.approvedDate,
   );
   const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
   const canDelete = allowDelete && Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";

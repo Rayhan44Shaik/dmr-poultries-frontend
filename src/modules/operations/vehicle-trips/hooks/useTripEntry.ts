@@ -23,6 +23,49 @@ import { translateValidationMessage } from "../utils/translateValidation";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
+/**
+ * Keep a user-selected load active after the backend returns a refreshed trip.
+ * Step submission may point `activeLegIndex` at the next incomplete load; that
+ * is useful for first-time workflow progression, but must not move an operator
+ * away from the load they are currently editing.
+ */
+export function withActiveTripLeg(trip: Trip, legIndex: number): Trip {
+  const normalizedIndex = Math.max(1, Math.trunc(Number(legIndex) || 1));
+  const leg = trip.legs?.find((candidate) => Number(candidate.legIndex) === normalizedIndex);
+  if (!leg) return { ...trip, activeLegIndex: normalizedIndex };
+
+  return {
+    ...trip,
+    activeLegIndex: normalizedIndex,
+    sourceFarmId: Number(leg.sourceFarmId ?? 0),
+    sourceFarm: String(leg.sourceFarm ?? ""),
+    destMeter: Number(leg.destMeter ?? 0),
+    pickupTolls: Number(leg.pickupTolls ?? 0),
+    farmAddress: leg.farmAddress ?? "",
+    avgBirdWeight: Number(leg.avgBirdWeight ?? 0),
+    birdTypeId: Number(leg.farmBirdTypeId ?? trip.birdTypeId ?? 0),
+    birdType: String(leg.farmBirdType ?? trip.birdType ?? ""),
+    farmGpsLat: leg.farmGpsLat ?? null,
+    farmGpsLon: leg.farmGpsLon ?? null,
+    farmGpsAccuracy: leg.farmGpsAccuracy ?? null,
+    farmGpsTime: leg.farmGpsTime ?? null,
+    farmStepSubmitted: Boolean(leg.farmStepSubmitted),
+    farmStepSubmittedAt: leg.farmStepSubmittedAt ?? null,
+    reachedTime: leg.reachedTime ?? "",
+    dcWeight: Number(leg.dcWeight ?? 0),
+    totalBirds: Number(leg.totalBirds ?? 0),
+    boxes: Number(leg.boxes ?? 0),
+    avgWeight: Number(leg.avgWeight ?? 0),
+    pickupLoadTime: leg.pickupLoadTime ?? "",
+    dcPhotoKey: leg.dcPhotoKey ?? undefined,
+    pickupStepSubmitted: Boolean(leg.pickupStepSubmitted),
+    pickupStepSubmittedAt: leg.pickupStepSubmittedAt ?? null,
+    deliveryStepSubmitted: Boolean(leg.deliveryStepSubmitted),
+    boxDetails: leg.boxDetails ?? [],
+    deliveries: (leg.deliveries as Trip["deliveries"]) ?? [],
+  };
+}
+
 export function useTripEntry(
   showNotification?: NotificationFn,
   onTripsChanged?: () => void
@@ -51,6 +94,8 @@ export function useTripEntry(
   const startSubmitLockRef = useRef(false);
   /** Per-step operation locks prevent double-click duplicate submits/saves. */
   const operationLocksRef = useRef<Set<string>>(new Set());
+  /** Latest-wins guard for rapid Load 1 / Load 2 switching. */
+  const selectLegRequestSeqRef = useRef(0);
   const onStep2SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep3SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep4SuccessRef = useRef<((trip: Trip) => void) | null>(null);
@@ -518,10 +563,15 @@ export function useTripEntry(
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "deliveries", current);
-      applySavedTrip(submitted);
+      // Updating Load 1 must remain on Load 1 even when the backend identifies
+      // Load 2 as the next workflow target. Overlay the authoritative returned
+      // Load 1 data while preserving the operator's current selection.
+      const selectedLegIndex = Number(current.activeLegIndex ?? 1);
+      const submittedOnSelectedLeg = withActiveTripLeg(submitted, selectedLegIndex);
+      applySavedTrip(submittedOnSelectedLeg);
       notifyRef.current?.(translate("ops.trip.step4_submitted"), "success");
       if (!wasSubmitted) {
-        onStep4SuccessRef.current?.(submitted);
+        onStep4SuccessRef.current?.(submittedOnSelectedLeg);
       }
       return true;
     } catch (error) {
@@ -640,43 +690,10 @@ export function useTripEntry(
 
   /** Overlay a load's Farm/Pickup/Delivery fields onto the working trip. */
   const selectLeg = useCallback((legIndex: number) => {
+    const requestSeq = selectLegRequestSeqRef.current + 1;
+    selectLegRequestSeqRef.current = requestSeq;
     setTrip((prev) => {
-      const leg = prev.legs?.find((l) => l.legIndex === legIndex);
-      if (!leg) {
-        const next = { ...prev, activeLegIndex: legIndex };
-        tripRef.current = next;
-        return next;
-      }
-      const next: Trip = {
-        ...prev,
-        activeLegIndex: legIndex,
-        sourceFarmId: Number(leg.sourceFarmId ?? 0),
-        sourceFarm: String(leg.sourceFarm ?? ""),
-        destMeter: Number(leg.destMeter ?? 0),
-        pickupTolls: Number(leg.pickupTolls ?? 0),
-        farmAddress: leg.farmAddress ?? "",
-        avgBirdWeight: Number(leg.avgBirdWeight ?? 0),
-        birdTypeId: Number(leg.farmBirdTypeId ?? prev.birdTypeId ?? 0),
-        birdType: String(leg.farmBirdType ?? prev.birdType ?? ""),
-        farmGpsLat: leg.farmGpsLat ?? null,
-        farmGpsLon: leg.farmGpsLon ?? null,
-        farmGpsAccuracy: leg.farmGpsAccuracy ?? null,
-        farmGpsTime: leg.farmGpsTime ?? null,
-        farmStepSubmitted: Boolean(leg.farmStepSubmitted),
-        farmStepSubmittedAt: leg.farmStepSubmittedAt ?? null,
-        reachedTime: leg.reachedTime ?? "",
-        dcWeight: Number(leg.dcWeight ?? 0),
-        totalBirds: Number(leg.totalBirds ?? 0),
-        boxes: Number(leg.boxes ?? 0),
-        avgWeight: Number(leg.avgWeight ?? 0),
-        pickupLoadTime: leg.pickupLoadTime ?? "",
-        dcPhotoKey: leg.dcPhotoKey ?? undefined,
-        pickupStepSubmitted: Boolean(leg.pickupStepSubmitted),
-        pickupStepSubmittedAt: leg.pickupStepSubmittedAt ?? null,
-        deliveryStepSubmitted: Boolean(leg.deliveryStepSubmitted),
-        boxDetails: leg.boxDetails ?? [],
-        deliveries: (leg.deliveries as Trip["deliveries"]) ?? [],
-      };
+      const next = withActiveTripLeg(prev, legIndex);
       tripRef.current = next;
       return next;
     });
@@ -684,11 +701,17 @@ export function useTripEntry(
     if (tripId > 0) {
       void loadTripById(tripId, legIndex)
         .then((loaded) => {
-          setTrip(loaded);
-          setSavedTrip(loaded);
-          tripRef.current = loaded;
+          if (requestSeq !== selectLegRequestSeqRef.current) return;
+          const selectedLoad = withActiveTripLeg(loaded, legIndex);
+          setTrip(selectedLoad);
+          setSavedTrip(selectedLoad);
+          tripRef.current = selectedLoad;
         })
-        .catch((error) => notifyRef.current?.(handleApiError(error), "error"));
+        .catch((error) => {
+          if (requestSeq === selectLegRequestSeqRef.current) {
+            notifyRef.current?.(handleApiError(error), "error");
+          }
+        });
     }
   }, []);
 

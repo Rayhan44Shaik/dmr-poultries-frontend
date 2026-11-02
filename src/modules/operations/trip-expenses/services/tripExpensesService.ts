@@ -1,4 +1,32 @@
-import { apiGet } from "../../../../api";
+import { apiDelete, apiGet, apiPost, apiPut } from "../../../../api";
+
+export type ManualExpense = {
+  id: number; expenseNo: string; expenseDate: string; amount: number;
+  expenseType: string; description: string; remarks: string; createdBy: string; createdAt: string | null;
+  status: "Pending" | "Approved"; approvedBy: string | null; approvedAt: string | null;
+};
+export type ManualExpenseDraft = Pick<ManualExpense, "expenseDate" | "amount" | "expenseType" | "description" | "remarks">;
+
+export async function listManualExpenses(params: Pick<TripExpenseQuery, "fromDate" | "toDate" | "search">, signal?: AbortSignal) {
+  const { data } = await apiGet<ManualExpense[]>("/operations/expenses/manual", { params, signal });
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createManualExpense(draft: ManualExpenseDraft) {
+  const { data } = await apiPost<ManualExpense>("/operations/expenses/manual", draft);
+  return data;
+}
+export async function updateManualExpense(id: number, draft: ManualExpenseDraft) {
+  const { data } = await apiPut<ManualExpense>(`/operations/expenses/manual/${id}`, draft);
+  return data;
+}
+export async function deleteManualExpense(id: number) {
+  await apiDelete(`/operations/expenses/manual/${id}`);
+}
+export async function approveManualExpense(id: number) {
+  const { data } = await apiPost<ManualExpense>(`/operations/expenses/manual/${id}/approve`, {});
+  return data;
+}
 
 export type ExpenseDetail = { name: string; amount: number };
 export type DieselDetail = { bunk: string; litres: number; rate: number; amount: number };

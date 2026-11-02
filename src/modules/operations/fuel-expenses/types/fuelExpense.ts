@@ -56,5 +56,5 @@ export interface FuelExpense {
 
 export type FuelExpenseDraft = Omit<
   FuelExpense,
-  "id" | "billNo" | "createdDate" | "createdBy" | "status" | "sourceType"
->;
+  "id" | "billNo" | "createdDate" | "createdBy" | "status" | "sourceType" | "driverId" | "driverName" | "supervisorId" | "supervisorName"
+> & { driverId?: number; driverName?: string; supervisorId?: number; supervisorName?: string };

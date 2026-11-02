@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useRef,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowDownLeft,
   ArrowUpDown,
@@ -265,6 +266,100 @@ const formatLedgerDateWithDay = (
 };
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
+
+function CumulativeMortalityCell({
+  row,
+  kind,
+}: {
+  row: ShopLedgerCumulativeRow;
+  kind: "birds" | "weight";
+}) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const loads = row.mortalityByLoad ?? [];
+  const boxBirds = loads.reduce((sum, load) => sum + load.boxBirds, 0);
+  const weightBirds = loads.reduce((sum, load) => sum + load.weightModeBirds, 0);
+  const open = () => {
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (rect) setAnchor(rect);
+  };
+  const close = () => setAnchor(null);
+  const popoverWidth = Math.min(320, window.innerWidth - 24);
+  const estimatedHeight = Math.min(390, 142 + loads.length * 94);
+  const top = anchor
+    ? anchor.bottom + estimatedHeight + 12 <= window.innerHeight
+      ? anchor.bottom + 8
+      : Math.max(12, anchor.top - estimatedHeight - 8)
+    : 0;
+  const left = anchor
+    ? Math.min(window.innerWidth - popoverWidth - 12, Math.max(12, anchor.right - popoverWidth))
+    : 0;
+
+  return (
+    <>
+      <button
+        ref={buttonRef}
+        type="button"
+        onMouseEnter={open}
+        onMouseLeave={close}
+        onFocus={open}
+        onBlur={close}
+        aria-label={`${row.shop} mortality breakdown`}
+        className="inline-flex min-w-[58px] items-center justify-end rounded-md px-1.5 py-1 text-right tabular-nums transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+      >
+        {kind === "birds"
+          ? row.mortalityBirds.toLocaleString()
+          : row.mortalityWeight.toFixed(2)}
+      </button>
+      {anchor && createPortal(
+        <div
+          role="tooltip"
+          style={{ position: "fixed", top, left, width: popoverWidth }}
+          className="pointer-events-none z-[10000] overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-2xl shadow-slate-900/20"
+        >
+          <div className="border-b border-slate-200 bg-gradient-to-r from-rose-50 to-orange-50 px-3.5 py-2.5">
+            <p className="truncate text-xs font-extrabold text-slate-900">{row.shop}</p>
+            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-600">Mortality by load and mode</p>
+          </div>
+          <div className="space-y-2 p-3">
+            {loads.length ? loads.map((load) => (
+              <div key={load.load} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70">
+                <div className="border-b border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-indigo-700">
+                  Load {load.load}
+                </div>
+                <div className="grid grid-cols-2 divide-x divide-slate-200">
+                  <div className="px-2.5 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Box mode</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-rose-700 tabular-nums">{load.boxBirds.toLocaleString()} birds</p>
+                    <p className="text-[10px] font-semibold text-rose-600 tabular-nums">{load.boxWeight.toFixed(2)} kg</p>
+                  </div>
+                  <div className="px-2.5 py-2">
+                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Weight mode</p>
+                    <p className="mt-0.5 text-xs font-extrabold text-violet-700 tabular-nums">{load.weightModeBirds.toLocaleString()} birds</p>
+                    <p className="text-[10px] font-semibold text-slate-400">Count only</p>
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">No mortality recorded</div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200 bg-slate-900 text-white">
+            <div className="px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Box total</p>
+              <p className="text-xs font-extrabold tabular-nums">{boxBirds.toLocaleString()} birds · {row.mortalityWeight.toFixed(2)} kg</p>
+            </div>
+            <div className="px-3 py-2">
+              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Weight total</p>
+              <p className="text-xs font-extrabold tabular-nums">{weightBirds.toLocaleString()} birds</p>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
 
 /** Fetch the COMPLETE ledger, walking server pagination until every row has
  *  arrived — without this, All-Shops ranges with more than one page of
@@ -946,27 +1041,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
       const quantities = await quantitiesPromise;
       if (appliedReportType === "collection") return rows;
-      const quantityKey = (shop: string, subShop = "") =>
-        `${shop.trim().toLocaleUpperCase("en-IN")}\u0000${subShop.trim().toLocaleUpperCase("en-IN")}`;
-      const byShop = new Map(quantities.map((item) => [quantityKey(item.shopName, item.subShopName), item]));
+      // Cumulative is a main-shop statement. Step-4 sub-shop labels remain on
+      // transaction detail, but must never split opening/sale/closing here.
+      const quantityKey = (shop: string) => shop.trim().toLocaleUpperCase("en-IN");
+      const byShop = new Map(quantities.map((item) => [quantityKey(item.shopName), item]));
       const merged = rows.map((row) => {
-        const quantity = byShop.get(quantityKey(row.shop, row.subShopName));
+        const quantity = byShop.get(quantityKey(row.shop));
         return quantity ? {
           ...row,
-          birds: quantity.birds,
-          weight: quantity.weight,
-          mortalityBirds: quantity.mortalityBirds,
-          mortalityWeight: quantity.mortalityWeight,
-          weightLoss: quantity.weightLoss,
-        } : row;
-      });
-      const existing = new Set(merged.map((row) => quantityKey(row.shop, row.subShopName)));
-      for (const quantity of quantities) {
-        const key = quantityKey(quantity.shopName, quantity.subShopName);
-        if (existing.has(key)) continue;
-        merged.push({
-          shop: quantity.shopName,
-          subShopName: quantity.subShopName || undefined,
           birds: quantity.birds,
           weight: quantity.weight,
           farmBirds: quantity.birds + quantity.mortalityBirds,
@@ -974,6 +1056,23 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           mortalityBirds: quantity.mortalityBirds,
           mortalityWeight: quantity.mortalityWeight,
           weightLoss: quantity.weightLoss,
+          mortalityByLoad: quantity.mortalityByLoad,
+        } : row;
+      });
+      const existing = new Set(merged.map((row) => quantityKey(row.shop)));
+      for (const quantity of quantities) {
+        const key = quantityKey(quantity.shopName);
+        if (existing.has(key)) continue;
+        merged.push({
+          shop: quantity.shopName,
+          birds: quantity.birds,
+          weight: quantity.weight,
+          farmBirds: quantity.birds + quantity.mortalityBirds,
+          farmWeight: quantity.weight + quantity.mortalityWeight + quantity.weightLoss,
+          mortalityBirds: quantity.mortalityBirds,
+          mortalityWeight: quantity.mortalityWeight,
+          weightLoss: quantity.weightLoss,
+          mortalityByLoad: quantity.mortalityByLoad,
           openingBalance: 0,
           sale: 0,
           collection: 0,
@@ -981,8 +1080,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         });
       }
       return merged.sort((a, b) =>
-        a.shop.localeCompare(b.shop, "en", { sensitivity: "base" }) ||
-        String(a.subShopName ?? "").localeCompare(String(b.subShopName ?? ""), "en", { sensitivity: "base" })
+        a.shop.localeCompare(b.shop, "en", { sensitivity: "base" })
       );
     };
     setCumulativeLoading(true);
@@ -2995,10 +3093,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><ListChecks size={15} className="text-indigo-500" />{t("shop_ledger.col.s_no")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={15} className="text-emerald-500" />{t("common.shop")}</span></th>
                   <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivered_birds")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.mortality")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Mortality birds across every load and sub-shop for this main shop">{t("ops.mortality.col.mortality")}</th>
                   <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivery_weight")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.mortality_weight")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.weight_loss")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Mortality weight in kg (Box-mode mortality; Weight-mode mortality is counted in birds)">{t("ops.mortality.col.mortality_weight")}</th>
+                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Farm weight minus delivered weight minus mortality weight, summed across all loads">{t("ops.mortality.col.weight_loss")}</th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Scale size={15} className="text-indigo-500" />{t("shop_ledger.col.opening")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowUpRight size={15} className="text-emerald-500" />{t("shop_ledger.col.sale")}</span></th>
                   <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowDownLeft size={15} className="text-blue-500" />{t("shop_ledger.col.collection")}</span></th>
@@ -3015,7 +3113,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 ) : (
                   <>
                     {pagedCumulativeRows.map((row, index) => {
-                      const rowLabel = row.subShopName ? `${row.shop} — ${row.subShopName}` : row.shop;
+                      const rowLabel = row.shop;
                       const selected = selectedCumulativeShop === rowLabel;
                       return (
                       <tr
@@ -3026,10 +3124,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{(cumulativeSafePage - 1) * pageSize + index + 1}</td>
                         <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={rowLabel}>{rowLabel}</td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.birds.toLocaleString()}</td>
-                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.mortalityBirds.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right text-xs"><CumulativeMortalityCell row={row} kind="birds" /></td>
                         <td className="px-3 py-3 text-right text-xs tabular-nums">{row.weight.toFixed(2)}</td>
-                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.mortalityWeight.toFixed(2)}</td>
-                        <td className="px-3 py-3 text-right text-xs font-semibold tabular-nums text-amber-700">{row.weightLoss.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-xs"><CumulativeMortalityCell row={row} kind="weight" /></td>
+                        <td className="px-3 py-3 text-right text-xs font-semibold tabular-nums text-amber-700" title={`${row.shop}: ${row.farmWeight.toFixed(2)} farm kg − ${row.weight.toFixed(2)} delivered kg − ${row.mortalityWeight.toFixed(2)} mortality kg`}>{row.weightLoss.toFixed(2)}</td>
                         {[row.openingBalance, row.sale, row.collection, row.closingBalance].map((value, valueIndex) => (
                           <td key={valueIndex} className={`px-3 py-3 text-right text-xs font-bold whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : valueIndex === 2 ? "text-blue-600" : valueIndex === 1 ? "text-emerald-600" : "text-slate-800"}`}>
                             {formatAmount(value)}

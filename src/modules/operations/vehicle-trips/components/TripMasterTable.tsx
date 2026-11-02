@@ -261,7 +261,7 @@ function TripMasterTable({
                     className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
-                        : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
+                      : `border-l-4 border-l-transparent hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
                     <td className="px-4 py-5 text-center text-[13px] text-slate-500 font-medium w-10">
@@ -270,8 +270,8 @@ function TripMasterTable({
                     {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
                     <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{localizeTripViewText(trip.tripNo, language)}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">
-                      <div>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
+                    <td className={`px-4 py-5 pl-9 text-[13px] font-medium whitespace-nowrap ${trip.isRentedVehicle ? "text-orange-600" : "text-slate-700"}`}>
+                      <div className={trip.isRentedVehicle ? "font-bold" : undefined}>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>
                     </td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.driverName, language) || "-"}</td>
                     <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.supervisorName, language)}</td>

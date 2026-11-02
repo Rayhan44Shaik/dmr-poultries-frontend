@@ -176,6 +176,7 @@ function CollectionInformation({
           </label>
           <input
             id="referenceNo"
+            name="collectionReferenceNo"
             type="text"
             value={entry.referenceNo}
             onChange={(e) => onReferenceChange(e.target.value)}

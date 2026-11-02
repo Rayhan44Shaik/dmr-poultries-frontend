@@ -1,7 +1,6 @@
 /**
- * The 10-day deletion window is a hard business rule: a collection may be
- * deleted only within 10 days of its entry date, never after, under any
- * circumstances. These cases pin the boundaries so the rule cannot drift.
+ * Approved collections stay deletable for 14 days from approval, matching
+ * Shop Sales. Pending entries remain deletable on their entry day only.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -10,33 +9,35 @@ import {
   daysSinceEntry,
   COLLECTION_DELETE_WINDOW_DAYS,
   getDeleteWindowForStatus,
+  getApprovedDeleteWindow,
 } from "./collectionDeleteWindow";
 
 const now = new Date(2026, 8, 15); // 2026-09-15, local midnight
+const nowUtc = new Date("2026-09-15T12:00:00.000Z");
 
-test("the window is 10 days", () => {
-  assert.equal(COLLECTION_DELETE_WINDOW_DAYS, 10);
+test("the approved window is 14 days", () => {
+  assert.equal(COLLECTION_DELETE_WINDOW_DAYS, 14);
 });
 
-test("an entry made today is deletable with 10 days left", () => {
+test("an entry made today is deletable with 14 calendar days left", () => {
   const w = getDeleteWindow("2026-09-15", now);
   assert.equal(w.canDelete, true);
   assert.equal(w.ageInDays, 0);
-  assert.equal(w.daysRemaining, 10);
-  assert.equal(w.deadline, "2026-09-25");
+  assert.equal(w.daysRemaining, 14);
+  assert.equal(w.deadline, "2026-09-29");
 });
 
-test("day 10 is still permitted and is the last day", () => {
-  const w = getDeleteWindow("2026-09-05", now);
+test("day 14 is still permitted on the calendar window", () => {
+  const w = getDeleteWindow("2026-09-01", now);
   assert.equal(w.canDelete, true);
-  assert.equal(w.ageInDays, 10);
+  assert.equal(w.ageInDays, 14);
   assert.equal(w.daysRemaining, 0);
 });
 
-test("day 11 is refused", () => {
-  const w = getDeleteWindow("2026-09-04", now);
+test("day 15 is refused", () => {
+  const w = getDeleteWindow("2026-08-31", now);
   assert.equal(w.canDelete, false);
-  assert.equal(w.ageInDays, 11);
+  assert.equal(w.ageInDays, 15);
 });
 
 test("a long-past entry is refused", () => {
@@ -58,11 +59,6 @@ test("ISO timestamps are counted by calendar day", () => {
   assert.equal(daysSinceEntry("2026-09-10T18:30:00Z", now), 5);
 });
 
-/* -------------------------------------------------------------------------
- * Status-aware windows: pending entries may be deleted on their entry day
- * only, approved entries get the full 10 days.
- * ---------------------------------------------------------------------- */
-
 test("a pending entry is deletable on its entry day", () => {
   const w = getDeleteWindowForStatus("2026-09-15", "Pending Approval", now);
   assert.equal(w.canDelete, true);
@@ -74,9 +70,25 @@ test("a pending entry is NOT deletable the next day", () => {
   assert.equal(getDeleteWindowForStatus("2026-09-14", "Pending Approval", now).canDelete, false);
 });
 
-test("an approved entry keeps the full 10-day window", () => {
-  assert.equal(getDeleteWindowForStatus("2026-09-05", "Approved", now).canDelete, true);
-  assert.equal(getDeleteWindowForStatus("2026-09-04", "Approved", now).canDelete, false);
+test("an approved entry uses approval time, not the collection date", () => {
+  const collectedLongAgo = "2026-08-01";
+  const approvedRecently = "2026-09-10T12:00:00.000Z";
+  const w = getDeleteWindowForStatus(collectedLongAgo, "Approved", nowUtc, approvedRecently);
+  assert.equal(w.canDelete, true);
+});
+
+test("an approved entry is locked 14 days after approval", () => {
+  const approvedAt = "2026-09-01T12:00:00.000Z";
+  assert.equal(getApprovedDeleteWindow(approvedAt, nowUtc).canDelete, false);
+  assert.equal(
+    getDeleteWindowForStatus("2026-08-01", "Approved", nowUtc, approvedAt).canDelete,
+    false,
+  );
+});
+
+test("an approved entry is still open just under 14 days after approval", () => {
+  const approvedAt = "2026-09-01T12:00:01.000Z";
+  assert.equal(getApprovedDeleteWindow(approvedAt, nowUtc).canDelete, true);
 });
 
 test("status matching is case-insensitive and tolerates plain 'Pending'", () => {
@@ -84,6 +96,6 @@ test("status matching is case-insensitive and tolerates plain 'Pending'", () => 
   assert.equal(getDeleteWindowForStatus("2026-09-14", "PENDING APPROVAL", now).canDelete, false);
 });
 
-test("an unknown or missing status is treated as approved (10 days)", () => {
-  assert.equal(getDeleteWindowForStatus("2026-09-14", undefined, now).canDelete, true);
+test("an unknown or missing status is treated as approved (14 days from the given stamp)", () => {
+  assert.equal(getDeleteWindowForStatus("2026-09-10", undefined, nowUtc, "2026-09-10T12:00:00.000Z").canDelete, true);
 });

@@ -103,7 +103,7 @@ export function shopSaleLockState(sale: Pick<ShopSale, "editable" | "lockReason"
     return {
       editable: false,
       label: "Locked",
-      message: "Edit window expired (2 weeks from insert).",
+      message: "Edit window expired (2 weeks after entering Shop Sales).",
     };
   }
 

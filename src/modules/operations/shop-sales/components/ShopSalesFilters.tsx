@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AlertTriangle, ArrowUpDown, Calendar, FileDown, FileSpreadsheet, Search, Store } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, FileDown, FileSpreadsheet, Hash, Search, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -17,12 +17,15 @@ interface Props {
   fromDate: string;
   toDate: string;
   shopName: string;
+  tripNo: string;
   sortBy: string;
   shopNames: string[];
+  tripNumbers: string[];
   searchQuery: string;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setShopName: (value: string) => void;
+  setTripNo: (value: string) => void;
   setSortBy: (value: string) => void;
   setSearchQuery: (value: string) => void;
   onReset: () => void;
@@ -45,11 +48,14 @@ function ShopSalesFilters({
   fromDate,
   toDate,
   shopName,
+  tripNo,
   sortBy,
   shopNames,
+  tripNumbers,
   setFromDate,
   setToDate,
   setShopName,
+  setTripNo,
   setSortBy,
   searchQuery,
   setSearchQuery,
@@ -102,10 +108,14 @@ function ShopSalesFilters({
     ],
     [],
   );
+  const tripOptions = useMemo<MasterDropdownOption[]>(
+    () => tripNumbers.map((value) => ({ value, label: value })),
+    [tripNumbers],
+  );
 
   return (
     <div className={opsFilterCardClass}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="shrink-0 text-emerald-500" />
@@ -134,6 +144,24 @@ function ShopSalesFilters({
             options={shopOptions}
             onChange={setShopName}
             placeholder="All Shops"
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className={opsFilterLabelClass}>
+            <Hash size={17} className="shrink-0 text-emerald-500" />
+            <span>Trip Number</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Trip Number"
+            value={tripNo}
+            options={tripOptions}
+            onChange={setTripNo}
+            placeholder="All Trips"
             searchable
             allowClear
             className="w-full"
@@ -192,6 +220,7 @@ function ShopSalesFilters({
             count={countActiveFilters(
               searchQuery.trim() !== "",
               shopName !== "",
+              tripNo !== "",
               sortBy !== "latest",
               fromDate !== "" || toDate !== "",
             )}

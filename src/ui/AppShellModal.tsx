@@ -12,6 +12,8 @@ import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { enterViewLayer } from "../shared/ui/viewLayer";
 
+export type AppShellModalSize = "view" | "dialog";
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -21,6 +23,16 @@ type Props = {
   zIndex?: number;
   /** Id of the heading inside the panel, so it names the dialog. */
   ariaLabelledBy?: string;
+  /**
+   * `view` fills the shell (trip sheets, ledgers). `dialog` is a compact
+   * centred card for small forms so they do not leave an empty white panel.
+   */
+  size?: AppShellModalSize;
+};
+
+const PANEL_MAX_WIDTH: Record<AppShellModalSize, string> = {
+  view: "min(96rem, calc(100vw - 2rem))",
+  dialog: "min(42.5rem, calc(100vw - 2rem))",
 };
 
 const HEADER_H = 64;
@@ -34,6 +46,7 @@ export default function AppShellModal({
   closeOnOverlay = true,
   zIndex = 50,
   ariaLabelledBy,
+  size = "view",
 }: Props) {
   useEffect(() => {
     if (!open) return;
@@ -83,9 +96,9 @@ export default function AppShellModal({
         }}
       >
         <div
-          className={`relative flex w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-[#e4ebe5] bg-white shadow-[0_24px_70px_-28px_rgba(16,60,50,0.38)] animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${panelClassName}`}
+          className={`relative flex flex-col overflow-hidden rounded-2xl border border-[#e4ebe5] bg-white shadow-[0_24px_70px_-28px_rgba(16,60,50,0.38)] animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${size === "dialog" ? "w-full max-w-[42.5rem]" : "w-full max-w-[96rem]"} ${panelClassName}`}
           style={{
-            maxWidth: "min(96rem, calc(100vw - 2rem))",
+            maxWidth: PANEL_MAX_WIDTH[size],
             maxHeight: "calc(100vh - 64px - 2rem)",
             width: "100%",
           }}

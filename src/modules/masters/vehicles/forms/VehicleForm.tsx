@@ -62,6 +62,7 @@ function VehicleForm({
   const [birdCapacity, setBirdCapacity] = useState<number | "">(vehicle?.birdCapacity ?? "");
   const [capacityKg, setCapacityKg] = useState<number | "">(vehicle?.capacityKg ?? "");
   const [isRented, setIsRented] = useState(vehicle?.isRented ?? false);
+  const [isPersonal, setIsPersonal] = useState(vehicle?.isPersonal ?? false);
   const [fastagBank, setFastagBank] = useState(vehicle?.fastagBank ?? "");
   const [purchaseDate, setPurchaseDate] = useState(vehicle?.purchaseDate ?? "");
   const [purchaseAmount, setPurchaseAmount] = useState<number | "">(vehicle?.purchaseAmount ?? "");
@@ -175,9 +176,9 @@ function VehicleForm({
     if (
       !vehicleNumber ||
       (!isRented && !vehicleType) ||
-      noOfBoxes === "" ||
-      birdCapacity === "" ||
-      capacityKg === ""
+      (!isPersonal && noOfBoxes === "") ||
+      (!isPersonal && birdCapacity === "") ||
+      (!isPersonal && capacityKg === "")
     ) {
       showNotification("Please fill all required fields.", "error");
       return;
@@ -195,10 +196,11 @@ function VehicleForm({
       vehicleNumber,
       vehicleType: isRented ? "" : vehicleType,
       isRented,
+      isPersonal,
       trackingId: isRented ? "" : trackingId,
-      noOfBoxes: Number(noOfBoxes),
-      birdCapacity: Number(birdCapacity),
-      capacityKg: Number(capacityKg),
+      noOfBoxes: isPersonal ? 1 : Number(noOfBoxes),
+      birdCapacity: isPersonal ? 1 : Number(birdCapacity),
+      capacityKg: isPersonal ? 1 : Number(capacityKg),
       fastagBank: isRented ? "" : fastagBank,
       purchaseDate: isRented ? "" : purchaseDate,
       purchaseAmount:
@@ -242,14 +244,24 @@ function VehicleForm({
       isSaving={isSaving}
       submitLabel={isEditing ? "Update Vehicle" : "Save Vehicle"}
       headerActions={
-        <div className="mr-3 flex items-center gap-2 border-r border-slate-200 pr-3">
+        <div className="mr-3 flex items-center gap-4 border-r border-slate-200 pr-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-slate-600">Personal vehicle</span>
+            <button type="button" role="switch" aria-label="Personal vehicle" aria-checked={isPersonal}
+              onClick={() => { setIsPersonal((value) => !value); setIsRented(false); }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPersonal ? "bg-violet-500" : "bg-slate-300"}`}>
+              <span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isPersonal ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+            <span className={`text-xs font-semibold ${isPersonal ? "text-violet-700" : "text-slate-500"}`}>{isPersonal ? "On" : "Off"}</span>
+          </div>
+          <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-slate-600">Rental vehicle</span>
           <button
             type="button"
             role="switch"
             aria-label="Rental vehicle"
             aria-checked={isRented}
-            onClick={() => setIsRented((value) => !value)}
+            onClick={() => { setIsRented((value) => !value); setIsPersonal(false); }}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-amber-500/30 ${isRented ? "bg-amber-500" : "bg-slate-300"}`}
           >
             <span className={`h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${isRented ? "translate-x-6" : "translate-x-1"}`} />
@@ -257,6 +269,7 @@ function VehicleForm({
           <span className={`text-xs font-semibold ${isRented ? "text-amber-700" : "text-slate-500"}`}>
             {isRented ? "On" : "Off"}
           </span>
+          </div>
         </div>
       }
     >
@@ -323,7 +336,7 @@ function VehicleForm({
       </section>
 
       {/* Section 2: Load capacity */}
-      <section className="space-y-3">
+      {!isPersonal && <section className="space-y-3">
         {sectionHeading("Load Capacity")}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="relative">
@@ -380,7 +393,7 @@ function VehicleForm({
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Section 3: Purchase & finance */}
       {!isRented && <section className="space-y-3">

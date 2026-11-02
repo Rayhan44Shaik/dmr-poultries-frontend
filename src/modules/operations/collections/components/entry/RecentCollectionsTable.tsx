@@ -12,6 +12,9 @@ import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { FilterResetButton, countActiveFilters } from "../../../../../ui";
 import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey } from "../../utils/collectionStatusLabel";
+import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
+import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
+import { confirmDialog } from "../../../../../ui/confirm/confirmStore";
 import {
   collectionShopKey,
   compareCollectionRecency,
@@ -25,9 +28,9 @@ interface Props {
   statusFilter: "Pending" | "Approved" | "Deleted";
   onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
   /** Optional: roles without approve rights simply never receive it. */
-  onApproveMany?: (ids: string[]) => void | Promise<void>;
+  onApproveMany?: (ids: string[]) => boolean | Promise<boolean>;
   onReject?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => void | Promise<void>;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
   /**
@@ -66,6 +69,20 @@ export default function RecentCollectionsTable({
   const [pageSize, setPageSize] = useState(10);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [isApprovingMany, setIsApprovingMany] = useState(false);
+  const onDeleteRef = useRef(onDelete);
+  useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
+
+  const { requestDelete, cancel: cancelDelete, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
+    await Promise.resolve(onDeleteRef.current?.(id));
+    setCheckedIds((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
+    });
+    setSelectedId((current) => current === id ? null : current);
+    onSelectionChange?.(null);
+  });
 
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
@@ -142,11 +159,37 @@ export default function RecentCollectionsTable({
   }, [collections, filteredBySearch]);
 
   const displayedData = buckets[statusFilter];
-  const selectedCollection = displayedData.find((row) => row.id === selectedId) ?? null;
+  const singleCheckedId = checkedIds.size === 1 ? [...checkedIds][0] : null;
+  const actionRowId = statusFilter === "Pending" ? singleCheckedId : selectedId;
+  const selectedCollection = displayedData.find((row) => row.id === actionRowId) ?? null;
   const selectedStatus = selectedCollection?.rawStatus || selectedCollection?.status;
   const canEditSelected = Boolean(selectedCollection && selectedStatus === "Pending Approval" && onEdit);
   const canViewSelected = Boolean(selectedCollection && selectedStatus === "Approved");
-  const canDeleteSelected = Boolean(selectedCollection && selectedStatus !== "Deleted" && onDelete);
+  const canDeleteSelected = Boolean(
+    selectedCollection &&
+    selectedStatus !== "Deleted" &&
+    onDelete &&
+    !isPending(selectedCollection.id),
+  );
+
+  const queueSelectedDelete = async () => {
+    if (!selectedCollection || !canDeleteSelected) return;
+    const confirmed = await confirmDialog({
+      title: t("ops.collection.delete_confirm_title_with_number", { number: selectedCollection.collectionNo }),
+      message: t("ops.collection.delete_countdown_body"),
+      confirmLabel: t("common.delete"),
+      cancelLabel: t("common.cancel"),
+      tone: "danger",
+    });
+    if (!confirmed || isPending(selectedCollection.id)) return;
+    // Let the confirmation dialog finish its close transition before the
+    // countdown card enters; mounting both in the same frame looks like a
+    // visual jump instead of one action flowing into the next.
+    await new Promise((resolve) => window.setTimeout(resolve, 140));
+    requestDelete(selectedCollection.id, {
+      label: t("ops.collection.delete_scheduled", { number: selectedCollection.collectionNo }),
+    });
+  };
 
   // Pagination. Reset to page 1 whenever the tab or the search changes, so a
   // filtered-down list can never leave the view stranded on an empty page.
@@ -156,9 +199,46 @@ export default function RecentCollectionsTable({
   const paginatedData = displayedData.slice(startIndex, startIndex + pageSize);
   const pendingPageIds = paginatedData.filter((row) => (row.rawStatus || row.status) === "Pending Approval").map((row) => row.id);
   const allPendingChecked = pendingPageIds.length > 0 && pendingPageIds.every((id) => checkedIds.has(id));
-  const toggleChecked = (id: string) => setCheckedIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  const toggleAllPending = () => setCheckedIds((current) => { const next = new Set(current); if (allPendingChecked) pendingPageIds.forEach((id) => next.delete(id)); else pendingPageIds.forEach((id) => next.add(id)); return next; });
-  const approveChecked = async () => { const ids = [...checkedIds]; if (!ids.length) return; await onApproveMany?.(ids); setCheckedIds(new Set()); };
+  const idsReadyToApprove = useMemo(() => {
+    const isPendingRow = (id: string) =>
+      displayedData.some(
+        (row) => row.id === id && (row.rawStatus || row.status) === "Pending Approval",
+      );
+    const checkedPending = [...checkedIds].filter(isPendingRow);
+    if (checkedPending.length) return checkedPending;
+    if (selectedId && isPendingRow(selectedId)) return [selectedId];
+    return [];
+  }, [checkedIds, displayedData, selectedId]);
+  const toggleChecked = (id: string) => {
+    const next = new Set(checkedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setCheckedIds(next);
+    const clicked = displayedData.find((row) => row.id === id) ?? null;
+    if (next.size === 0) selectRow(null);
+    else selectRow(clicked);
+  };
+  const toggleAllPending = () => {
+    const next = new Set(checkedIds);
+    if (allPendingChecked) pendingPageIds.forEach((id) => next.delete(id));
+    else pendingPageIds.forEach((id) => next.add(id));
+    setCheckedIds(next);
+    if (next.size === 0) selectRow(null);
+    else if (next.size === 1) selectRow(displayedData.find((row) => row.id === [...next][0]) ?? null);
+  };
+  const approveChecked = async () => {
+    const ids = idsReadyToApprove;
+    if (!ids.length || !onApproveMany || isApprovingMany) return;
+    setIsApprovingMany(true);
+    try {
+      const approved = await onApproveMany(ids);
+      if (approved) {
+        setCheckedIds(new Set());
+        selectRow(null);
+      }
+    } finally {
+      setIsApprovingMany(false);
+    }
+  };
 
 
   /**
@@ -176,21 +256,25 @@ export default function RecentCollectionsTable({
     * this table. Using pointerdown makes the selection disappear immediately,
     * while a click on another row still proceeds to select that row normally. */
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId && checkedIds.size === 0) return;
 
     const handleClickAway = (event: PointerEvent) => {
       const target = event.target;
+      // Ignore the whole Recent Collections card — toolbar, select-all,
+      // Approve selected, pagination and rows must not wipe the selection
+      // before their own click handlers run.
       if (
         target instanceof Element &&
-        target.closest("[data-recent-collection-row], [data-recent-collection-actions]")
+        target.closest("[data-recent-collections]")
       ) return;
+      setCheckedIds(new Set());
       setSelectedId(null);
       onSelectionChange?.(null);
     };
 
     document.addEventListener("pointerdown", handleClickAway);
     return () => document.removeEventListener("pointerdown", handleClickAway);
-  }, [selectedId, onSelectionChange]);
+  }, [selectedId, checkedIds.size, onSelectionChange]);
 
   const selectRow = (col: RecentCollection | null) => {
     setSelectedId(col ? col.id : null);
@@ -262,7 +346,7 @@ export default function RecentCollectionsTable({
       case "Enter":
       case " ":
         event.preventDefault();
-        if (statusFilter === "Pending" && col.rawStatus === "Pending Approval" && onApproveMany) {
+        if (statusFilter === "Pending" && col.rawStatus === "Pending Approval") {
           toggleChecked(col.id);
           break;
         }
@@ -285,6 +369,7 @@ export default function RecentCollectionsTable({
   const updateSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    setCheckedIds(new Set());
     selectRow(null);
   };
   const clearSearch = () => updateSearch("");
@@ -295,6 +380,7 @@ export default function RecentCollectionsTable({
     * than none. */
   const refreshTable = () => {
     setCurrentPage(1);
+    setCheckedIds(new Set());
     selectRow(null);
     void onRefresh?.();
   };
@@ -319,7 +405,10 @@ export default function RecentCollectionsTable({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
+    <div
+      data-recent-collections
+      className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300"
+    >
       {/* Header — mirrors Recent Trip Activity: icon + title, selected-tab count
         * beside the name, segmented status toggle, then the search box. */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
@@ -356,6 +445,7 @@ export default function RecentCollectionsTable({
                   key={tab}
                   type="button"
                   onClick={() => {
+                    setCheckedIds(new Set());
                     selectRow(null);
                     onStatusChange(tab);
                     setCurrentPage(1);
@@ -385,6 +475,8 @@ export default function RecentCollectionsTable({
             </span>
             <div className="relative min-w-0 flex-1 sm:flex-initial">
               <input
+                id="recent-collections-search"
+                name="recentCollectionsSearch"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => updateSearch(e.target.value)}
@@ -410,7 +502,20 @@ export default function RecentCollectionsTable({
             onClick={resetTable}
           />
 
-          {onApproveMany && statusFilter === "Pending" && <button type="button" onClick={() => void approveChecked()} disabled={!checkedIds.size} className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40"><CheckCircle size={14} className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12"/>Approve selected{checkedIds.size ? ` (${checkedIds.size})` : ""}</button>}
+          {onApproveMany && statusFilter === "Pending" && (
+            <button
+              type="button"
+              data-recent-collection-actions
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => void approveChecked()}
+              disabled={!idsReadyToApprove.length || isApprovingMany}
+              className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-bold text-emerald-700 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-100 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <CheckCircle size={14} className={`transition-transform duration-300 ${isApprovingMany ? "animate-pulse" : "group-hover:scale-110 group-hover:rotate-12"}`} />
+              {isApprovingMany ? "Approving" : "Approve selected"}
+              {idsReadyToApprove.length ? ` (${idsReadyToApprove.length})` : ""}
+            </button>
+          )}
 
           <div className="flex items-center gap-1" data-recent-collection-actions>
             <button
@@ -433,7 +538,7 @@ export default function RecentCollectionsTable({
             </button>
             <button
               type="button"
-              onClick={() => selectedCollection && onDelete?.(selectedCollection.id)}
+              onClick={() => void queueSelectedDelete()}
               disabled={!canDeleteSelected}
               className={`group relative flex h-8 items-center gap-1 rounded-xl border px-2.5 text-xs font-medium shadow-sm transition-all ${canDeleteSelected ? "border-rose-200/60 bg-rose-50/70 text-rose-600 hover:bg-rose-50 active:scale-95" : "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"}`}
               aria-label={t("common.delete")}
@@ -474,7 +579,7 @@ export default function RecentCollectionsTable({
               {/* Each column is tagged with the same icon vocabulary Shop Sales
                 * uses, so a column means the same thing across the product. */}
               <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
-                <button type="button" onClick={toggleAllPending} disabled={!pendingPageIds.length || statusFilter !== "Pending"} aria-label={allPendingChecked ? "Clear selected collections" : "Select all pending collections"} title={allPendingChecked ? "Clear selection" : "Select all pending"} className="group inline-flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"><span>#</span><ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${allPendingChecked ? "rotate-180 text-amber-600" : "group-hover:translate-y-0.5"}`} /></button>
+                <button type="button" data-recent-collection-actions onPointerDown={(event) => event.stopPropagation()} onClick={toggleAllPending} disabled={!pendingPageIds.length || statusFilter !== "Pending"} aria-label={allPendingChecked ? "Clear selected collections" : "Select all pending collections"} title={allPendingChecked ? "Clear selection" : "Select all pending"} className="group inline-flex items-center gap-1 rounded-lg px-2 py-1 transition-all hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-40"><span>#</span><ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${allPendingChecked ? "rotate-180 text-amber-600" : "group-hover:translate-y-0.5"}`} /></button>
               </th>
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
@@ -559,14 +664,14 @@ export default function RecentCollectionsTable({
                     }}
                     tabIndex={index === activeRowIndex ? 0 : -1}
                     onClick={() => {
-                      if (statusFilter === "Pending" && rawStatus === "Pending Approval" && onApproveMany) {
+                      if (statusFilter === "Pending" && rawStatus === "Pending Approval") {
                         toggleChecked(col.id);
                         return;
                       }
                       selectRow(isSelected ? null : col);
                     }}
                     onKeyDown={(event) => handleRowKeyDown(event, index, col)}
-                    aria-selected={isSelected}
+                    aria-selected={isSelected || isChecked}
                     className={`cursor-pointer outline-none transition-[background-color,box-shadow,border-color] duration-200 ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300 ${
                       isSelected || isChecked
                         ? "bg-amber-50/70 border-l-4 border-l-amber-300 ring-1 ring-inset ring-amber-100"
@@ -620,6 +725,13 @@ export default function RecentCollectionsTable({
           compact
         />
       )}
+
+      <PendingDeleteNotification
+        items={pendingItems}
+        onCancel={cancelDelete}
+        countdownLabel={(seconds) => t("ops.collection.deleting_in", { seconds })}
+        cancelLabel={t("ops.collection.undo_delete")}
+      />
     </div>
   );
 }

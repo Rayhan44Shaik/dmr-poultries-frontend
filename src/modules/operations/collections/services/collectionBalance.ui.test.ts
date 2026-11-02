@@ -119,7 +119,6 @@ test("Collection Entry renders the collection table with the required columns", 
   assert.match(tableSrc, /t\("table\.mode"\)/);
   assert.match(tableSrc, /t\("table\.amount"\)/);
   assert.match(tableSrc, /t\("table\.remarks"\)/);
-  assert.match(tableSrc, /t\("table\.status"\)/);
   assert.match(tableSrc, /col\.paymentModeName/);
 });
 
@@ -138,33 +137,35 @@ test("Filtering happens before display (single global filter)", () => {
   // RecentCollectionsTable doesn't use pagination (it shows all filtered results)
 });
 
-test("Recent Collections clears the selected row when clicking outside the table rows", () => {
+test("Recent Collections clears the selected row when clicking outside the table card", () => {
   assert.match(tableSrc, /document\.addEventListener\("pointerdown", handleClickAway\)/);
-  assert.match(tableSrc, /target\.closest\("\[data-recent-collection-row\], \[data-recent-collection-actions\]"\)/);
+  assert.match(tableSrc, /target\.closest\("\[data-recent-collections\]"\)/);
+  assert.match(tableSrc, /data-recent-collections/);
   assert.match(tableSrc, /data-recent-collection-row/);
   assert.match(tableSrc, /data-recent-collection-actions/);
   assert.match(tableSrc, /onSelectionChange\?\.\(null\)/);
 });
 
 test("Recent Collections keeps the selected row while a table-level action is clicked", () => {
-  const guard = tableSrc.indexOf('target.closest("[data-recent-collection-row], [data-recent-collection-actions]")');
+  const guard = tableSrc.indexOf('target.closest("[data-recent-collections]")');
   const edit = tableSrc.indexOf("selectedCollection && onEdit(selectedCollection)");
-  assert.ok(guard !== -1, "the click-away guard must include the selected-row action toolbar");
+  assert.ok(guard !== -1, "the click-away guard must include the whole Recent Collections card");
   assert.ok(edit !== -1, "the Edit action must use the selected collection");
 });
 
 test("Recent Collections uses selected-row toolbar actions instead of an actions column", () => {
   assert.match(tableSrc, /canEditSelected/);
   assert.match(tableSrc, /canDeleteSelected/);
-  assert.match(tableSrc, /onDelete\?\.\(selectedCollection\.id\)/);
+  assert.match(tableSrc, /queueSelectedDelete/);
   assert.doesNotMatch(tableSrc, /t\("table\.actions"\)/);
 });
 
-test("Pending collection status changes through the row dropdown, not a toolbar approve button", () => {
-  assert.match(tableSrc, /<select[\s\S]*value="Pending Approval"/);
-  assert.match(tableSrc, /event\.target\.value === "Approved"/);
-  assert.match(tableSrc, /onApprove\(col\.id\)/);
-  assert.doesNotMatch(tableSrc, /canApproveSelected/);
+test("Approve selected works for one pending row, many rows, and select-all", () => {
+  assert.match(tableSrc, /idsReadyToApprove/);
+  assert.match(tableSrc, /onApproveMany\(ids\)/);
+  assert.match(tableSrc, /toggleAllPending/);
+  assert.match(tableSrc, /Approve selected/);
+  assert.match(tableSrc, /data-recent-collections/);
 });
 
 test("approveCollection() reads the backend-returned currentBalance", async () => {

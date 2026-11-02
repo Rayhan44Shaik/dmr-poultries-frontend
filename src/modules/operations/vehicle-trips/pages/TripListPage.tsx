@@ -79,6 +79,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
   const [farm, setFarm] = useState(ALL_SOURCES);
   const [shop, setShop] = useState(ALL_SHOPS);
+  const [vehicleOwnership, setVehicleOwnership] = useState<"all" | "rental" | "owned">("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
@@ -138,7 +139,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       } while (page <= totalPages);
 
       const matchingTrips = sortTripListTrips(
-        filterTripListTrips(uniqueTripsById(fetchedTrips), filters),
+        filterTripListTrips(uniqueTripsById(fetchedTrips), { ...filters, vehicleOwnership }),
         sortBy,
         sortDir,
       );
@@ -158,7 +159,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         setIsLoading(false);
       }
     }
-  }, [showNotification, t, fromDate, toDate, vehicle, supervisor, farm, shop, deferredSearch, sortBy, sortDir]);
+  }, [showNotification, t, fromDate, toDate, vehicle, supervisor, farm, shop, vehicleOwnership, deferredSearch, sortBy, sortDir]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +179,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setSupervisor(ALL_SUPERVISORS);
     setFarm(ALL_SOURCES);
     setShop(ALL_SHOPS);
+    setVehicleOwnership("all");
     setFromDate("");
     setToDate("");
     setSortBy(null);
@@ -307,9 +309,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const completedTrips = useMemo(
     () => filterTripListTrips(uniqueTripsById(Array.isArray(trips) ? trips : []), {
       shopId: numericFilter(shop, ALL_SHOPS),
+      vehicleOwnership,
       search,
     }),
-    [trips, shop, search],
+    [trips, shop, vehicleOwnership, search],
   );
 
   const hasFilters =
@@ -318,6 +321,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     supervisor !== ALL_SUPERVISORS ||
     farm !== ALL_SOURCES ||
     shop !== ALL_SHOPS ||
+    vehicleOwnership !== "all" ||
     fromDate !== "" ||
     toDate !== "";
 
@@ -463,6 +467,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         supervisor !== ALL_SUPERVISORS ? { label: t("common.supervisor"), value: selectedSupervisorLabel } : null,
         farm !== ALL_SOURCES ? { label: t("ops.trip.source_farm"), value: selectedFarmLabel } : null,
         shop !== ALL_SHOPS ? { label: t("common.shop"), value: selectedShopLabel } : null,
+        vehicleOwnership !== "all"
+          ? {
+              label: t("ops.trip.vehicle_ownership"),
+              value: vehicleOwnership === "rental" ? t("ops.trip.rental_vehicles") : t("ops.trip.owned_vehicles"),
+            }
+          : null,
       ].filter((filter): filter is { label: string; value: string } => filter !== null);
 
       exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
@@ -550,6 +560,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         supervisor={supervisor}
         farm={farm}
         shop={shop}
+        vehicleOwnership={vehicleOwnership}
         sortBy={sortBy}
         sortDir={sortDir}
         search={search}
@@ -559,6 +570,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         setSupervisor={setFilterSupervisor}
         setFarm={setFilterFarm}
         setShop={setFilterShop}
+        setVehicleOwnership={(value) => {
+          setFilterResultsReady(false);
+          setVehicleOwnership(value);
+          setCurrentPage(1);
+        }}
         setSort={setFilterSort}
         setSearch={setFilterSearch}
         onReset={handleResetFilters}

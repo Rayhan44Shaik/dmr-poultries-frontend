@@ -186,9 +186,20 @@ test("PendingCollectionsPage lists shops read-only — no delete from the list",
   assert.doesNotMatch(pendingPageSrc, /handleDelete/);
 });
 
-test("the shop view owns deletion and calls the pending-specific service", () => {
+test("the shop view owns deletion — pending rows use the pending route, approved rows reverse through soft-delete", () => {
   assert.match(shopViewSrc, /collectionService\.deletePendingCollection\(/);
-  assert.doesNotMatch(shopViewSrc, /deleteCollection\(/);
+  assert.match(shopViewSrc, /collectionService\.deleteCollection\(/);
+});
+
+test("Pending Collections table has View only — no table-level Delete", () => {
+  const pendingCollectionsTableSrc = readFileSync(
+    join(__dirname, "../components/pending/PendingCollectionsTable.tsx"),
+    "utf8",
+  );
+  assert.doesNotMatch(pendingCollectionsTableSrc, /Trash2/);
+  assert.doesNotMatch(pendingCollectionsTableSrc, /allowDelete/);
+  assert.doesNotMatch(pendingCollectionsTableSrc, /t\("common\.delete"\)/);
+  assert.match(pendingCollectionsTableSrc, /onView/);
 });
 
 test("PendingCollectionsPage has no client-side 10-day (or any hardcoded day-count) eligibility calculation", () => {

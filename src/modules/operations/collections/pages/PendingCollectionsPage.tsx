@@ -14,7 +14,6 @@ import type {
 import { useToast } from "../../../../components/common/ToastProvider";
 import { ShopCollectionDetailModal } from "../components/pending/ShopCollectionDetailModal";
 import PendingCollectionsFilters from "../components/pending/PendingCollectionsFilters";
-import PendingCollectionsSummary from "../components/pending/PendingCollectionsSummary";
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";
 import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
@@ -59,9 +58,10 @@ export default function PendingCollectionsPage() {
   /**
    * Column order, held as key + direction — one vocabulary shared with the
    * table headers and the filter bar's Sort By, exactly like Trip List.
-   * `null` means no column order: the register's own sequence.
+   * Default is shop name A → Z. `null` still means that same alphabet order
+   * (never the master's insert sequence, which put "Z …" at the top).
    */
-  const [sortBy, setSortBy] = useState<PendingShopSortKey | null>(null);
+  const [sortBy, setSortBy] = useState<PendingShopSortKey | null>("shopName");
   const [sortDir, setSortDir] = useState<PendingShopSortDir>("asc");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -88,7 +88,7 @@ export default function PendingCollectionsPage() {
 
   // Applied filters
   const [appliedShopName, setAppliedShopName] = useState("");
-  const [appliedSortBy, setAppliedSortBy] = useState<PendingShopSortKey | null>(null);
+  const [appliedSortBy, setAppliedSortBy] = useState<PendingShopSortKey | null>("shopName");
   const [appliedSortDir, setAppliedSortDir] = useState<PendingShopSortDir>("asc");
   const [appliedFromDate, setAppliedFromDate] = useState("");
   const [appliedToDate, setAppliedToDate] = useState("");
@@ -237,38 +237,38 @@ export default function PendingCollectionsPage() {
       data = data.filter((shop) => shop.recoveryPercentage >= appliedRecoveryThreshold);
     }
 
-    if (appliedSortBy) {
-      const direction = appliedSortDir === "asc" ? 1 : -1;
-      const orderValue = (row: PendingReportRow): string | number => {
-        switch (appliedSortBy) {
-          case "balance":
-            return row.balance;
-          case "weeklySales":
-            return row.weeklySales;
-          case "weeklyApprovedCollections":
-            return row.weeklyApprovedCollections;
-          case "recoveryPercentage":
-            return row.recoveryPercentage;
-          case "overdueDays":
-            // A shop that is not overdue sits below every overdue shop, in both
-            // directions — "not overdue" is an absence, not a small number.
-            return row.overdueDays ?? -1;
-          case "lastCollectionDate":
-            return row.lastCollectionDate ?? "";
-          case "shopName":
-          default:
-            return row.shopName.toLowerCase();
-        }
-      };
-      data.sort((a, b) => {
-        const left = orderValue(a);
-        const right = orderValue(b);
-        if (typeof left === "number" && typeof right === "number") {
-          return (left - right) * direction;
-        }
-        return String(left).localeCompare(String(right)) * direction;
-      });
-    }
+    const column = appliedSortBy ?? "shopName";
+    const direction = appliedSortBy ? (appliedSortDir === "asc" ? 1 : -1) : 1;
+    const orderValue = (row: PendingReportRow): string | number => {
+      switch (column) {
+        case "balance":
+          return row.balance;
+        case "weeklySales":
+          return row.weeklySales;
+        case "weeklyApprovedCollections":
+          return row.weeklyApprovedCollections;
+        case "recoveryPercentage":
+          return row.recoveryPercentage;
+        case "overdueDays":
+          return row.overdueDays ?? -1;
+        case "lastCollectionDate":
+          return row.lastCollectionDate ?? "";
+        case "shopName":
+        default:
+          return row.shopName;
+      }
+    };
+    data.sort((a, b) => {
+      const left = orderValue(a);
+      const right = orderValue(b);
+      if (typeof left === "number" && typeof right === "number") {
+        return (left - right) * direction;
+      }
+      return String(left).localeCompare(String(right), "en", {
+        numeric: true,
+        sensitivity: "base",
+      }) * direction;
+    });
     return data;
   }, [
     reportData,
@@ -330,7 +330,7 @@ export default function PendingCollectionsPage() {
     };
   }, [filteredData, totalOutstanding, totalWeeklySales, totalWeeklyCollections, overallRecovery]);
 
-  /** Header click: ascending → descending → back to the register order. */
+  /** Header click: ascending → descending → back to shop name A → Z. */
   const handleSortChange = useCallback((key: PendingShopSortKey) => {
     if (sortBy !== key) {
       setSortBy(key);
@@ -341,7 +341,7 @@ export default function PendingCollectionsPage() {
       setSortDir("desc");
       return;
     }
-    setSortBy(null);
+    setSortBy("shopName");
     setSortDir("asc");
   }, [sortBy, sortDir]);
 
@@ -395,14 +395,14 @@ export default function PendingCollectionsPage() {
     setFromDate("");
     setToDate("");
     setShopName("");
-    setSortBy(null);
+    setSortBy("shopName");
     setSortDir("asc");
     setRecoveryThreshold(0);
     setSearchQuery("");
     setAppliedFromDate("");
     setAppliedToDate("");
     setAppliedShopName("");
-    setAppliedSortBy(null);
+    setAppliedSortBy("shopName");
     setAppliedSortDir("asc");
     setAppliedRecoveryThreshold(0);
     setAppliedSearchQuery("");
@@ -447,18 +447,6 @@ export default function PendingCollectionsPage() {
         refreshing={firstLoad || refreshing}
       />
 
-      {hasKpiFilters && (
-        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
-          <PendingCollectionsSummary
-            totalOutstanding={totalOutstanding}
-            weeklySales={totalWeeklySales}
-            weeklyCollections={totalWeeklyCollections}
-            recoveryPercentage={overallRecovery}
-            isLoading={firstLoad}
-          />
-        </div>
-      )}
-
       {/* Table Section */}
       <div className="rounded-2xl border border-slate-200/80 overflow-hidden bg-white shadow-sm text-xs md:text-sm">
         <PendingCollectionsTable
@@ -466,8 +454,6 @@ export default function PendingCollectionsPage() {
           selectedShopName={selectedShopName}
           onSelectShop={setSelectedShopName}
           onView={handleView}
-          onOpenShop={handleView}
-          allowDelete={can(CAPABILITIES.COLLECTION_DELETE)}
           totalShops={filteredData.length}
           startIndex={(currentPage - 1) * pageSize}
           isLoading={tableLoading}

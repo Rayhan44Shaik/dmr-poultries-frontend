@@ -17,12 +17,11 @@
 // from the column headers exactly like the Trip List table (ascending →
 // descending → clear) and pages it with the global Pagination.
 //
-// Deleting: one row, one click, the shared 10-second countdown pop — the exact
-// delete flow the Recent Collections table uses — and only while the entry is
-// inside its delete window (aged rows render the same disabled state the
-// Collection Entry view shows, with the days remaining beside the button). The
-// service republishes the shop balance, so the Shops master is correct
-// immediately and the row shows up under Recent Collections → Deleted.
+// Deleting lives in this view only (never on the Pending Collections table).
+// Approved collections stay deletable for 14 days from approval — the same
+// two-week window Shop Sales uses after insert — counted from approvedAt,
+// never from the original collection date. One click starts the shared
+// 10-second countdown pop; aged rows render disabled with days remaining.
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -249,19 +248,23 @@ function ShopCollectionDetailView({
    * ------------------------------------------------------------------ */
   const performDelete = useCallback(
     async (id: string) => {
-      const result = await collectionService.deletePendingCollection(String(id));
+      const row = recentList.find((entry) => String(entry.id) === String(id));
+      const pending = String(row?.status ?? "").toLowerCase().startsWith("pending");
+      const result = pending
+        ? await collectionService.deletePendingCollection(String(id))
+        : {
+            success: await collectionService.deleteCollection(String(id)),
+            message: undefined as string | undefined,
+          };
       if (result.success) {
         showNotification(t("ops.collection.deleted_success"), "success");
-        // Row leaves this table immediately, and the page (Recent Collections)
-        // reloads behind it. The service has already republished the shop
-        // balance, so the Shops master shows the corrected figure at once.
         setRefreshToken((token) => token + 1);
         await onRefresh();
       } else {
         showNotification(result.message ?? t("ops.collection.delete_failed"), "error");
       }
     },
-    [onRefresh, showNotification, t],
+    [onRefresh, recentList, showNotification, t],
   );
 
   const pendingDelete = usePendingDelete<string>(performDelete);
@@ -269,7 +272,12 @@ function ShopCollectionDetailView({
   /** The 10-day rule, said in words, for one row. */
   const deleteHintFor = useCallback(
     (collection: CollectionApiEntry) => {
-      const window = getDeleteWindowForStatus(collection.collectionDate, collection.status);
+      const window = getDeleteWindowForStatus(
+        collection.collectionDate,
+        collection.status,
+        new Date(),
+        collection.approvedAt,
+      );
       const isPendingEntry = String(collection.status ?? "").toLowerCase().startsWith("pending");
       if (!window.canDelete) {
         return isPendingEntry
@@ -459,8 +467,6 @@ function ShopCollectionDetailView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 justify-end shrink-0">
-          {/* The delete rule, stated plainly: the same 10-day window the
-            * Collection Entry view enforces. */}
           <span className="mr-auto inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 shadow-sm lg:mr-0">
             <Clock size={12} className="text-orange-500" />
             {t("ops.collection.delete_window_rule")}
@@ -575,7 +581,55 @@ function ShopCollectionDetailView({
                     })()}
                   </div>
                 </section>
-                <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}><div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 px-4 py-3"><span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700"><IndianRupee size={15} />Amount received</span><span className="text-lg font-bold tabular-nums text-emerald-700">{formatCurrency(Number(selectedRecord.amount) || 0)}</span></div></section>
+                <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 px-4 py-3">
+                    <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                      <IndianRupee size={15} />Amount received
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg font-bold tabular-nums text-emerald-700">
+                        {formatCurrency(Number(selectedRecord.amount) || 0)}
+                      </span>
+                      {allowDelete && !selectedRecord.deleted ? (() => {
+                        const deleteWindow = getDeleteWindowForStatus(
+                          selectedRecord.collectionDate,
+                          selectedRecord.status,
+                          new Date(),
+                          selectedRecord.approvedAt,
+                        );
+                        const canDelete = selectedRecord.canDelete !== false && deleteWindow.canDelete;
+                        const isCounting = pendingDelete.isPending(String(selectedRecord.id));
+                        const isCommitting = pendingDelete.isCommitting(String(selectedRecord.id));
+                        return (
+                          <span className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                pendingDelete.requestDelete(String(selectedRecord.id), {
+                                  label: `${t("ops.collection.delete_collection")} · ${
+                                    selectedRecord.collectionNo || formatCurrency(Number(selectedRecord.amount) || 0)
+                                  }`,
+                                })
+                              }
+                              disabled={!canDelete || isCounting || isCommitting}
+                              aria-label={`${t("ops.collection.delete_collection")} — ${deleteHintFor(selectedRecord)}`}
+                              title={deleteHintFor(selectedRecord)}
+                              className="group inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-50 active:scale-95 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300 disabled:shadow-none"
+                            >
+                              {isCommitting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} className={uiActionIconMotionClass.delete} />}
+                              {t("common.delete")}
+                            </button>
+                            {canDelete && deleteWindow.daysRemaining > 0 ? (
+                              <span className="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-slate-500">
+                                {t("ops.collection.delete_days_chip", { days: deleteWindow.daysRemaining })}
+                              </span>
+                            ) : null}
+                          </span>
+                        );
+                      })() : null}
+                    </span>
+                  </div>
+                </section>
               </>
             ) : null}
           </div>
@@ -752,8 +806,8 @@ function ShopCollectionDetailView({
                         const statusLabel = translatedStatus === statusKey
                           ? collectionStatusLabel(col.status, t)
                           : translatedStatus;
-                        const deleteWindow = getDeleteWindowForStatus(col.collectionDate, col.status);
-                        const canDelete = allowDelete && Boolean(col.canDelete) && deleteWindow.canDelete && !col.deleted;
+                        const deleteWindow = getDeleteWindowForStatus(col.collectionDate, col.status, new Date(), col.approvedAt);
+                        const canDelete = allowDelete && col.canDelete !== false && deleteWindow.canDelete && !col.deleted;
                         const deleteHint = deleteHintFor(col);
                         const isCommitting = pendingDelete.isCommitting(String(col.id));
                         const isCounting = pendingDelete.isPending(String(col.id));
@@ -866,19 +920,8 @@ function ShopCollectionDetailView({
         </div>
       </div>
 
-      {/* Footer — Close only, in the Trip List view's button. */}
+      {/* Footer — Close only. Delete sits on the selected record, not here. */}
       <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 md:px-8 rounded-b-2xl flex-shrink-0">
-        {selectedRecord && allowDelete && selectedRecord.canDelete && !selectedRecord.deleted && getDeleteWindowForStatus(selectedRecord.collectionDate, selectedRecord.status).canDelete ? (
-          <button
-            type="button"
-            onClick={() => pendingDelete.requestDelete(String(selectedRecord.id), { label: `${t("ops.collection.delete_collection")} · ${selectedRecord.collectionNo || formatCurrency(Number(selectedRecord.amount) || 0)}` })}
-            disabled={pendingDelete.isPending(String(selectedRecord.id)) || pendingDelete.isCommitting(String(selectedRecord.id))}
-            className="group inline-flex items-center gap-2 rounded-2xl border border-rose-200 bg-white px-5 py-2.5 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-50 active:scale-95 disabled:opacity-50"
-          >
-            {pendingDelete.isCommitting(String(selectedRecord.id)) ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} className={uiActionIconMotionClass.delete} />}
-            {t("ops.collection.delete_collection")}
-          </button>
-        ) : null}
         <button
           type="button"
           onClick={onClose}

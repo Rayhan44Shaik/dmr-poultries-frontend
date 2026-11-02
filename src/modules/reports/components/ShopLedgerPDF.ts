@@ -63,6 +63,12 @@ export interface ShopLedgerCumulativeRow {
   sale: number;
   collection: number;
   closingBalance: number;
+  mortalityByLoad?: Array<{
+    load: number;
+    boxBirds: number;
+    boxWeight: number;
+    weightModeBirds: number;
+  }>;
 }
 
 /** Build one financially complete row per shop from canonical ledger rows. */
@@ -343,7 +349,7 @@ export const generateShopLedgerPDF = async (
     );
     const summaryRows: (string | number)[][] = cumulative.map((row, index) => [
       index + 1,
-      row.subShopName ? `${row.shop} — ${row.subShopName}` : row.shop,
+      row.shop,
       String(row.birds),
       String(row.mortalityBirds),
       row.weight.toFixed(2),

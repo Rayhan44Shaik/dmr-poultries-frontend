@@ -130,7 +130,7 @@ function PendingCollectionsFilters({
   const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
   const setSortValue = (value: string) => {
     if (!value) {
-      setSort(null, "asc");
+      setSort("shopName", "asc");
       return;
     }
     const match = sortOptions.find((option) => option.value === value);

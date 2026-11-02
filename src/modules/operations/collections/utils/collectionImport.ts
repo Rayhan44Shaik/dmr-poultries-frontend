@@ -19,16 +19,53 @@ export type CollectionImportIssue = { field: CollectionImportField; message: str
 
 const key = (value: string) => value.trim().toLocaleLowerCase("en-IN");
 
+/** Preserve ordinary Excel text/numbers, but render genuine Excel date cells
+ * consistently across Date, Remark and Reference Number columns. */
+export function collectionImportCellText(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    // SheetJS constructs Excel calendar dates at local midnight. UTC getters
+    // would shift an Indian 19-Oct cell back to 18-Oct.
+    const day = String(value.getDate()).padStart(2, "0");
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    return `${day}-${month}-${value.getFullYear()}`;
+  }
+  return value == null ? "" : String(value);
+}
+
 export function canonicalValue(value: string, choices: string[]): string | null {
   const sought = key(value);
   return choices.find((choice) => key(choice) === sought) ?? null;
 }
 
 export function parseDisplayDate(value: string): string | null {
-  const match = value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (!match) return null;
-  const [, dd, mm, yyyy] = match;
-  const iso = `${yyyy}-${mm}-${dd}`;
+  const text = value.trim();
+  let day: string;
+  let month: string;
+  let year: string;
+
+  const dmy = text.match(/^(\d{1,2})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{2}|\d{4})$/);
+  const isoDate = text.match(/^(\d{4})\s*[-/.]\s*(\d{1,2})\s*[-/.]\s*(\d{1,2})$/);
+  const named = text.match(/^(\d{1,2})\s*[-/. ]\s*([A-Za-z]{3,9})\s*[-/. ]\s*(\d{2}|\d{4})$/);
+
+  if (dmy) {
+    [, day, month, year] = dmy;
+  } else if (isoDate) {
+    [, year, month, day] = isoDate;
+  } else if (named) {
+    const monthNames = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+    const monthIndex = monthNames.indexOf(named[2].slice(0, 3).toLowerCase());
+    if (monthIndex < 0) return null;
+    day = named[1];
+    month = String(monthIndex + 1);
+    year = named[3];
+  } else {
+    return null;
+  }
+
+  if (year.length === 2) year = `20${year}`;
+  const dd = day.padStart(2, "0");
+  const mm = month.padStart(2, "0");
+  const iso = `${year}-${mm}-${dd}`;
   const parsed = new Date(`${iso}T00:00:00Z`);
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === iso ? iso : null;
 }
@@ -39,7 +76,7 @@ export function validateCollectionImportRow(
 ): CollectionImportIssue[] {
   const issues: CollectionImportIssue[] = [];
   if (!/^\d+$/.test(row.serialNo.trim())) issues.push({ field: "serialNo", message: "S.No must be a whole number." });
-  if (!parseDisplayDate(row.date)) issues.push({ field: "date", message: "Use DD-MM-YYYY (for example 12-10-2026)." });
+  if (!parseDisplayDate(row.date)) issues.push({ field: "date", message: "Use a valid date such as 19-10-2026 or 19/10/2026." });
   if (!canonicalValue(row.shopName, masters.shops)) issues.push({ field: "shopName", message: "Shop is not in the Shop master." });
   if (!canonicalValue(row.collector, masters.collectors)) issues.push({ field: "collector", message: "Collector is not in the active Collection employee list." });
   if (!canonicalValue(row.mode, masters.modes)) issues.push({ field: "mode", message: "Mode must be Cash or an active Bank master." });

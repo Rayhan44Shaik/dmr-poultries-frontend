@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ShopSale, ShopSaleFilter } from "../types/shopSale";
-import { filterShopSales, paginateSales, calculateSummary } from "./shopSaleCalculation";
+import { filterShopSales, paginateSales, calculateSummary, listTripNumbersNewestFirst } from "./shopSaleCalculation";
 
 function sale(overrides: Partial<ShopSale> = {}): ShopSale {
   return {
@@ -28,6 +28,7 @@ const baseFilter: ShopSaleFilter = {
   fromDate: "",
   toDate: "",
   shopName: "",
+  tripNo: "",
   search: "",
   sortBy: "latest",
 };
@@ -69,6 +70,11 @@ describe("filterShopSales", () => {
     const out = filterShopSales(list, { ...baseFilter, shopName: "Rayhan" });
     assert.equal(out.length, 1);
     assert.equal(out[0].shopName, "Rayhan");
+  });
+
+  it("trip-number filter returns all shops belonging to the selected trip", () => {
+    const out = filterShopSales(list, { ...baseFilter, tripNo: "TR-20260820-001" });
+    assert.deepEqual(out.map((sale) => sale.id), ["1", "2"]);
   });
 
   it("from/to date filters work", () => {
@@ -122,6 +128,18 @@ describe("filterShopSales", () => {
     const copy = [...list];
     filterShopSales(list, { ...baseFilter, sortBy: "amount_asc" });
     assert.deepEqual(list.map((s) => s.id), copy.map((s) => s.id));
+  });
+});
+
+describe("listTripNumbersNewestFirst", () => {
+  it("lists unique trip numbers with the latest trip date first", () => {
+    const trips = listTripNumbersNewestFirst([
+      sale({ id: "1", tripNo: "TR-20261030-001", tripDate: "2026-10-30" }),
+      sale({ id: "2", tripNo: "TR-20261101-001", tripDate: "2026-11-01" }),
+      sale({ id: "3", tripNo: "TR-20261031-005", tripDate: "2026-10-31" }),
+      sale({ id: "4", tripNo: "TR-20261101-001", tripDate: "2026-11-01" }),
+    ]);
+    assert.deepEqual(trips, ["TR-20261101-001", "TR-20261031-005", "TR-20261030-001"]);
   });
 });
 

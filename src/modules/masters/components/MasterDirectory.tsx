@@ -61,6 +61,7 @@ export type MasterDirectoryFiltersProps = {
   onSortChange: (v: string) => void;
   /** Sort value treated as the page default when counting active filters. */
   defaultSort?: string;
+  sortOptions?: Array<{ value: string; label: string }>;
   /** One optional extra field rendered between Search and Status (e.g. City). */
   extraFilter?: ReactNode;
   /** Whether the extra filter is currently active (feeds the Reset count). */
@@ -89,6 +90,7 @@ export function MasterDirectoryFilters({
   sort,
   onSortChange,
   defaultSort = "number",
+  sortOptions,
   extraFilter,
   extraActive = false,
   onReset,
@@ -149,7 +151,7 @@ export function MasterDirectoryFilters({
             label={t("common.status")}
             hideLabel
             value={status}
-            options={[
+            options={sortOptions ?? [
               { value: "", label: t("common.all_statuses") },
               { value: "Active", label: t("common.active") },
               { value: "Inactive", label: t("common.inactive") },

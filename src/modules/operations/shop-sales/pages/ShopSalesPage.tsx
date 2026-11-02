@@ -34,6 +34,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     filter,
     setFilter,
     shopNames: salesShopNames,
+    tripNumbers,
     currentPage,
     setCurrentPage,
     pageSize,
@@ -125,14 +126,20 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         fromDate={filter.fromDate}
         toDate={filter.toDate}
         shopName={filter.shopName}
+        tripNo={filter.tripNo}
         sortBy={filter.sortBy}
         shopNames={shopNames}
+        tripNumbers={tripNumbers}
         searchQuery={searchInput}
         setSearchQuery={handleSearchInputChange}
         setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
         setToDate={(v) => setFilter({ ...filter, toDate: v })}
         setShopName={(v) => {
           setFilter({ ...filter, shopName: v });
+          setCurrentPage(1);
+        }}
+        setTripNo={(v) => {
+          setFilter({ ...filter, tripNo: v });
           setCurrentPage(1);
         }}
         setSortBy={(v) => {
@@ -149,7 +156,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}
       />
 
-      {(Boolean(filter.fromDate) || Boolean(filter.toDate) || Boolean(filter.shopName.trim())) && (
+      {(Boolean(filter.fromDate) || Boolean(filter.toDate) || Boolean(filter.shopName.trim()) || Boolean(filter.tripNo.trim()) || Boolean(filter.search.trim())) && (
         <ShopSalesSummary
           summary={summary}
           isLoading={isLoading}

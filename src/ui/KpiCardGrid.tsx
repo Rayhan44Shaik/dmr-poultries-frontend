@@ -14,6 +14,8 @@ export interface KpiCardItem {
   tooltipContent?: ReactNode;
   Icon: LucideIcon;
   tone: KpiTone;
+  /** Light tinted fill in the same tone — brighter than the default white card. */
+  filled?: boolean;
 }
 
 export type CompactKpiValue = {
@@ -103,47 +105,59 @@ const densityClasses = {
   },
 } as const;
 
-const toneClasses: Record<KpiTone, { value: string; icon: string; glow: string; accent: string }> = {
+const toneClasses: Record<KpiTone, { value: string; icon: string; glow: string; accent: string; fill: string; fillValue: string }> = {
   blue: {
     value: "text-blue-600",
     icon: "border-blue-100 bg-blue-50 text-blue-500 shadow-blue-100/60",
-    glow: "bg-blue-50",
-    accent: "bg-blue-300",
+    glow: "bg-sky-100",
+    accent: "bg-sky-400",
+    fill: "border border-sky-100 bg-gradient-to-br from-sky-50 via-white to-sky-100/70",
+    fillValue: "text-sky-600",
   },
   amber: {
     value: "text-amber-600",
     icon: "border-amber-100 bg-amber-50 text-amber-500 shadow-amber-100/60",
-    glow: "bg-amber-50",
-    accent: "bg-amber-300",
+    glow: "bg-amber-100",
+    accent: "bg-amber-400",
+    fill: "border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-amber-100/70",
+    fillValue: "text-amber-600",
   },
   emerald: {
     value: "text-emerald-600",
     icon: "border-emerald-100 bg-emerald-50 text-emerald-500 shadow-emerald-100/60",
-    glow: "bg-emerald-50",
-    accent: "bg-emerald-300",
+    glow: "bg-emerald-100",
+    accent: "bg-emerald-400",
+    fill: "border border-emerald-100 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70",
+    fillValue: "text-emerald-600",
   },
   violet: {
     value: "text-violet-600",
     icon: "border-violet-100 bg-violet-50 text-violet-500 shadow-violet-100/60",
-    glow: "bg-violet-50",
-    accent: "bg-violet-300",
+    glow: "bg-violet-100",
+    accent: "bg-violet-400",
+    fill: "border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-violet-100/70",
+    fillValue: "text-violet-600",
   },
   rose: {
     value: "text-rose-600",
     icon: "border-rose-100 bg-rose-50 text-rose-500 shadow-rose-100/60",
-    glow: "bg-rose-50",
-    accent: "bg-rose-300",
+    glow: "bg-rose-100",
+    accent: "bg-rose-400",
+    fill: "border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-rose-100/70",
+    fillValue: "text-rose-600",
   },
   cyan: {
     value: "text-cyan-600",
     icon: "border-cyan-100 bg-cyan-50 text-cyan-500 shadow-cyan-100/60",
-    glow: "bg-cyan-50",
-    accent: "bg-cyan-300",
+    glow: "bg-cyan-100",
+    accent: "bg-cyan-400",
+    fill: "border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-cyan-100/70",
+    fillValue: "text-cyan-600",
   },
 };
 
 function KpiCard({ item, density }: { item: KpiCardItem; density: keyof typeof densityClasses }) {
-  const { id, label, value, tooltip, tooltipContent, Icon, tone } = item;
+  const { id, label, value, tooltip, tooltipContent, Icon, tone, filled } = item;
   const dense = densityClasses[density];
   const classes = toneClasses[tone];
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
@@ -167,14 +181,14 @@ function KpiCard({ item, density }: { item: KpiCardItem; density: keyof typeof d
       onPointerLeave={() => setPosition(null)}
       onFocus={handleFocus}
       onBlur={() => setPosition(null)}
-      className={`group relative isolate overflow-hidden border border-slate-200/80 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${dense.card} ${tooltip || tooltipContent ? "cursor-help" : ""}`}
+      className={`group relative isolate overflow-hidden shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 ${dense.card} ${filled ? classes.fill : "border border-slate-200/80 bg-white hover:border-slate-300"} ${tooltip || tooltipContent ? "cursor-help" : ""}`}
     >
       <span className={`pointer-events-none absolute rounded-full ${dense.glow} ${classes.glow}`} aria-hidden="true" />
       <span className={`absolute inset-x-0 bottom-0 ${dense.accent} ${classes.accent}`} aria-hidden="true" />
       <div className="relative flex h-full items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`font-bold uppercase tracking-wide text-slate-500 ${dense.label}`}>{label}</p>
-          <p className={`font-extrabold leading-none tracking-tight tabular-nums ${dense.value} ${classes.value}`}>{value}</p>
+          <p className={`font-extrabold leading-none tracking-tight tabular-nums ${dense.value} ${filled ? classes.fillValue : classes.value}`}>{value}</p>
         </div>
         <span className={`inline-flex shrink-0 items-center justify-center border shadow-sm transition-transform duration-200 group-hover:scale-105 ${dense.iconTile} ${classes.icon}`} aria-hidden="true">
           <Icon size={dense.iconSize} strokeWidth={2.25} />

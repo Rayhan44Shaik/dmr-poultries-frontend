@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, Store, ArrowUpDown } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, Store, ArrowUpDown, BadgeIndianRupee } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -25,6 +25,7 @@ interface Props {
   supervisor: string;
   farm: string;
   shop: string;
+  vehicleOwnership: "all" | "rental" | "owned";
   sortBy: TripSortKey | null;
   sortDir: "asc" | "desc";
   search: string;
@@ -34,6 +35,7 @@ interface Props {
   setSupervisor: (v: string) => void;
   setFarm: (v: string) => void;
   setShop: (v: string) => void;
+  setVehicleOwnership: (v: "all" | "rental" | "owned") => void;
   setSort: (sortBy: TripSortKey | null, sortDir: "asc" | "desc") => void;
   setSearch: (v: string) => void;
   onReset: () => void;
@@ -58,6 +60,7 @@ function TripFilters({
   supervisor,
   farm,
   shop,
+  vehicleOwnership,
   sortBy,
   sortDir,
   search,
@@ -67,6 +70,7 @@ function TripFilters({
   setSupervisor,
   setFarm,
   setShop,
+  setVehicleOwnership,
   setSort,
   setSearch,
   onReset,
@@ -223,7 +227,7 @@ function TripFilters({
 
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[repeat(3,minmax(0,1fr))_max-content] gap-3.5 items-end pt-1">
+      <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-[repeat(4,minmax(0,1fr))_max-content] gap-3.5 items-end pt-1">
         <div className="min-w-0">
           <label className={opsFilterLabelClass}>
             <Store size={17} className="text-sky-500 flex-shrink-0" />
@@ -237,6 +241,26 @@ function TripFilters({
             onChange={(next) => setShop(next || "All Shops")}
             placeholder={t("ops.trip.all_shops")}
             searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div className="min-w-0">
+          <label className={opsFilterLabelClass}>
+            <BadgeIndianRupee size={17} className="text-orange-500 flex-shrink-0" />
+            <span>{t("ops.trip.vehicle_ownership")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("ops.trip.vehicle_ownership")}
+            value={vehicleOwnership === "all" ? "" : vehicleOwnership}
+            options={[
+              { value: "rental", label: t("ops.trip.rental_vehicles") },
+              { value: "owned", label: t("ops.trip.owned_vehicles") },
+            ]}
+            onChange={(next) => setVehicleOwnership(next === "rental" || next === "owned" ? next : "all")}
+            placeholder={t("ops.trip.all_vehicle_types")}
             allowClear
             className="w-full"
           />
@@ -276,7 +300,7 @@ function TripFilters({
           </div>
         </div>
 
-        <div className="md:col-span-3 xl:col-span-1 flex min-w-0 items-center gap-2 justify-end flex-wrap xl:flex-nowrap">
+        <div className="md:col-span-4 xl:col-span-1 flex min-w-0 items-center gap-2 justify-end flex-wrap xl:flex-nowrap">
           {onViewSelected && (
             <button
               ref={viewButtonRef}
@@ -296,6 +320,7 @@ function TripFilters({
               !isAllOption(supervisor),
               !isAllOption(farm),
               !isAllOption(shop),
+              vehicleOwnership !== "all",
               fromDate !== "" || toDate !== "",
               sortBy !== null,
             )}

@@ -60,6 +60,8 @@ amount: number;
   selectedBoxCount?: number;
   dcBirds?: number;
   dcWeight?: number;
+  /** Trip Entry's persisted loss for this load, separate from weight still pending assignment. */
+  loadWeightLoss?: number;
   /** Server-reported pickup quantity for the sale's source trip. */
   tripPickupBirds?: number | null;
   /** Server-computed maximum birds for this shop after all other deliveries
@@ -87,7 +89,7 @@ amount: number;
   /** Backend-authoritative, user-friendly reason a sale is not editable
    * (e.g. "Original trip no longer exists.", "Editing period has expired."). */
   lockReason?: string | null;
-  /** Backend-authoritative Rate Entry lock / 2-week-from-insert correction state. */
+  /** Backend-authoritative two-week correction state from Shop Sales entry. */
   rateCompleted?: boolean;
   rateLockedAt?: string | null;
   rateLockedBy?: string | null;
@@ -119,6 +121,9 @@ export interface ShopSaleFilter {
   toDate: string;
 
   shopName: string;
+
+  /** Exact trip selected from the searchable trip-number filter. */
+  tripNo: string;
 
   /** Free-text search sent to the backend — matches Shop Sales No,
    * Shop Name, Trip No and remarks (backend ILIKE). */

@@ -38,7 +38,7 @@ type VehicleTableProps = {
   loading?: boolean;
 };
 
-const COLS = 7;
+const COLS = 8;
 
 function VehicleTable({
   vehicles,
@@ -61,6 +61,7 @@ function VehicleTable({
         <colgroup>
           <col className="w-[3.5rem]" />
           <col className="w-[11rem]" />
+          <col className="w-[8rem]" />
           <col className="w-[9rem]" />
           <col className="w-[7rem]" />
           <col className="w-[8rem]" />
@@ -82,7 +83,12 @@ function VehicleTable({
           <MasterTh
             icon={Tag}
             iconClass={tint.tag}
-            label={t("masters.dir.type")}
+            label="Ownership"
+          />
+          <MasterTh
+            icon={Tag}
+            iconClass={tint.tag}
+            label="Vehicle Type"
           />
           <MasterTh
             icon={Boxes}
@@ -136,14 +142,17 @@ function VehicleTable({
                 {formatVehicleNumber(f.vehicleNumber)}
               </td>
               <td className={masterTdClass}>
-                {f.isRented ? (
+                {f.isPersonal ? (
+                  <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700">
+                    Personal
+                  </span>
+                ) : f.isRented ? (
                   <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">
                     Rental
                   </span>
-                ) : (
-                  <span className="block truncate">{shown(f.vehicleType) || "—"}</span>
-                )}
+                ) : <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Office</span>}
               </td>
+              <td className={masterTdClass}><span className="block truncate font-medium text-slate-700">{shown(f.vehicleType) || "—"}</span></td>
               <td className={`${masterTdClass} text-right tabular-nums`}>
                 {f.noOfBoxes}
               </td>

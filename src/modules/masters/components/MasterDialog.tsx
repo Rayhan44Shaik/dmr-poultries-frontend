@@ -6,7 +6,7 @@ interface MasterDialogProps {
   children: ReactNode;
   onClose: () => void;
   isSaving?: boolean;
-  width?: "standard" | "wide";
+  width?: "standard" | "wide" | "full";
 }
 
 /** No second padded card around the form. Portalled menus stay in this modal. */
@@ -108,7 +108,7 @@ export default function MasterDialog({
         aria-busy={isSaving}
         tabIndex={-1}
         data-master-dialog
-        className={`w-full min-w-0 outline-none ${width === "wide" ? "max-w-5xl" : "max-w-4xl"}`}
+        className={`w-full min-w-0 outline-none ${width === "full" ? "max-w-[96rem]" : width === "wide" ? "max-w-5xl" : "max-w-4xl"}`}
       >
         {children}
       </div>

@@ -37,6 +37,7 @@ const ALL_VEHICLES = "All Vehicles";
 const ALL_DRIVERS = "All Drivers";
 const ALL_BUNKS = "All Bunks";
 const isGenericOtherBunk = (value: string) => /^others?$/i.test(value.trim());
+const withinManualWindow = (bill: FuelExpense) => Date.now() - new Date(bill.createdDate).getTime() <= 14 * 24 * 60 * 60 * 1000;
 
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const { t, language } = useI18n();
@@ -315,14 +316,14 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
-    if (target.status === "Approved") {
-      showNotification(language === "te" ? "ఆమోదించిన ఇంధన బిల్లులను సవరించలేము." : "Approved fuel bills cannot be edited.", "info");
+    if (!withinManualWindow(target)) {
+      showNotification("Manual fuel bills are frozen 14 days after entry.", "info");
       return;
     }
     setEditingId(target.id);
     setEditingData(target);
     setShowForm(true);
-  }, [selectedBill, showNotification, language, t]);
+  }, [selectedBill, showNotification, t]);
 
   // ── Delayed 10-Second Pending Delete with Undo ──
   const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
@@ -337,8 +338,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
-    if (target.status === "Approved") {
-      showNotification(t("ops.fuel.cant_delete_approved"), "info");
+    if (!withinManualWindow(target)) {
+      showNotification("Manual fuel bills are frozen 14 days after entry.", "info");
       return;
     }
     requestDelete(target.id, {
@@ -588,6 +589,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           tabCounts={tabCounts}
           includeMasterBunks={includeMasterBunks}
           onIncludeMasterBunksChange={(next) => { setIncludeMasterBunks(next); setCurrentPage(1); }}
+          filteredTotals={hasFilters ? { records: allFilteredBills.length, litres: summaryTotals.totalLitres, amount: summaryTotals.totalAmount } : null}
         />
 
         <PendingDeleteNotification items={pendingItems} onCancel={cancel} />

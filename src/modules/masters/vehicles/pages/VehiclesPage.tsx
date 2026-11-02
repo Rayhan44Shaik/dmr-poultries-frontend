@@ -1,10 +1,12 @@
 import "../../styles/masters.css";
-import { Truck } from "lucide-react";
+import { Tags, Truck } from "lucide-react";
 import { countActiveFilters } from "../../../../ui";
 import {
   MasterDirectoryFilters,
   MasterDirectoryCard,
+  MasterDirectoryField,
 } from "../../components/MasterDirectory";
+import MasterDropdown from "../../components/MasterDropdown";
 import { useI18n } from "../../../../i18n";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\vehicles\pages\MasterVehiclesPage.tsx
 
@@ -36,6 +38,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
+  const [vehicleClass, setVehicleClass] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -60,6 +63,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     search,
     status: statusFilter,
     sort: sortOrder,
+    vehicleClass,
   });
 
   const vehicleBulkImportConfig = useMemo(
@@ -154,6 +158,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     const engineNumber = vehicle.engineNumber?.trim() ?? "";
     const chassisNumber = vehicle.chassisNumber?.trim() ?? "";
     const isRented = vehicle.isRented === true;
+    const isPersonal = vehicle.isPersonal === true;
     const noOfBoxes = Number(vehicle.noOfBoxes);
     const birdCapacity = Number(vehicle.birdCapacity);
     const capacityKg = Number(vehicle.capacityKg);
@@ -161,9 +166,9 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     if (
       !vehicleNumber ||
       (!isRented && !vehicleType) ||
-      Number.isNaN(noOfBoxes) ||
-      Number.isNaN(birdCapacity) ||
-      Number.isNaN(capacityKg)
+      (!isPersonal && Number.isNaN(noOfBoxes)) ||
+      (!isPersonal && Number.isNaN(birdCapacity)) ||
+      (!isPersonal && Number.isNaN(capacityKg))
     ) {
       return "Please fill all required fields.";
     }
@@ -173,7 +178,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     if (!isRented && !chassisNumber) {
       return "Chassis Number is required.";
     }
-    if (noOfBoxes <= 0 || birdCapacity <= 0 || capacityKg <= 0) {
+    if (!isPersonal && (noOfBoxes <= 0 || birdCapacity <= 0 || capacityKg <= 0)) {
       return "Boxes, bird capacity, and capacity (kg) must be positive numbers.";
     }
 
@@ -202,10 +207,11 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
       vehicleNumber: vehicle.vehicleNumber!.trim(),
       vehicleType: vehicle.vehicleType?.trim() ?? "",
       isRented: vehicle.isRented === true,
+      isPersonal: vehicle.isPersonal === true,
       trackingId: vehicle.trackingId?.trim() ?? "",
-      noOfBoxes: Number(vehicle.noOfBoxes),
-      birdCapacity: Number(vehicle.birdCapacity),
-      capacityKg: Number(vehicle.capacityKg),
+      noOfBoxes: vehicle.isPersonal ? 1 : Number(vehicle.noOfBoxes),
+      birdCapacity: vehicle.isPersonal ? 1 : Number(vehicle.birdCapacity),
+      capacityKg: vehicle.isPersonal ? 1 : Number(vehicle.capacityKg),
       fastagBank: vehicle.fastagBank?.trim() ?? "",
       engineNumber: vehicle.engineNumber?.trim() ?? "",
       chassisNumber: vehicle.chassisNumber?.trim() ?? "",
@@ -270,11 +276,13 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     setSearch("");
     setStatusFilter("");
     setSortOrder("number");
+    setVehicleClass("");
     setCurrentPage(1);
   };
   const activeFilterCount = countActiveFilters(
     search.trim() !== "",
     statusFilter !== "",
+    vehicleClass !== "",
     sortOrder !== "number",
   );
 
@@ -286,12 +294,37 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
         search={search}
         onSearchChange={handleSearchChange}
         searchPlaceholder={t("masters.dir.search_vehicle")}
+        extraActive={vehicleClass !== ""}
+        extraFilter={
+          <MasterDirectoryField icon={Tags} iconClass="text-indigo-500" label="Ownership">
+            <MasterDropdown
+              label="Ownership"
+              hideLabel
+              value={vehicleClass}
+              options={[
+                { value: "", label: "All ownerships" },
+                { value: "Rental", label: "Rental vehicles" },
+                { value: "Personal", label: "Personal vehicles" },
+                { value: "Office", label: "Office vehicles" },
+              ]}
+              onChange={(value) => { setVehicleClass(value); setCurrentPage(1); }}
+              searchable
+              className="w-full"
+            />
+          </MasterDirectoryField>
+        }
         status={statusFilter}
         onStatusChange={(value) => {
           setStatusFilter(value);
           setCurrentPage(1);
         }}
         sort={sortOrder}
+        sortOptions={[
+          { value: "number", label: "Vehicle number" },
+          { value: "name", label: "Registration" },
+          { value: "type", label: "Vehicle category/type" },
+          { value: "status", label: "Status" },
+        ]}
         onSortChange={(value) => {
           setSortOrder(value);
           setCurrentPage(1);

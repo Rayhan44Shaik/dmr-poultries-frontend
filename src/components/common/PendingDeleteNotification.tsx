@@ -29,6 +29,8 @@ type PendingDeleteNotificationProps<TId extends string | number> = {
   ariaLabel?: string;
   /** Formats the ticking countdown; defaults to the "Deleting in N seconds" copy. */
   countdownLabel?: (secondsLeft: number) => string;
+  /** Overrides the default Cancel button, for example "Undo Delete". */
+  cancelLabel?: string;
 };
 
 function mixRoseToSlate(progress01: number): string {
@@ -46,6 +48,7 @@ export function PendingDeleteNotification<TId extends string | number>({
   icon,
   ariaLabel,
   countdownLabel,
+  cancelLabel,
 }: PendingDeleteNotificationProps<TId>) {
   const { t } = useI18n();
   if (typeof document === "undefined" || items.length === 0) return null;
@@ -112,7 +115,7 @@ export function PendingDeleteNotification<TId extends string | number>({
                   onClick={() => onCancel(item.id)}
                   className="mt-5 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
-                  {t("common.cancel")}
+                  {cancelLabel ?? t("common.cancel")}
                 </button>
               )}
             </div>

@@ -221,10 +221,6 @@ export const SearchDropdown = React.memo(function SearchDropdown({
     [filtered, options],
   );
 
-  // Opening a dropdown must not make its first row look selected. A keyboard
-  // candidate appears only after typing or pressing an arrow key.
-  useEffect(() => setActiveIndex(query.trim() ? 0 : -1), [query, open]);
-
   const selected = useMemo(
     () => options.find((option) => option.value === value) || null,
     [options, value]
@@ -252,7 +248,10 @@ export const SearchDropdown = React.memo(function SearchDropdown({
         tabIndex={tabIndex}
         disabled={disabled}
         onClick={() => {
-          if (!open) setQuery("");
+          if (!open) {
+            setQuery("");
+            setActiveIndex(-1);
+          }
           setOpen((o) => !o);
         }}
         className={`${dropdownTriggerClass(Boolean(invalid), disabled)} flex h-[42px] items-center justify-between gap-2 px-4`}
@@ -271,7 +270,10 @@ export const SearchDropdown = React.memo(function SearchDropdown({
           <DropdownSearchBox
             searchRef={searchRef}
             query={query}
-            setQuery={setQuery}
+            setQuery={(nextQuery) => {
+              setQuery(nextQuery);
+              setActiveIndex(nextQuery.trim() ? 0 : -1);
+            }}
             searchPlaceholder={searchPlaceholder}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
@@ -400,8 +402,13 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, triggerRef, restoreTriggerFocus, filtered } = useDropdownPanel();
   const { t } = useI18n();
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
+  const visibleOptions = useMemo(
+    () => filtered(options).filter((option) => !option.disabled),
+    [filtered, options],
+  );
 
   const toggle = useCallback(
     (value: string) => {
@@ -424,15 +431,23 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
         aria-disabled={disabled}
         onClick={() => {
           if (disabled) return;
-          if (!open) setQuery("");
+          if (!open) {
+            setQuery("");
+            setActiveIndex(-1);
+          }
           setOpen((o) => !o);
         }}
         onKeyDown={(event) => {
           if (disabled) return;
-          if (event.key === "Enter" || event.key === " ") {
+          if (event.key === "Enter" || event.key === " " || event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            if (!open) setQuery("");
-            setOpen((o) => !o);
+            if (!open) {
+              setQuery("");
+              setActiveIndex(-1);
+              setOpen(true);
+            } else if (event.key === "Enter" || event.key === " ") {
+              setOpen(false);
+            }
           }
         }}
         className={`${dropdownTriggerClass(Boolean(invalid), disabled)} flex min-h-[42px] flex-wrap items-center gap-1.5 px-2.5 py-1.5`}
@@ -483,7 +498,10 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           <DropdownSearchBox
             searchRef={searchRef}
             query={query}
-            setQuery={setQuery}
+            setQuery={(nextQuery) => {
+              setQuery(nextQuery);
+              setActiveIndex(nextQuery.trim() ? 0 : -1);
+            }}
             searchPlaceholder={searchPlaceholder}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
@@ -492,21 +510,45 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                 restoreTriggerFocus();
                 return;
               }
-              if (event.key !== "Enter") return;
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setActiveIndex((current) => {
+                  if (!visibleOptions.length) return -1;
+                  const direction = event.key === "ArrowDown" ? 1 : -1;
+                  if (current < 0) return direction > 0 ? 0 : visibleOptions.length - 1;
+                  return (current + direction + visibleOptions.length) % visibleOptions.length;
+                });
+                return;
+              }
+              if (event.key !== "Enter" && event.key !== "Tab") return;
               const allowed = options
                 .filter((option) => !option.disabled)
                 .map((option) => option.value);
               const additions = numericRangeSelection
                 ? parseBoxSelectionQuery(query, allowed)
                 : [];
-              const fallback = filtered(options).find((option) => !option.disabled)?.value;
+              const fallback = activeIndex >= 0
+                ? visibleOptions[activeIndex]?.value
+                : query.trim()
+                  ? visibleOptions[0]?.value
+                  : undefined;
               const accepted = additions.length ? additions : fallback ? [fallback] : [];
-              if (!accepted.length) return;
+              if (!accepted.length) {
+                if (event.key === "Tab") {
+                  setOpen(false);
+                  setQuery("");
+                }
+                return;
+              }
               event.preventDefault();
               onChange(Array.from(new Set([...selectedValues, ...accepted])));
               setQuery("");
               setOpen(false);
-              restoreTriggerFocus();
+              if (event.key === "Tab") {
+                requestAnimationFrame(() => focusNextTabStop(triggerRef.current));
+              } else {
+                restoreTriggerFocus();
+              }
             }}
           />
 
@@ -557,6 +599,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             {filtered(options).map((option) => {
               const isSelected = selectedSet.has(option.value);
               const isLocked = Boolean(option.disabled) && !isSelected;
+              const keyboardIndex = visibleOptions.findIndex((visible) => visible.value === option.value);
+              const isActive = activeIndex >= 0 && keyboardIndex === activeIndex;
               return (
                 <li key={option.value}>
                   <button
@@ -568,6 +612,8 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                         ? "text-slate-400 bg-slate-50/80 cursor-not-allowed"
                         : isSelected
                           ? "text-emerald-500 bg-emerald-50/70 hover:bg-slate-50"
+                          : isActive
+                            ? "text-blue-700 bg-blue-50/80"
                           : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >

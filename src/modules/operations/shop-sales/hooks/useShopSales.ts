@@ -5,6 +5,7 @@ import { handleApiError } from "../../../../api";
 import {
   calculateSummary,
   filterShopSales,
+  listTripNumbersNewestFirst,
   paginateSales,
 } from "../utils/shopSaleCalculation";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/paginationStyles";
@@ -13,6 +14,7 @@ const DEFAULT_FILTER: ShopSaleFilter = {
   fromDate: "",
   toDate: "",
   shopName: "",
+  tripNo: "",
   search: "",
   sortBy: "latest",
 };
@@ -148,6 +150,10 @@ function useShopSales() {
     return [...new Set(sales.map((x) => x.shopName))].sort();
   }, [sales]);
 
+  const tripNumbers = useMemo(() => {
+    return listTripNumbersNewestFirst(sales);
+  }, [sales]);
+
   const filteredSales = useMemo(() => {
     return filterShopSales(sales, filter);
   }, [sales, filter]);
@@ -179,6 +185,7 @@ function useShopSales() {
     filter,
     setFilter,
     shopNames,
+    tripNumbers,
     currentPage,
     setCurrentPage,
     pageSize,

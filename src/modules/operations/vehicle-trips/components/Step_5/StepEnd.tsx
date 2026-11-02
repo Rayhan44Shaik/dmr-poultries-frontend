@@ -169,15 +169,24 @@ export default function StepEnd({
       // Only free-text notes in the editable field — keep order: tags aside.
       remarks: splitRemarks((tripData as any).remarks).userNotes,
     };
-    // Copy any already-flattened diesel* fields from the trip record.
-    Object.keys(tripData).forEach(key => {
-      if (key.startsWith("diesel")) {
-        (data as any)[key] = (tripData as any)[key];
-      }
-    });
     // Hydrate dieselEntries[] → dieselLtr1 / dieselRate1 / … so the diesel
     // table shows fuel bills from dieselEntries (incl. bill image) when present.
+    // Only copy flattened diesel* keys for slots that still exist — leftover
+    // dieselLtr1 after delete/re-add must not reopen an empty S.No 01.
     const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
+    const liveDieselSlots = new Set<number>();
+    entries.forEach((entry, idx) => {
+      const raw = Number(entry.rowIndex);
+      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
+      liveDieselSlots.add(n);
+    });
+    Object.keys(tripData).forEach((key) => {
+      if (!key.startsWith("diesel") || key === "dieselEntries") return;
+      const m = key.match(/(\d+)$/);
+      const slot = m ? Number(m[1]) : NaN;
+      if (!Number.isFinite(slot) || !liveDieselSlots.has(slot)) return;
+      (data as any)[key] = (tripData as any)[key];
+    });
     entries.forEach((entry, idx) => {
       // Unlimited diesel bills — use entry.rowIndex as-is (1-based).
       const raw = Number(entry.rowIndex);

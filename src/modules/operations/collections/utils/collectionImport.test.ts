@@ -1,11 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseDisplayDate, validateCollectionImportRow } from "./collectionImport";
+import { collectionImportCellText, parseDisplayDate, validateCollectionImportRow } from "./collectionImport";
 
-test("collection import date is strict DD-MM-YYYY", () => {
+test("collection import accepts common Excel and Indian date formats", () => {
   assert.equal(parseDisplayDate("12-10-2026"), "2026-10-12");
-  assert.equal(parseDisplayDate("2026-10-12"), null);
+  assert.equal(parseDisplayDate("19/10/2026"), "2026-10-19");
+  assert.equal(parseDisplayDate("19.10.2026"), "2026-10-19");
+  assert.equal(parseDisplayDate("19-Oct-26"), "2026-10-19");
+  assert.equal(parseDisplayDate("2026-10-19"), "2026-10-19");
   assert.equal(parseDisplayDate("31-02-2026"), null);
+});
+
+test("genuine Excel dates use DD-MM-YYYY in date, remark and reference cells", () => {
+  assert.equal(collectionImportCellText(new Date("2026-10-26T00:00:00.000Z")), "26-10-2026");
+  assert.equal(collectionImportCellText("Weekly collection"), "Weekly collection");
+  assert.equal(collectionImportCellText(12345), "12345");
+  assert.equal(collectionImportCellText(null), "");
 });
 
 test("master validation is case insensitive without creating new values", () => {

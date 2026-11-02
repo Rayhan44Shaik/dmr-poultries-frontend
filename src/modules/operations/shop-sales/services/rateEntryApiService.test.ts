@@ -92,3 +92,10 @@ test("mapRowToTrip preserves cumulative and per-load amounts for the queue table
   assert.equal(trip.rateEntryTotalAmount, 0);
   assert.deepEqual(trip.rateEntryLoadAmounts, [{ load: 1, shops: 1, birds: 40, weight: 80, amount: 10040 }]);
 });
+
+test("mapRowToTrip preserves rental vehicle state for orange Rate Entry styling", () => {
+  const dto = row([delivery()]);
+  dto.isRentedVehicle = true;
+  const trip = mapRowToTrip(dto, true);
+  assert.equal(trip.isRentedVehicle, true);
+});

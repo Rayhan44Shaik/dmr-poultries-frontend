@@ -1,7 +1,7 @@
 import React from "react";
 import {
   ArrowDown, ArrowUp, Calendar, Clock3, CreditCard, Eye, Hash, LoaderCircle,
-  ShoppingBag, Trash2, TrendingUp,
+  ShoppingBag, TrendingUp,
 } from "lucide-react";
 import type {
   PendingOverallTotals,
@@ -53,8 +53,6 @@ interface Props {
   selectedShopName: string | null;
   onSelectShop: (shopName: string | null) => void;
   onView: (shopName: string) => void;
-  onOpenShop?: (shopName: string) => void;
-  allowDelete?: boolean;
   totalShops: number;
   startIndex?: number;
   isLoading?: boolean;
@@ -81,10 +79,9 @@ interface Props {
  *     and the card keeps its identity. Rate Entry and Trip List behave the same
  *     way; the page around it never blanks.
  *
- *   • READ-ONLY ROWS — a row offers View only. Owner name and mobile live in
- *     the shop view, not as two more columns here, and nothing on this table
- *     can delete a shop's collection. Deletion stays in the shop view, where
- *     the record being removed is visible and confirmable.
+ *   • READ-ONLY ROWS — a row offers View only. View and Delete never sit on
+ *     the table toolbar or in a second Actions control: opening the shop view
+ *     is the one way in, and deletion lives inside that view, on the record.
  *
  *   • CUMULATIVE — the closing row totals the filtered set, not the page, so
  *     "overall" keeps its meaning at every page size and on every page.
@@ -94,8 +91,6 @@ function PendingCollectionsTable({
   selectedShopName,
   onSelectShop,
   onView,
-  onOpenShop,
-  allowDelete = false,
   totalShops,
   startIndex = 0,
   isLoading = false,
@@ -169,28 +164,6 @@ function PendingCollectionsTable({
             )}
           </h3>
         </div>
-        {selectedShop ? (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onView(selectedShop.shopName)}
-              className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 text-xs font-semibold text-emerald-700"
-            >
-              <span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={13} /></span>
-              {t("common.view")}
-            </button>
-            {allowDelete && (
-              <button
-                type="button"
-                onClick={() => (onOpenShop ?? onView)(selectedShop.shopName)}
-                className="group inline-flex h-8 items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600"
-              >
-                <span className={`inline-flex ${uiActionIconMotionClass.delete}`}><Trash2 size={13} /></span>
-                {t("common.delete")}
-              </button>
-            )}
-          </div>
-        ) : null}
       </div>
 
       {refreshing && !isLoading ? (
@@ -219,37 +192,37 @@ function PendingCollectionsTable({
                 <th className="px-3.5 py-3 text-left">
                   {sortable("shopName", t("operations.shop_name"))}
                 </th>
-                <th className="px-3.5 py-3 text-right">
-                  {sortable("balance", t("common.balance"), "right")}
+                <th className="px-3.5 py-3 text-center">
+                  {sortable("balance", t("common.balance"), "center")}
                 </th>
-                <th className="px-3.5 py-3 text-right">
+                <th className="px-3.5 py-3 text-center">
                   {sortable(
                     "weeklySales",
                     <span className="inline-flex items-center gap-1.5">
                       <ShoppingBag size={14} className="text-blue-600" />
                       {t("operations.recent_sales")}
                     </span>,
-                    "right",
+                    "center",
                   )}
                 </th>
-                <th className="px-3.5 py-3 text-right">
+                <th className="px-3.5 py-3 text-center">
                   {sortable(
                     "weeklyApprovedCollections",
                     <span className="inline-flex items-center gap-1.5">
                       <CreditCard size={14} className="text-green-600" />
                       {t("operations.recent_collections")}
                     </span>,
-                    "right",
+                    "center",
                   )}
                 </th>
-                <th className="px-3.5 py-3 text-right">
+                <th className="px-3.5 py-3 text-center">
                   {sortable(
                     "recoveryPercentage",
                     <span className="inline-flex items-center gap-1.5">
                       <TrendingUp size={14} className="text-purple-600" />
                       {t("ops.collection.recovery_pct")}
                     </span>,
-                    "right",
+                    "center",
                   )}
                 </th>
                 {/* Last Collection sits beside Recovery %: the two read together
@@ -322,11 +295,11 @@ function PendingCollectionsTable({
                       <td className="px-3.5 py-3 text-xs font-semibold whitespace-nowrap text-slate-700">
                         {shown(shop.shopName)}
                       </td>
-                      <td className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${balanceColor}`}>{formatBalance(balance)}</td>
-                      <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-blue-600">{formatCurrency(weeklySales)}</td>
-                      <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-green-600">{formatCurrency(weeklyCollections)}</td>
+                      <td className={`px-3.5 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums ${balanceColor}`}>{formatBalance(balance)}</td>
+                      <td className="px-3.5 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums text-blue-600">{formatCurrency(weeklySales)}</td>
+                      <td className="px-3.5 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums text-green-600">{formatCurrency(weeklyCollections)}</td>
                       <td
-                        className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${
+                        className={`px-3.5 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums ${
                           weeklySales > 0 ? recoveryColor : "text-slate-400"
                         }`}
                       >
@@ -346,7 +319,7 @@ function PendingCollectionsTable({
                         )}
                       </td>
                       <td className="px-3.5 py-3 text-center">
-                        <div className="inline-flex items-center justify-center gap-1">
+                        <div className="inline-flex items-center justify-center">
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
@@ -355,16 +328,6 @@ function PendingCollectionsTable({
                           >
                             <Eye size={16} className={uiActionIconMotionClass.view} />
                           </button>
-                          {allowDelete && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); (onOpenShop ?? onView)(shop.shopName); }}
-                              aria-label={t("common.delete")}
-                              className="group inline-flex h-8 w-8 items-center justify-center rounded-lg text-rose-600 hover:bg-rose-50 transition"
-                            >
-                              <Trash2 size={16} className={uiActionIconMotionClass.delete} />
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -386,12 +349,12 @@ function PendingCollectionsTable({
                       </span>
                     </span>
                   </td>
-                  <td className={`px-3.5 py-3 text-right tabular-nums ${overallBalanceColor}`}>
+                  <td className={`px-3.5 py-3 text-center tabular-nums ${overallBalanceColor}`}>
                     {formatBalance(overall.balance)}
                   </td>
-                  <td className="px-3.5 py-3 text-right tabular-nums text-blue-700">{money(overall.weeklySales)}</td>
-                  <td className="px-3.5 py-3 text-right tabular-nums text-green-700">{money(overall.weeklyApprovedCollections)}</td>
-                  <td className="px-3.5 py-3 text-right tabular-nums text-purple-700">
+                  <td className="px-3.5 py-3 text-center tabular-nums text-blue-700">{money(overall.weeklySales)}</td>
+                  <td className="px-3.5 py-3 text-center tabular-nums text-green-700">{money(overall.weeklyApprovedCollections)}</td>
+                  <td className="px-3.5 py-3 text-center tabular-nums text-purple-700">
                     {overall.weeklySales > 0 ? `${overall.recoveryPercentage.toFixed(2)}%` : "—"}
                   </td>
                   <td className="px-3.5 py-3 text-center tabular-nums text-slate-700">{formatDate(overall.lastCollectionDate)}</td>

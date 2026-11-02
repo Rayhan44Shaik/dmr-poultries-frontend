@@ -6,6 +6,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { allocateSavedDeliveryAcrossBoxes } from "./shopPdfAllocation";
 import type { BoxDetail } from "../types/trip";
 import { resolveShopPdfHeader, type ShopPdfEmployeeRef } from "./shopPdfHeader";
 import type { ShopDeliveryWithExtra } from "../components/Step_4/useShopDeliveryForm";
@@ -334,6 +335,24 @@ export async function generateShopPDFBlob(
       totalWeight = shopDeliveredWeight;
     }
 
+    // Selected pickup boxes identify the physical source, but their original
+    // gross quantities are stale after a Shop Sales split/edit. Reallocate the
+    // current saved delivery totals across the displayed box lines so the PDF
+    // always matches Trip View and Shop Sales.
+    if (isBoxMode && tableRows.length > 0 && tableRows[0][0] !== "No box allocation") {
+      const allocated = allocateSavedDeliveryAcrossBoxes(
+        tableRows.map((item) => ({ birds: toNum(item[1]), weight: toNum(item[2]) })),
+        shopDeliveredBirds,
+        shopDeliveredWeight
+      );
+      tableRows.forEach((item, index) => {
+        item[1] = allocated[index].birds.toLocaleString();
+        item[2] = allocated[index].weight.toFixed(2);
+      });
+      totalBirds = shopDeliveredBirds;
+      totalWeight = shopDeliveredWeight;
+    }
+
     const hasDirectAllocation = tableRows.length === 1 && tableRows[0][0] === "No box allocation";
     const boxCount = hasDirectAllocation ? 0 : tableRows.length;
 
@@ -417,10 +436,10 @@ export async function generateShopPDFBlob(
         0
       );
 
-      // totalBirds/totalWeight are gross farm values in Box Mode.
-      // Delivered figures = gross - mortality, exactly as computed in Step 4.
-      const finalBirdsVal = hasDirectAllocation ? shopDeliveredBirds : Math.max(0, totalBirds - mortalityBirdsVal);
-      const finalWeightVal = hasDirectAllocation ? shopDeliveredWeight : Math.max(0, totalWeight - mortalityWeightVal);
+      // The persisted delivery row is authoritative. Mortality is displayed
+      // separately and must not be subtracted again from already-net values.
+      const finalBirdsVal = shopDeliveredBirds;
+      const finalWeightVal = shopDeliveredWeight;
 
       const summaryHeaders = ["Boxes", "Birds", "Weight(Kg)", "Mortality", "Mortality(KG)"];
       const summaryRows = [

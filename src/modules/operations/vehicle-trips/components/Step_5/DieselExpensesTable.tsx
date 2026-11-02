@@ -94,6 +94,26 @@ function dieselSlotActive(data: Record<string, unknown>, i: number): boolean {
   );
 }
 
+/** Visible diesel rows: submitted/active sheet slots, plus empty rows the user
+ *  explicitly opened with + Add Diesel Entry. Never keep a phantom slot 1 after
+ *  a remount when bills already live on 2, 3, 4 (delete-then-re-add). */
+export function mergeVisibleDieselRows(
+  prev: number[],
+  activeFromSheet: number[],
+  keepEmpty: ReadonlySet<number>
+): number[] {
+  const draftOnly = prev.filter(
+    (n) => n >= 1 && !activeFromSheet.includes(n) && keepEmpty.has(n)
+  );
+  const next = Array.from(new Set([...activeFromSheet, ...draftOnly])).sort((a, b) => a - b);
+  return next.length > 0 ? next : [1];
+}
+
+function dieselRowsFromSheet(data: Record<string, unknown>): number[] {
+  const slots = collectDieselSlotIndices(data).filter((i) => dieselSlotActive(data, i));
+  return slots.length > 0 ? slots : [1];
+}
+
 export default function DieselExpensesTable({
   tripId,
   sheetData,
@@ -123,7 +143,12 @@ export default function DieselExpensesTable({
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [, setIsEditingSubmitted] = useState(false);
   const [draftData, setDraftData] = useState<Record<string, any>>({});
-  const [rowIndices, setRowIndices] = useState<number[]>([1]);
+  const [rowIndices, setRowIndices] = useState<number[]>(() =>
+    dieselRowsFromSheet(sheetData as Record<string, unknown>)
+  );
+  /** Empty slots opened via + Add Diesel Entry — kept across sheet hydrates,
+   *  dropped on remount so a leftover S.No 01 does not reappear. */
+  const keepEmptySlotsRef = useRef<Set<number>>(new Set());
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
     typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`
   );
@@ -141,11 +166,9 @@ export default function DieselExpensesTable({
     const activeFromSheet = slots.filter((i) =>
       dieselSlotActive(sheetData as Record<string, unknown>, i)
     );
+    for (const n of activeFromSheet) keepEmptySlotsRef.current.delete(n);
     setRowIndices((prev) => {
-      // Preserve draft-only rows the user just added that are not yet on sheet content.
-      const draftOnly = prev.filter((n) => n >= 1 && !activeFromSheet.includes(n));
-      const next = Array.from(new Set([...activeFromSheet, ...draftOnly])).sort((a, b) => a - b);
-      const final = next.length > 0 ? next : [1];
+      const final = mergeVisibleDieselRows(prev, activeFromSheet, keepEmptySlotsRef.current);
       const same = prev.length === final.length && prev.every((v, i) => v === final[i]);
       return same ? prev : final;
     });
@@ -261,6 +284,7 @@ export default function DieselExpensesTable({
       [`dieselClientKey${nextId}`]: nextKey,
     });
     setDraftClientKey(nextKey);
+    keepEmptySlotsRef.current.add(nextId);
     setRowIndices((prev) => (prev.includes(nextId) ? prev : [...prev, nextId].sort((a, b) => a - b)));
     // Open the new row for editing so Upload Bill is immediately available.
     setEditingRow(nextId);
@@ -426,6 +450,7 @@ export default function DieselExpensesTable({
       [`dieselClientKey${num}`]: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`,
     });
     if (fileInputRefs.current[num]) fileInputRefs.current[num]!.value = "";
+    keepEmptySlotsRef.current.delete(num);
     setMeterErrors((prev) => {
       const copy = { ...prev };
       delete copy[num];
@@ -803,8 +828,8 @@ export default function DieselExpensesTable({
 
   /** Rebuild visible row list from flattened sheet (unlimited). */
   const rowsFromFlattened = (flattened: Record<string, unknown>): number[] => {
-    const nextRows = collectDieselSlotIndices(flattened).filter((i) => dieselSlotActive(flattened, i));
-    return nextRows.length > 0 ? nextRows : [1];
+    keepEmptySlotsRef.current.clear();
+    return dieselRowsFromSheet(flattened);
   };
 
   const handleRowSubmit = async (num: number) => {

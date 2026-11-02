@@ -109,7 +109,7 @@ export default function useCollectionEntry() {
         // offering drivers/loaders here would let a collection be booked
         // against someone who never collects money.
         const collectorNames = orderCollectionCollectors(getEmployees()
-          .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
+          .filter((emp) => emp.status === "Active" && (emp.department ?? "").toLowerCase() === "collection")
           .map((emp) => emp.employeeName));
         setCollectors(collectorNames);
         setEntry((prev) => prev.collectorName || isEditing
@@ -117,6 +117,7 @@ export default function useCollectionEntry() {
           : { ...prev, collectorName: defaultCollectionCollector(collectorNames) });
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
         getBanks()
+          .filter((bank) => bank.status === "Active")
           .slice()
           .sort((a, b) => a.bankName.localeCompare(b.bankName))
           .forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
@@ -509,8 +510,8 @@ export default function useCollectionEntry() {
     }
   }
 
-  async function approveCollections(ids: string[]) {
-    if (!ids.length) return;
+  async function approveCollections(ids: string[]): Promise<boolean> {
+    if (!ids.length) return false;
     const approved = await collectionService.approveCollections(ids);
     if (approved) {
       showNotification(
@@ -520,20 +521,17 @@ export default function useCollectionEntry() {
         "success",
       );
       await refreshPage();
+      return true;
     } else {
       showNotification(translate("ops.collection.failed_approve"), "error");
+      // Some earlier batches may already be approved. Refresh immediately so
+      // the Pending table and the retained selection reflect server truth.
+      await refreshPage();
+      return false;
     }
   }
 
   async function deleteCollection(id: string) {
-    const confirmed = await confirmDialog({
-      title: translate("ops.collection.delete_confirm_title"),
-      message: translate("ops.collection.confirm_delete_collection"),
-      confirmLabel: translate("common.delete"),
-      cancelLabel: translate("common.cancel"),
-      tone: "danger",
-    });
-    if (!confirmed) return;
     const success = await collectionService.deleteCollection(id);
     if (success) {
       showNotification(translate("ops.collection.deleted_success"), "success");

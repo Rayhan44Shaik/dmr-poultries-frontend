@@ -209,6 +209,7 @@ export default function CollectionAmount({
           <input
             ref={inputRef}
             id="amount"
+            name="collectionAmount"
             type="text"
             inputMode="decimal"
             value={inputValue}
@@ -239,6 +240,7 @@ export default function CollectionAmount({
         </label>
         <input
           id="remarks"
+          name="collectionRemarks"
           type="text"
           value={remarks}
           onChange={(e) => onRemarksChange(e.target.value)}

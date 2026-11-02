@@ -129,16 +129,6 @@ export default function StepPickup({
     if (editable) setIsLocalEditing(true);
   }, [editable, trip.id]);
   const [removedBoxNos, setRemovedBoxNos] = useState<number[]>([]);
-  const [rows, setRows] = useState<Row[]>(() => {
-    const details = trip.boxDetails || [];
-    return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
-  });
-  /** After Add Box, focus the new row's Weight field (birds are defaulted). */
-  const pendingWeightFocusUidRef = useRef<string | null>(null);
-  const weightInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
-  const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [selectedBoxNo, setSelectedBoxNo] = useState("");
-
   // Local operator preference for NEW box bird counts. It is intentionally not
   // trip/backend data, but survives refreshes on this device.
   const DEFAULT_BOX_SIZE_KEY = "dmr-trip-step3-default-box-size";
@@ -150,6 +140,18 @@ export default function StepPickup({
       return 0;
     }
   };
+  const [rows, setRows] = useState<Row[]>(() => {
+    const details = trip.boxDetails || [];
+    return details.length > 0
+      ? details.map((d) => ({ ...d, uid: generateUid() }))
+      : [makeRow(1, storedDefaultBoxSize())];
+  });
+  /** After Add Box / Apply Default, focus the new row's entry field. */
+  const pendingFocusRef = useRef<{ uid: string; field: "birds" | "weight" } | null>(null);
+  const birdsInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const weightInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [selectedBoxNo, setSelectedBoxNo] = useState("");
   const [defaultBoxSizeDraft, setDefaultBoxSizeDraft] = useState(() => String(storedDefaultBoxSize() || ""));
   const [appliedDefaultBoxSize, setAppliedDefaultBoxSize] = useState(storedDefaultBoxSize);
   useEffect(() => {
@@ -166,9 +168,13 @@ export default function StepPickup({
         behavior: "smooth",
         block: "center",
       });
-      const weightInput = weightInputRefs.current.get(row.uid);
-      weightInput?.focus({ preventScroll: true });
-      weightInput?.select();
+      const field = appliedDefaultBoxSize > 0 ? "weight" : "birds";
+      const input =
+        field === "birds"
+          ? birdsInputRefs.current.get(row.uid)
+          : weightInputRefs.current.get(row.uid);
+      input?.focus({ preventScroll: true });
+      input?.select();
     });
   };
 
@@ -198,7 +204,7 @@ export default function StepPickup({
       return next;
     });
     // Birds are filled — put the caret on Weight so Tab flow starts there.
-    if (focusUid) pendingWeightFocusUidRef.current = focusUid;
+    if (focusUid) pendingFocusRef.current = { uid: focusUid, field: "weight" };
   };
 
   const [maxBoxes, setMaxBoxes] = useState<number>(() => {
@@ -468,7 +474,9 @@ export default function StepPickup({
     queueMicrotask(() => {
       if (cancelled) return;
       const nextRows =
-        details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
+        details.length > 0
+          ? details.map((d) => ({ ...d, uid: generateUid() }))
+          : [makeRow(1, storedDefaultBoxSize())];
       setRows(nextRows);
       setRemovedBoxNos([]);
       setLastSavedFingerprint(
@@ -484,20 +492,25 @@ export default function StepPickup({
   }, [trip.id, isLocalEditing]);
 
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
+  const skipBirdsInTab = appliedDefaultBoxSize > 0;
+  const fieldAfterAdd = (): "birds" | "weight" => (skipBirdsInTab ? "weight" : "birds");
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
-  /** After Add Box, focus the new row's Weight field once it mounts. */
+  /** After Add Box, focus the new row's Birds (no default) or Weight (default set). */
   useEffect(() => {
-    const uid = pendingWeightFocusUidRef.current;
-    if (!uid) return;
-    const el = weightInputRefs.current.get(uid);
+    const pending = pendingFocusRef.current;
+    if (!pending) return;
+    const el =
+      pending.field === "birds"
+        ? birdsInputRefs.current.get(pending.uid)
+        : weightInputRefs.current.get(pending.uid);
     if (!el) return;
     el.focus();
     el.select();
-    pendingWeightFocusUidRef.current = null;
+    pendingFocusRef.current = null;
   }, [rows]);
 
-  const addRow = (options?: { focusWeight?: boolean }) => {
+  const addRow = (options?: { focusField?: "birds" | "weight" }) => {
     if (maxBoxes > 0 && rows.length >= maxBoxes) {
       setToast({
         message: t("ops.trip.box_limit_exceeded", { max: maxBoxes }),
@@ -516,8 +529,8 @@ export default function StepPickup({
       }
     }
     const nextRow = makeRow(rows.length + 1, appliedDefaultBoxSize);
-    if (options?.focusWeight) {
-      pendingWeightFocusUidRef.current = nextRow.uid;
+    if (options?.focusField) {
+      pendingFocusRef.current = { uid: nextRow.uid, field: options.focusField };
     }
     setRows((prev) => [...prev, nextRow]);
     return true;
@@ -552,15 +565,13 @@ export default function StepPickup({
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
   };
 
-  /** Tab order: Weight → Add Box → (Tab/Enter adds) → Weight of new box.
-   * Birds are pre-filled from Default Box Size, so they are skipped in the tab
-   * cycle (still clickable to edit). */
+  /** Tab order without default: Birds → Weight → Add Box → Birds of next box.
+   * With Default set: Weight → Add Box → Weight of next box (Birds stay clickable). */
   const handleBirdsKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     uid: string
   ) => {
     blockScrollAndArrows(e);
-    // If the user clicked into Birds, Tab still jumps to this row's Weight.
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
       const weightEl = weightInputRefs.current.get(uid);
@@ -591,12 +602,12 @@ export default function StepPickup({
   const handleAddBoxKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      addRow({ focusWeight: true });
+      addRow({ focusField: fieldAfterAdd() });
       return;
     }
     if (e.key === "Tab" && !e.shiftKey) {
       e.preventDefault();
-      addRow({ focusWeight: true });
+      addRow({ focusField: fieldAfterAdd() });
     }
   };
 
@@ -1563,7 +1574,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               ref={addBoxButtonRef}
-                              onClick={() => addRow({ focusWeight: true })}
+                              onClick={() => addRow({ focusField: fieldAfterAdd() })}
                               onKeyDown={handleAddBoxKeyDown}
                               className="w-full h-8 text-[11px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
@@ -1580,17 +1591,21 @@ export default function StepPickup({
                         <td data-pickup-box-no={row.boxNo} className={`border-l-2 ${tone.edge} ${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} text-center px-1 py-1.5 font-bold text-[13px] border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}><span className={`inline-flex h-6 min-w-7 items-center justify-center rounded-md border px-1.5 shadow-sm ${isSelectedBox ? 'border-emerald-500 bg-emerald-600 text-white' : tone.badge}`}>{row.boxNo}</span></td>
                         <td className={`${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} px-1 py-1.5 border-r border-slate-200`}>
                           <input
+                            ref={(el) => {
+                              if (el) birdsInputRefs.current.set(row.uid, el);
+                              else birdsInputRefs.current.delete(row.uid);
+                            }}
                             type="number"
                             step="1"
                             min="0"
-                            tabIndex={-1}
+                            tabIndex={skipBirdsInTab ? -1 : 0}
                             value={row.birds || ""}
                             onChange={(e) => updateRow(row.uid, "birds", parseInt(e.target.value) || 0)}
                             onWheel={(e) => e.currentTarget.blur()}
                             onKeyDown={(e) => handleBirdsKeyDown(e, row.uid)}
                             placeholder="0"
                             className="mini-input hide-spinner"
-                            title={t("ops.trip.birds_click_to_edit")}
+                            title={skipBirdsInTab ? t("ops.trip.birds_click_to_edit") : undefined}
                           />
                         </td>
                         <td className={`${tone.cell} ${isSelectedBox ? 'ring-2 ring-inset ring-emerald-400' : ''} px-1 py-1.5 border-r border-slate-200`}>
@@ -1645,7 +1660,7 @@ export default function StepPickup({
             </table>
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5">
-            {t("ops.trip.box_tab_hint")}
+            {t(skipBirdsInTab ? "ops.trip.box_tab_hint_default" : "ops.trip.box_tab_hint")}
             {!isLastRowComplete && rows.length > 0 && (
               <span className="text-amber-500 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
             )}

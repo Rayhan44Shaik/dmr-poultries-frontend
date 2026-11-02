@@ -35,6 +35,7 @@ export interface ApiShopSale {
   selectedBoxCount?: number;
   dcBirds?: number;
   dcWeight?: number;
+  loadWeightLoss?: number;
   /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
   tripPickupBirds?: number | null;
   maxEditableBirds?: number | null;
@@ -57,7 +58,7 @@ export interface ApiShopSale {
   approvedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
-  /** Backend-authoritative Rate Entry lock / 2-week-from-insert correction state. */
+  /** Backend-authoritative two-week correction state from Shop Sales entry. */
   rateCompleted?: boolean;
   rateLockedAt?: string | null;
   rateLockedBy?: string | null;
@@ -114,6 +115,7 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     selectedBoxCount: num(row.selectedBoxCount),
     dcBirds: num(row.dcBirds),
     dcWeight: num(row.dcWeight),
+    loadWeightLoss: num(row.loadWeightLoss),
     tripPickupBirds: row.tripPickupBirds ?? null,
     maxEditableBirds: row.maxEditableBirds ?? null,
     tripDeliveredBirds: row.tripDeliveredBirds ?? null,

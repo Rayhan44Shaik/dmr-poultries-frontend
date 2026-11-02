@@ -16,13 +16,14 @@ import { reverseGeocode } from "../../vehicle-trips/utils/reverseGeocode";
 import { GpsAddressText } from "../../vehicle-trips/components/GpsAddressText";
 import { googleMapsUrl, isValidGps, resolveFuelGps } from "../utils/fuelGps";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
+import { fetchLastClosingMeter } from "../../vehicle-trips/services/tripHeaderApiService";
 
 interface Props {
   onSave: (data: FuelExpenseDraft) => void;
   onUpdate: (id: string, updates: Partial<FuelExpense>) => void;
   editingId?: string | null;
   initialData?: FuelExpense | null;
-  vehicles: Array<{ id: number; status?: string; vehicleNumber: string }>;
+  vehicles: Array<{ id: number; status?: string; vehicleNumber: string; isPersonal?: boolean }>;
   drivers: Array<{ id: number; employeeName: string }>;
   supervisors?: Array<{ id: number; employeeName: string }>;
   fuelBunks: BirdType[];
@@ -75,6 +76,8 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [isCompressingImage, setIsCompressingImage] = useState(false);
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
+  const selectedVehicle = activeVehicles.find((vehicle) => vehicle.id === vehicleId);
+  const isPersonalVehicle = selectedVehicle?.isPersonal === true;
 
   useEffect(() => {
     if (initialData && editingId) {
@@ -194,9 +197,20 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     if (v) {
       setVehicleId(v.id);
       setVehicleNo(v.vehicleNumber);
+      if (v.isPersonal) {
+        setDriverId(0); setDriverName(""); setSupervisorId(0); setSupervisorName("");
+      }
       if (!editingId) {
         setMeterReading(0);
         setMinMeterReading(0);
+        void fetchLastClosingMeter(v.id).then((last) => {
+          const closingMeter = Number(last?.closingMeter ?? 0);
+          setMeterReading(closingMeter);
+          setMinMeterReading(closingMeter);
+        }).catch(() => {
+          setMeterReading(0);
+          setMinMeterReading(0);
+        });
       }
     }
   };
@@ -263,7 +277,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       place = address || "";
       if (place) setGpsAddress(place);
     }
-    if (!date || !vehicleId || !driverId || meterReading <= 0 || litres <= 0 || rate <= 0 || !petrolBunk.trim() || !isValidGps(gpsLat, gpsLon) || !image) {
+    if (!date || !vehicleId || (!isPersonalVehicle && !driverId) || meterReading <= 0 || litres <= 0 || rate <= 0 || !petrolBunk.trim() || !isValidGps(gpsLat, gpsLon) || !image) {
       showNotification(
         language === "te" ? "దయచేసి అవసరమైన అన్ని ఇంధన బిల్లు వివరాలను పూరించండి." : "Please complete all required fuel bill details, GPS, and bill upload.",
         "error"
@@ -279,10 +293,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       date,
       vehicleId,
       vehicleNo,
-      driverId,
-      driverName,
-      supervisorId: supervisorId || undefined,
-      supervisorName: supervisorName || undefined,
+      driverId: isPersonalVehicle ? undefined : driverId,
+      driverName: isPersonalVehicle ? undefined : driverName,
+      supervisorId: isPersonalVehicle ? undefined : (supervisorId || undefined),
+      supervisorName: isPersonalVehicle ? undefined : (supervisorName || undefined),
       meterReading,
       amount,
       rate,
@@ -385,7 +399,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           </div>
 
           {/* Driver */}
-          <div>
+          {!isPersonalVehicle && <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
               {t("common.driver")} <span className="text-red-500">*</span>
             </label>
@@ -405,10 +419,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               allowClear={false}
               widthClass="w-full"
             />
-          </div>
+          </div>}
 
           {/* Supervisor — same crew identity as Step 5 diesel bills */}
-          <div>
+          {!isPersonalVehicle && <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
               {t("common.supervisor")}
             </label>
@@ -431,8 +445,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               allowClear
               widthClass="w-full"
             />
-          </div>
-
+          </div>}
           {/* Meter Reading */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
@@ -579,26 +592,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
         </div>
 
-        <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="group inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-xs transition-all hover:border-slate-300 hover:bg-slate-50"
-            >
-              <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" />
-              {t("common.cancel")}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            className="group inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:-translate-y-0.5 active:scale-[0.97]"
-          >
-            <CheckCircle2 size={15} className="shrink-0 transition-transform duration-200 group-hover:scale-110" />
-            {editingId ? t("ops.fuel.update_bill") : t("ops.fuel.save_bill")}
-          </button>
-        </div>
       </div>
     </>
   );

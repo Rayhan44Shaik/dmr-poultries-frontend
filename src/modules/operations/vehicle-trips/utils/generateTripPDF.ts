@@ -428,7 +428,9 @@ export async function generateTripReportPDF(
   const deliveryTotals = deliverySubmitted
     ? calculateDeliveryDisplayTotals(trip, deliveries)
     : { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 };
-  const weightLoss = Math.max(0, Number(trip.dcWeight || 0) - (deliveryTotals.totalWeight + deliveryTotals.totalMortalityKg));
+  // Shop Sales corrections synchronize Trip List totals. Weight loss remains
+  // the loss recorded by Trip Entry; an unassigned edit balance is not loss.
+  const weightLoss = Math.max(0, Number(trip.weightLoss ?? 0));
   const { pickupDistance, deliveryDistance, totalDistance } = calculateTripDistances(trip);
 
   const startMeter = Number(trip.openingMeter || 0);

@@ -27,6 +27,7 @@ export type TripListClientFilters = {
   supervisorId?: number;
   farmId?: number;
   shopId?: number;
+  vehicleOwnership?: "all" | "rental" | "owned";
   /** Matches all visible Trip List columns, including vehicle plates. */
   search?: string;
 };
@@ -59,7 +60,7 @@ function matchesGlobalSearch(trip: Trip, search: string): boolean {
 
 export function filterTripListTrips(
   trips: readonly Trip[],
-  { fromDate, toDate, vehicleId, supervisorId, farmId, shopId, search = "" }: TripListClientFilters,
+  { fromDate, toDate, vehicleId, supervisorId, farmId, shopId, vehicleOwnership = "all", search = "" }: TripListClientFilters,
 ): Trip[] {
   const from = dateOnly(fromDate);
   const to = dateOnly(toDate);
@@ -70,6 +71,8 @@ export function filterTripListTrips(
     const tripDate = dateOnly(trip.tripDate);
     if ((from && (!tripDate || tripDate < from)) || (to && (!tripDate || tripDate > to))) return false;
     if (vehicleId != null && Number(trip.vehicleId) !== vehicleId) return false;
+    if (vehicleOwnership === "rental" && !trip.isRentedVehicle) return false;
+    if (vehicleOwnership === "owned" && trip.isRentedVehicle) return false;
     if (supervisorId != null && Number(trip.supervisorId) !== supervisorId) return false;
     if (farmId != null && Number(trip.sourceFarmId) !== farmId) return false;
     if (shopId != null) {

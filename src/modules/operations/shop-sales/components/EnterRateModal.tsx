@@ -713,7 +713,7 @@ export default function EnterRateModal({
               </div>
               <div className="relative my-4 min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-sky-700/70">{t("ops.rate.modal.vehicle_no")}</p>
-                <p className="mt-1 break-words text-[17px] font-extrabold leading-tight tracking-tight text-sky-950">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</p>
+                <p className={`mt-1 break-words text-[17px] font-extrabold leading-tight tracking-tight ${trip.isRentedVehicle ? "text-orange-600" : "text-sky-950"}`}>{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</p>
               </div>
               <div className="relative h-1 overflow-hidden rounded-full bg-sky-50"><span className="block h-full w-full rounded-full bg-sky-300/65" /></div>
             </div>

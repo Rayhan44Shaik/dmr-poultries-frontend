@@ -13,6 +13,7 @@ export type Vehicle = {
   capacityKg: number;
 
   isRented: boolean;
+  isPersonal?: boolean;
 
   trackingId: string;
 

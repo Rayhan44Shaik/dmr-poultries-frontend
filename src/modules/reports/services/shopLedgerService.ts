@@ -64,12 +64,17 @@ export interface ShopLedgerResponse {
 export interface ShopLedgerCumulativeQuantity {
   shopId: number;
   shopName: string;
-  subShopName: string;
   birds: number;
   weight: number;
   mortalityBirds: number;
   mortalityWeight: number;
   weightLoss: number;
+  mortalityByLoad: Array<{
+    load: number;
+    boxBirds: number;
+    boxWeight: number;
+    weightModeBirds: number;
+  }>;
 }
 
 export async function fetchShopLedgerCumulativeQuantities(filters: {
@@ -85,11 +90,16 @@ export async function fetchShopLedgerCumulativeQuantities(filters: {
   );
   return (data ?? []).map((row) => ({
     shopId: Number(row.shopId), shopName: String(row.shopName ?? ""),
-    subShopName: String(row.subShopName ?? ""),
     birds: Number(row.birds ?? 0), weight: Number(row.weight ?? 0),
     mortalityBirds: Number(row.mortalityBirds ?? 0),
     mortalityWeight: Number(row.mortalityWeight ?? 0),
     weightLoss: Number(row.weightLoss ?? 0),
+    mortalityByLoad: (row.mortalityByLoad ?? []).map((load) => ({
+      load: Number(load.load ?? 1),
+      boxBirds: Number(load.boxBirds ?? 0),
+      boxWeight: Number(load.boxWeight ?? 0),
+      weightModeBirds: Number(load.weightModeBirds ?? 0),
+    })),
   }));
 }
 

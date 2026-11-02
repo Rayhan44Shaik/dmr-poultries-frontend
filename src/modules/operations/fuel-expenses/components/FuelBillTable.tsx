@@ -51,6 +51,7 @@ interface Props {
   tabCounts?: { all: number; pending: number; approved: number; deleted: number };
   includeMasterBunks?: boolean;
   onIncludeMasterBunksChange?: (next: boolean) => void;
+  filteredTotals?: { records: number; litres: number; amount: number } | null;
 }
 
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
@@ -262,6 +263,7 @@ export function FuelBillTable({
   tabCounts = { all: 0, pending: 0, approved: 0, deleted: 0 },
   includeMasterBunks = true,
   onIncludeMasterBunksChange,
+  filteredTotals,
 }: Props) {
   const { t, language } = useI18n();
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
@@ -549,6 +551,15 @@ export function FuelBillTable({
               })
             )}
           </tbody>
+          {filteredTotals && filteredTotals.records > 0 && <tfoot className="border-t-2 border-slate-200 bg-slate-50/90"><tr>
+            <td className="px-4 py-4 text-center font-bold text-slate-500">Σ</td>
+            <td colSpan={4} className="px-4 py-4 text-left"><div className="text-sm font-extrabold text-emerald-700">Overall Total</div><div className="text-[11px] font-medium text-slate-500">{filteredTotals.records} filtered bills · not just this page</div></td>
+            <td className="px-4 py-4 text-center text-slate-400">—</td>
+            <td className="px-4 py-4 text-center text-sm font-extrabold tabular-nums text-cyan-700">{filteredTotals.litres.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L</td>
+            <td className="px-4 py-4 text-center text-slate-400">—</td>
+            <td className="px-4 py-4 text-center text-sm font-extrabold tabular-nums text-emerald-700">₹{filteredTotals.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+            <td colSpan={2} />
+          </tr></tfoot>}
         </table>
       </div>
     </div>

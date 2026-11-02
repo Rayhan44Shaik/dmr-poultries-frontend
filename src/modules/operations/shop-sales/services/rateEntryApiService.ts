@@ -211,10 +211,11 @@ export function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Tr
 /** GET /operations/rate-entry — trips currently eligible for rate entry
  * (Completed, not deleted, not rate-locked). The backend is the authority. */
 export async function listEligibleTrips(options: { signal?: AbortSignal } = {}): Promise<Trip[]> {
-  const { data } = await apiGet<RateEntryTripDto[]>(RATE_ENTRY_PATH, {
+  const { data } = await apiGet<RateEntryTripDto[] | { data?: RateEntryTripDto[] }>(RATE_ENTRY_PATH, {
     signal: options.signal,
   });
-  return uniqueTripsById((data || []).map((row) => mapRowToTrip(row, false)));
+  const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  return uniqueTripsById(rows.map((row) => mapRowToTrip(row, false)));
 }
 
 /** GET /operations/rate-entry/:tripId — full trip detail with shop-wise
