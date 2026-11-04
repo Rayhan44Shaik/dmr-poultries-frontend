@@ -37,7 +37,7 @@ import { useAuth } from "../../providers/authContext";
 import { canAccessNavPath, hasCapability, CAPABILITIES } from "../../modules/auth/permissions";
 import ChangePasswordDialog from "../../modules/auth/ChangePasswordDialog";
 import MfaSettingsDialog from "../../modules/auth/MfaSettingsDialog";
-import { useTheme } from "../../providers/ThemeProvider";
+import { useTheme } from "../../providers/useTheme";
 import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
 import { personNameLabel } from "../../i18n/displayNames";

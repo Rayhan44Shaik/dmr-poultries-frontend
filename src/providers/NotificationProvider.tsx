@@ -22,29 +22,19 @@
  */
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useMemo } from "react";
+import { useMemo } from "react";
 import {
-  dismissAll,
   dismissLatest,
   push,
-  type NotificationTone,
 } from "../ui/notifications/notificationStore";
+import {
+  NotificationContext,
+  type NotificationContextType,
+} from "./notificationContext";
 
-/** Accepted tones. Superset of the previous union — existing callers are fine. */
-export type NotificationType = NotificationTone;
-
-interface NotificationContextType {
-  showNotification: (
-    message: string,
-    type?: NotificationType,
-    duration?: number,
-  ) => void;
-  hideNotification: () => void;
-}
-
-const NotificationContext = createContext<NotificationContextType | undefined>(
-  undefined,
-);
+/** Accepted tones — the public alias lives in ./notificationContext so this
+ *  module exports components only. */
+export type { NotificationType } from "./notificationContext";
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   // Stable identity: the value never changes, so consumers never re-render
@@ -71,17 +61,4 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       {children}
     </NotificationContext.Provider>
   );
-}
-
-export function useNotification(): NotificationContextType {
-  const context = useContext(NotificationContext);
-  if (!context) {
-    throw new Error("useNotification must be used within a NotificationProvider");
-  }
-  return context;
-}
-
-/** Clear every notification on screen (Escape / route-change style resets). */
-export function clearNotifications(): void {
-  dismissAll();
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useI18n } from "../../../i18n";
-import { useTheme } from "../../../providers/ThemeProvider";
+import { useTheme } from "../../../providers/useTheme";
 import { useFontScale } from "../../../providers/fontScaleContext";
 import type { FontScale } from "../../../providers/fontScale";
 import {

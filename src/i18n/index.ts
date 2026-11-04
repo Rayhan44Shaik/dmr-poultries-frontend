@@ -8,5 +8,6 @@ export {
   translateStatus,
   translateRole,
 } from './translate';
-export { I18nProvider, useI18n } from './I18nProvider';
+export { I18nProvider } from './I18nProvider';
+export { useI18n } from './useI18n';
 export { ScopedI18nProvider } from './ScopedI18nProvider';
