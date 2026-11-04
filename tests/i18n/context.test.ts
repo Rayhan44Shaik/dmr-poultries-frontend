@@ -4,12 +4,17 @@ import { createElement, type ComponentType, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { I18nProvider, useI18n } from '../../src/i18n/index.ts';
 
-type I18nModule = typeof import('../../src/i18n/I18nProvider.tsx');
+type I18nProviderModule = typeof import('../../src/i18n/I18nProvider.tsx');
+type I18nHookModule = typeof import('../../src/i18n/useI18n.ts');
 
-// Like a Vite HMR update, a distinct URL re-evaluates the provider/hook module
-// while the existing tree can still reference the preceding generation.
-const reloadI18n = (generation: string): Promise<I18nModule> =>
+// Like a Vite HMR update, a distinct URL re-evaluates a module while the
+// existing tree can still reference the preceding generation. Provider and
+// hook reload independently; they stay connected through `./context`, which is
+// deliberately never re-evaluated here.
+const reloadI18nProvider = (generation: string): Promise<I18nProviderModule> =>
   import(new URL(`../../src/i18n/I18nProvider.tsx?hmr=${generation}`, import.meta.url).href);
+const reloadI18nHook = (generation: string): Promise<I18nHookModule> =>
+  import(new URL(`../../src/i18n/useI18n.ts?hmr=${generation}`, import.meta.url).href);
 
 function renderLabel(Provider: ComponentType<{ children: ReactNode }>, hook: typeof useI18n) {
   function Consumer() {
@@ -20,23 +25,24 @@ function renderLabel(Provider: ComponentType<{ children: ReactNode }>, hook: typ
 }
 
 test('a refreshed hook still reads the already-mounted provider context', async () => {
-  const refreshed = await reloadI18n('consumer');
-  assert.notEqual(refreshed.useI18n, useI18n, 'the module must actually be re-evaluated');
-  assert.equal(renderLabel(I18nProvider, refreshed.useI18n), '<span>EMI Schedule</span>');
+  const refreshedHook = await reloadI18nHook('consumer');
+  assert.notEqual(refreshedHook.useI18n, useI18n, 'the module must actually be re-evaluated');
+  assert.equal(renderLabel(I18nProvider, refreshedHook.useI18n), '<span>EMI Schedule</span>');
 });
 
 test('a refreshed provider still serves consumers from an older lazy route', async () => {
-  const refreshed = await reloadI18n('provider');
-  assert.notEqual(refreshed.I18nProvider, I18nProvider);
-  assert.equal(renderLabel(refreshed.I18nProvider, useI18n), '<span>EMI Schedule</span>');
+  const refreshedProvider = await reloadI18nProvider('provider');
+  assert.notEqual(refreshedProvider.I18nProvider, I18nProvider);
+  assert.equal(renderLabel(refreshedProvider.I18nProvider, useI18n), '<span>EMI Schedule</span>');
 });
 
 test('repeated translation updates keep one shared context', async () => {
-  const first = await reloadI18n('first');
-  const second = await reloadI18n('second');
-  const third = await reloadI18n('third');
-  assert.equal(renderLabel(first.I18nProvider, third.useI18n), '<span>EMI Schedule</span>');
-  assert.equal(renderLabel(third.I18nProvider, second.useI18n), '<span>EMI Schedule</span>');
+  const secondHook = await reloadI18nHook('second');
+  const thirdHook = await reloadI18nHook('third');
+  const firstProvider = await reloadI18nProvider('first');
+  const thirdProvider = await reloadI18nProvider('third');
+  assert.equal(renderLabel(firstProvider.I18nProvider, thirdHook.useI18n), '<span>EMI Schedule</span>');
+  assert.equal(renderLabel(thirdProvider.I18nProvider, secondHook.useI18n), '<span>EMI Schedule</span>');
 });
 
 test('the saved Telugu language still renders through a refreshed consumer', async (t) => {
@@ -49,8 +55,8 @@ test('the saved Telugu language still renders through a refreshed consumer', asy
     if (original) Object.defineProperty(globalThis, 'localStorage', original);
     else Reflect.deleteProperty(globalThis, 'localStorage');
   });
-  const refreshed = await reloadI18n('telugu');
-  assert.equal(renderLabel(I18nProvider, refreshed.useI18n), '<span>EMI షెడ్యూల్</span>');
+  const refreshedHook = await reloadI18nHook('telugu');
+  assert.equal(renderLabel(I18nProvider, refreshedHook.useI18n), '<span>EMI షెడ్యూల్</span>');
 });
 
 test('useI18n still rejects consumers genuinely outside the provider', () => {
