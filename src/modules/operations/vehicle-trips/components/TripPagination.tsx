@@ -37,7 +37,7 @@ function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hid
     const maxVisible = 5;
     const half = Math.floor(maxVisible / 2);
     let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisible - 1);
+    const end = Math.min(totalPages, start + maxVisible - 1);
     if (end - start < maxVisible - 1) {
       start = Math.max(1, end - maxVisible + 1);
     }

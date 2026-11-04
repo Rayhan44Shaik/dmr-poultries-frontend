@@ -258,7 +258,7 @@ export default function useCollectionEntry() {
       setWeeklySummary(summary);
       setShowSummary(true);
       setLedgerLoaded(true);
-    } catch (error) {
+    } catch {
       showNotification(translate("ops.collection.failed_load_ledger"), "error");
       setWeeklySummary(EMPTY_WEEKLY);
       setShowSummary(false);
@@ -497,7 +497,7 @@ export default function useCollectionEntry() {
       setErrors({});
       setIsEditing(false);
       return true;
-    } catch (error) {
+    } catch {
       showNotification(translate("ops.collection.failed_save"), "error");
       return false;
     } finally {

@@ -6,7 +6,7 @@
  * classification (no false logout). Each test uses an isolated browser
  * context. Probe account: e2e-probe-owner / E2E-Probe-Pass-123!
  */
-import { expect, test, type Browser, type BrowserContext } from '@playwright/test';
+import { expect, test, type Browser } from '@playwright/test';
 
 const USERNAME = 'e2e-probe-owner';
 const PASSWORD = 'E2E-Probe-Pass-123!';

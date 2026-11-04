@@ -35,7 +35,6 @@ export function useReverseGeocodedAddress(
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latNum, lonNum]);
 
   return state;

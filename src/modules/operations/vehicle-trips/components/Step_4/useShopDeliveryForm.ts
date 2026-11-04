@@ -86,7 +86,7 @@ export function computeValidationErrors(input: ValidationInput): ValidationError
 
   let birdsExceed = false;
   let birdsMismatch = false;
-  let weightMismatch = false;
+  const weightMismatch = false;
   let birdsExceedFarm = false;
   let weightExceedFarm = false;
   const perBoxBirdsErrors: boolean[] = [];
@@ -278,7 +278,7 @@ export function useShopDeliveryForm(
       const newBoxNos = formData.selectedBoxIds.filter((id: number) => !currentBoxNos.includes(id));
       const removedBoxNos = currentBoxNos.filter((id: number) => !formData.selectedBoxIds.includes(id));
       if (newBoxNos.length > 0 || removedBoxNos.length > 0) {
-        let updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
+        const updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
         newBoxNos.forEach((boxNo: number) => {
           updated.push({ boxNo, birds: 0, weight: 0 });
         });

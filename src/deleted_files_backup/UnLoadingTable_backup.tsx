@@ -1,11 +1,8 @@
 import React, { useCallback, useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
-  Trash2,
-  Save,
   ShoppingCart,
   Layers,
-  Hash,
   Scale,
   MessageSquare,
   AlertCircle,
@@ -340,19 +337,11 @@ function UnLoadingTable({
   const deliveredBirds = mode === "box" ? Math.max(0, farmBirds - formData.mortality) : weightModeTotals.birds;
   const deliveredWeight = mode === "box" ? Math.max(0, farmWeight - mortKg) : weightModeTotals.weight;
 
-  // ─── Weight Loss (only for Weight mode) ──────────────────────
-  const weightLoss = useMemo<number>(() => {
-    if (mode !== "weight") return 0;
-    const totalDeliveredWeight = weightModeTotals.weight;
-    const totalMortalityWeight = formData.mortWeight || 0;
-    return Math.max(0, farmWeight - (totalDeliveredWeight + totalMortalityWeight));
-  }, [mode, farmWeight, weightModeTotals.weight, formData.mortWeight]);
-
   // ─── Validation ──────────────────────────────────────────────────
   const validate = useCallback(() => {
     let birdsExceed = false;
     let birdsMismatch = false;
-    let weightMismatch = false;
+    const weightMismatch = false;
     let birdsExceedFarm = false;
     let weightExceedFarm = false;
     const perBoxBirdsErrors: boolean[] = [];
@@ -434,7 +423,7 @@ function UnLoadingTable({
       const newBoxNos = formData.selectedBoxIds.filter((id: number) => !currentBoxNos.includes(id));
       const removedBoxNos = currentBoxNos.filter((id: number) => !formData.selectedBoxIds.includes(id));
       if (newBoxNos.length > 0 || removedBoxNos.length > 0) {
-        let updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
+        const updated = formData.perBoxData.filter((item: { boxNo: number }) => formData.selectedBoxIds.includes(item.boxNo));
         newBoxNos.forEach((boxNo: number) => {
           updated.push({ boxNo, birds: 0, weight: 0 });
         });

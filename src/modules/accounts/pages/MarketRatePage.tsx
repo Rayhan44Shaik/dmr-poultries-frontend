@@ -131,7 +131,7 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
       return;
     }
     const days = [];
-    let currentDate = parseLocalDate(fromDate);
+    const currentDate = parseLocalDate(fromDate);
     const endDate = parseLocalDate(toDate);
 
     while (currentDate <= endDate) {

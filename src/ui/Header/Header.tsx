@@ -282,7 +282,6 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, language, t, canApproveAnything]);
 
   /* ----- Data-driven notifications (collections snapshot + live ops alerts) -----

@@ -21,8 +21,6 @@ test.describe('Trip List', () => {
 
   test('Pagination - first page', async ({ page }) => {
     // Check pagination controls exist
-    const prevButton = page.locator('button:has-text("Previous"), button:has-text("Prev"), button[aria-label*="previous" i]').first();
-    const nextButton = page.locator('button:has-text("Next"), button[aria-label*="next" i]').first();
     
     // Should be on page 1
     const pageIndicator = page.locator('[aria-current="page"], .active, .current').first();

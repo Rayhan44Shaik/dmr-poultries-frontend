@@ -25,7 +25,7 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
   const visiblePages = (() => {
     const maxVisible = 5;
     let start = Math.max(1, safeCurrentPage - Math.floor(maxVisible / 2));
-    let end = Math.min(safeTotalPages, start + maxVisible - 1);
+    const end = Math.min(safeTotalPages, start + maxVisible - 1);
     if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);
   })();

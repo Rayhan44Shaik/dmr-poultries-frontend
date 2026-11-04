@@ -68,7 +68,7 @@ export default function WeeklyMarketRates() {
 
   useEffect(() => {
     const days = [];
-    let current = parseLocalDate(fromDate);
+    const current = parseLocalDate(fromDate);
     const end = parseLocalDate(toDate);
 
     while (current <= end) {
