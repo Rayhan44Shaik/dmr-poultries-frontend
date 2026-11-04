@@ -1,5 +1,5 @@
 import { Calculator, AlertTriangle, CheckCircle, Clock, X, Save, Loader2 } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useI18n } from "../../../../../i18n";
 import { amountInWords } from "../../utils/amountInWords";
 
@@ -163,9 +163,11 @@ export default function CollectionAmount({
   const displayReceived = (showSummary && ledgerLoaded) ? receivedToday : 0;
   const displayProjected = (showSummary && ledgerLoaded) ? projectedBalance : 0;
 
-  let statusText = "";
-  let statusClass = "";
-  let statusIcon = null;
+  // The four-branch status selection below always assigns all three, so the
+  // empty-string / null placeholders were dead stores.
+  let statusText: string;
+  let statusClass: string;
+  let statusIcon: ReactNode;
   
   if (!showSummary || !ledgerLoaded) {
     statusText = t("ops.collection.status.select_shop");

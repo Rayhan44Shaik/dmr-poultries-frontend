@@ -304,7 +304,7 @@ export async function generateShopPDFBlob(
         const targetTotalWeight = shopDeliveredWeight > 0 ? shopDeliveredWeight : totalFarmWeight;
 
         resolvedBoxes.forEach((item) => {
-          let boxDeliveredWt = 0;
+          let boxDeliveredWt: number; // every if / else-if / else branch assigns
           if (totalFarmWeight > 0) {
             boxDeliveredWt = (item.weight / totalFarmWeight) * targetTotalWeight;
           } else if (totalBoxBirds > 0) {

@@ -877,12 +877,15 @@ export default function UnLoadingTable({
     // The same shop MAY be captured more than once — e.g. one Box Mode and one
     // Weight Mode delivery for the same shop. Duplicates are accepted.
 
-    let finalBirds = formData.birds;
-    let finalWeight = formData.weight;
-    let selectedBoxIds: number[] = [];
-    let farmBirdsVal = 0;
-    let farmWeightVal = 0;
-    let mortKgVal = 0;
+    // Declared without initialisers: both mode branches below always assign
+    // every one of these before first use, so the old placeholders were dead
+    // stores (no side effect — they were literals and a copy of form state).
+    let finalBirds: number;
+    let finalWeight: number;
+    let selectedBoxIds: number[];
+    let farmBirdsVal: number;
+    let farmWeightVal: number;
+    let mortKgVal: number;
     let perBoxData: { boxNo: number; birds: number; weight: number }[] = [];
 
     if (mode === "box") {
