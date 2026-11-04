@@ -16,6 +16,13 @@ export type FuelSortKey =
   | "petrolBunk"
   | "status";
 
+export interface FuelTripLoad {
+  load: number;
+  farmName?: string | null;
+  dcWeight?: number;
+  birds?: number;
+}
+
 export interface FuelExpense {
   id: string;
   billNo: string;
@@ -41,6 +48,16 @@ export interface FuelExpense {
   gpsAccuracy?: number | null;
   gpsCapturedAt?: string | null;
   status: FuelUiStatus;
+  /** Authoritative saved trip distance (trips.total_km, else end − opening)
+   * for trip-linked bills; null otherwise. Read-only: never entered here. */
+  travelDistance?: number | null;
+  /** Diesel entry index within the linked trip (identity with the trip's
+   * Step 5 diesel row); null for manual bills. */
+  tripFuelEntryIndex?: number | null;
+  /** Number of pickup-submitted loads on the linked trip; null when unlinked. */
+  tripLoadCount?: number | null;
+  /** Per-load DC/farm context of the linked trip for the Load 1/Load 2 display. */
+  tripLoads?: FuelTripLoad[];
   deleted?: boolean;
   deletedAt?: string;
   deletedReason?: string;

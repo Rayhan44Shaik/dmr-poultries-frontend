@@ -36,6 +36,8 @@ import { ViewLanguageToggle } from '../../../../ui/ViewLanguageToggle';
 interface FarmPaymentTripViewModalProps {
   open: boolean;
   trip: Trip | null;
+  /** Load to highlight when opened from a multi-load Farm Payment row. */
+  initialLoad?: number | null;
   onClose: () => void;
 }
 
@@ -84,20 +86,23 @@ function PickupStepLockedView({ trip }: { trip: Trip }) {
   );
 }
 
-function FarmPaymentTripView({ open, trip, onClose }: FarmPaymentTripViewModalProps) {
+function FarmPaymentTripView({ open, trip, initialLoad, onClose }: FarmPaymentTripViewModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   // Opens on Step 2 (Farm Details) — the payment reviewer's primary step.
   const [step, setStep] = useState<1 | 2>(1);
-  const [selectedLoad, setSelectedLoad] = useState(1);
+  const [selectedLoad, setSelectedLoad] = useState(initialLoad ?? 1);
   const [lastTripId, setLastTripId] = useState<number | null>(trip?.id ?? null);
+  const [lastInitialLoad, setLastInitialLoad] = useState<number | null>(initialLoad ?? null);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const displayTrip = useMemo(() => (trip ? localizeTripForView(trip, language) : null), [trip, language]);
 
-  // A new trip always reopens on Step 2 (render-phase derived-state reset).
-  if (trip && trip.id !== lastTripId) {
+  // A new trip (or a different load of the same trip) always reopens on
+  // Step 2 (render-phase derived-state reset).
+  if (trip && (trip.id !== lastTripId || (initialLoad ?? null) !== lastInitialLoad)) {
     setLastTripId(trip.id);
+    setLastInitialLoad(initialLoad ?? null);
     setStep(1);
-    setSelectedLoad(1);
+    setSelectedLoad(initialLoad ?? 1);
   }
 
   if (!open || !trip) return null;

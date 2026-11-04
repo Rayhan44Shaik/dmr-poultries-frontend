@@ -1,12 +1,15 @@
-import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { expect, type Page, type APIRequestContext } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 
 /**
  * Shared Batch C3 browser helpers. Isolated harness only:
  * Vite :5199 (same-origin /api proxy) -> PGlite harness :4100.
+ * The Vite origin (E2E_WEB_URL) and browser-login owner
+ * (E2E_TEST_OWNER_USERNAME) are configurable with committed defaults.
  */
 export const API = '/api';
+export const OWNER_USERNAME = process.env.E2E_TEST_OWNER_USERNAME ?? 'test-owner-4100';
 export const EVIDENCE = process.env.C3_EVIDENCE_DIR
   ? path.resolve(process.env.C3_EVIDENCE_DIR)
   : path.resolve('../../outputs/batch-c3-provisional/browser');
@@ -30,7 +33,7 @@ export function saveJson(name: string, value: unknown) {
 
 export async function login(page: Page) {
   await page.goto('/');
-  await page.locator('#login-username').fill('test-owner-4100');
+  await page.locator('#login-username').fill(OWNER_USERNAME);
   await page.locator('#login-password').fill('Test-only-password-123!');
   await page.locator('form button[type="submit"]').first().click();
   await expect(page.locator('#login-username')).toHaveCount(0, { timeout: 30_000 });
@@ -43,19 +46,19 @@ export async function login(page: Page) {
 export async function rows(response: { json: () => Promise<unknown> }) {
   const value = (await response.json()) as unknown;
   const record = value as Record<string, unknown>;
-  if (Array.isArray(value)) return value as Array<Record<string, any>>;
+  if (Array.isArray(value)) return value as Array<Record<string, unknown>>;
   for (const key of ['items', 'data', 'rows', 'results']) {
-    if (Array.isArray(record[key])) return record[key] as Array<Record<string, any>>;
+    if (Array.isArray(record[key])) return record[key] as Array<Record<string, unknown>>;
   }
-  return [] as Array<Record<string, any>>;
+  return [] as Array<Record<string, unknown>>;
 }
 
 export type Fixtures = {
-  vehicles: Array<Record<string, any>>;
-  employees: Array<Record<string, any>>;
-  farms: Array<Record<string, any>>;
-  birds: Array<Record<string, any>>;
-  shops: Array<Record<string, any>>;
+  vehicles: Array<Record<string, unknown>>;
+  employees: Array<Record<string, unknown>>;
+  farms: Array<Record<string, unknown>>;
+  birds: Array<Record<string, unknown>>;
+  shops: Array<Record<string, unknown>>;
 };
 
 export async function fixtures(page: Page): Promise<Fixtures> {

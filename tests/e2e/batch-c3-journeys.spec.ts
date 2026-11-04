@@ -8,7 +8,7 @@ const API_EVIDENCE = path.resolve('../../outputs/batch-c3/api');
 
 async function login(page: Page) {
   await page.goto('/');
-  await page.locator('#login-username').fill('test-owner-4100');
+  await page.locator('#login-username').fill(process.env.E2E_TEST_OWNER_USERNAME ?? 'test-owner-4100');
   await page.locator('#login-password').fill('Test-only-password-123!');
   await page.locator('form button[type="submit"]').first().click();
   await expect(page.locator('#login-username')).toHaveCount(0, { timeout: 30_000 });
@@ -49,8 +49,8 @@ async function createTrip(page: Page, rental: boolean, boxes: Array<{boxNo:numbe
   const supervisor = await employee('Supervisor', 2);
   const helper = await employee('Helper', 3);
   const loader = await employee('Loader', 4);
-  const farm = f.farms.find((row: any) => /E2E Source/.test(row.farmName));
-  const bird = f.birds.find((row: any) => /E2E Broiler/.test(row.birdType));
+  const farm = f.farms.find((row: Record<string, unknown>) => /E2E Source/.test(String(row.farmName)));
+  const bird = f.birds.find((row: Record<string, unknown>) => /E2E Broiler/.test(String(row.birdType)));
   const response = await page.request.post(`${API}/trips`, { data: {
     tripDate: '2026-10-18', status: 'Draft', vehicleId: vehicle.id, vehicleNo: vehicle.vehicleNumber,
     driverId: driver.id, driverName: driver.employeeName, supervisorId: supervisor.id,
@@ -94,7 +94,7 @@ test('C3 IMP-12 A erase countdown B delivery and refresh evidence', async ({ pag
   await login(page);
   const { trip, f, bird } = await createTrip(page, false, []);
   const hashA = '1'.repeat(64), hashB = '2'.repeat(64);
-  const save = (boxes: any[], hash: string, name: string) => page.request.put(`${API}/trips/${trip.id}`, { data: {
+  const save = (boxes: unknown[], hash: string, name: string) => page.request.put(`${API}/trips/${trip.id}`, { data: {
     boxDetails: boxes,
     importFingerprint: { algorithm: 'SHA-256', version: 1, contentHash: hash, originalFilename: name, byteLength: 128 },
   }});
@@ -110,9 +110,9 @@ test('C3 IMP-12 A erase countdown B delivery and refresh evidence', async ({ pag
   const erased = await page.request.get(`${API}/trips/${trip.id}`);
   expect((await erased.json()).boxDetails).toHaveLength(0);
   expect((await save([{boxNo:1,birds:25,weight:50},{boxNo:2,birds:25,weight:50}], hashB, 'dataset-b.xlsx')).ok()).toBeTruthy();
-  const shopA = f.shops.find((s: any) => /Alpha/.test(s.shopName));
-  const shopB = f.shops.find((s: any) => /Bravo/.test(s.shopName));
-  const delivery = (shop: any, key: string, box: number) => ({ id:0, clientKey:key, shopId:shop.id, shopName:shop.shopName,
+  const shopA = f.shops.find((s: Record<string, unknown>) => /Alpha/.test(String(s.shopName)));
+  const shopB = f.shops.find((s: Record<string, unknown>) => /Bravo/.test(String(s.shopName)));
+  const delivery = (shop: Record<string, unknown>, key: string, box: number) => ({ id:0, clientKey:key, shopId:shop.id, shopName:shop.shopName,
     birdTypeId:bird.id, birdType:bird.birdType, birds:25, weight:50, mortality:0, mortKg:0, rate:100,
     amount:2500, remarks:'', deliveryMode:'box', selectedBoxIds:[box] });
   const deliveryRes = await page.request.put(`${API}/trips/${trip.id}/deliveries`, { data: {
@@ -127,7 +127,7 @@ test('C3 IMP-12 A erase countdown B delivery and refresh evidence', async ({ pag
   await shot(page, 'c3-imp12-dataset-b-deliveries');
   const finalResponse = await page.request.get(`${API}/trips/${trip.id}`);
   const final = await finalResponse.json();
-  expect(final.boxDetails.map((b: any) => Number(b.birds))).toEqual([25, 25]);
+  expect(final.boxDetails.map((b: Record<string, unknown>) => Number(b.birds))).toEqual([25, 25]);
   fs.mkdirSync(API_EVIDENCE, { recursive: true });
   fs.writeFileSync(path.join(API_EVIDENCE, 'imp12-final.json'), JSON.stringify(final, null, 2));
 });

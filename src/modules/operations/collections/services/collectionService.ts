@@ -329,6 +329,9 @@ function getRecentCollections(status: "Pending" | "Approved" | "Deleted" = "Pend
     rows = collectionsCache.filter((c) => c.status === "Pending");
   }
 
+  return toRecentRows(rows);
+}
+function toRecentRows(rows: Collection[]): RecentCollection[] {
   const byId = new Map(entriesCache.map((e) => [String(e.id), e]));
   return rows
     .slice()
@@ -353,6 +356,18 @@ function getRecentCollections(status: "Pending" | "Approved" | "Deleted" = "Pend
       numericId: row.numericId,
       numericShopId: row.numericShopId,
     }));
+}
+/**
+ * Every cached entry as a recent row. With `includeDeleted` this is the full
+ * register (pending + approved + deleted) backing the "All" toggle; the
+ * table then applies the rolling four-week window itself. Row shape,
+ * ordering and mapping intentionally match getRecentCollections.
+ */
+function list(options?: { includeDeleted?: boolean }): RecentCollection[] {
+  const entries = options?.includeDeleted
+    ? entriesCache
+    : entriesCache.filter((e) => !e.deleted);
+  return toRecentRows(entries.map(mapEntryToCollection));
 }
 function getPendingApprovalCount(): number {
   return entriesCache.filter((e) => !e.deleted && e.status === "Pending Approval").length;
@@ -858,6 +873,7 @@ getShopSales,
   approveCollections,
   rejectCollection,
   getRecentCollections,
+  list,
   getPendingApprovalCount,
   getApprovedCount,
   getCollectorSummary,

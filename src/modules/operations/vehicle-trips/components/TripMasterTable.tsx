@@ -1,5 +1,8 @@
-import React, { useCallback, useRef, useState } from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown, Layers3 } from "lucide-react";
+import React, { useCallback, useState } from "react";
+import { Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown, Layers3 } from "lucide-react";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../shared/ui/RowSelectMark";
 import type { Trip } from "../types/trip";
 import type { TripListSortKey } from "../utils/filterTripList";
 import { formatTripListDay } from "../utils/formatTripListDay";
@@ -22,6 +25,12 @@ interface Props {
   sortBy?: TripSortKey | null;
   sortDir?: "asc" | "desc";
   onSortChange?: (key: TripSortKey) => void;
+  /**
+   * When false the table renders without its own scroll container so the
+   * parent page can own the single coordinated scroll viewport (sticky
+   * toolbar + sticky column headings + rows sharing one horizontal scroll).
+   */
+  scrollable?: boolean;
 }
 
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
@@ -103,35 +112,34 @@ function TripMasterTable({
   sortBy = null,
   sortDir = "asc",
   onSortChange,
+  scrollable = true,
 }: Props) {
   const { t, language } = useI18n();
-  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
 
   const selectRow = useCallback(
     (trip: Trip) => (onRowSelect ? onRowSelect(trip) : onRowClick(trip)),
     [onRowClick, onRowSelect],
   );
 
-  const handleRowKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-      // Let controls inside a row keep their normal keyboard behaviour.
-      if (event.target !== event.currentTarget) return;
-      const currentTrip = trips[rowIndex];
-      if (!currentTrip) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        selectRow(currentTrip);
-        return;
-      }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      event.preventDefault();
-      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
-      if (!nextTrip) return;
-      selectRow(nextTrip);
-      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+  // Single shared selection: click toggles, arrows/Home/End/Space/Enter move
+  // or invoke exactly like the previous per-table handlers did.
+  const selection = useTableRowSelection<Trip>({
+    rows: trips,
+    getId: (trip) => trip.id,
+    selectedId: selectedRowId ?? null,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (trip) => `Trip ${trip.tripNo}`,
+    onSelect: (trip, _index, via) => {
+      if (via === "keyboard") selectRow(trip);
+      else onRowClick(trip);
     },
-    [selectRow, trips],
-  );
+    onDeselect: () => {
+      const current = trips.find((trip) => trip.id === selectedRowId);
+      if (current) onRowClick(current);
+    },
+    onPrimaryAction: (trip) => selectRow(trip),
+  });
 
   const sortable = (key: TripSortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -150,76 +158,80 @@ function TripMasterTable({
       </button>
     );
   };
+  // Sticky column cells: solid background + stacking above scrolling rows.
+  // The page keeps the toolbar above this table's scroll viewport, so the
+  // headings stick at the very top of that viewport (top-0).
+  const stickyHeadCellClass = "sticky top-0 z-10 bg-slate-50 border-b border-slate-200";
   return (
-    <div className="w-full overflow-x-auto">
+    <div className={scrollable ? "w-full overflow-x-auto" : "w-full"}>
       <table className="min-w-full text-[13px] text-left border-collapse">
-        <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
+        <thead className="bg-slate-50 text-slate-600">
             <tr className="whitespace-nowrap">
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider w-10">#</th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider w-10 ${stickyHeadCellClass}`}>#</th>
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("tripNo", <div className="flex items-center gap-1.5">
                   <Hash size={14} className="text-slate-400 flex-shrink-0" />
                   <span>{t("operations.trip_no")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("tripDate", <div className="flex items-center gap-1.5">
                   <Calendar size={14} className="text-blue-500 flex-shrink-0" />
                   <span>{t("ops.trip.day")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("vehicleNo", <div className="flex items-center gap-1.5">
                   <Truck size={14} className="text-indigo-500 flex-shrink-0" />
                   <span>{t("common.vehicle")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("driverName", <div className="flex items-center gap-1.5">
                   <User size={14} className="text-emerald-500 flex-shrink-0" />
                   <span>{t("common.driver")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("supervisorName", <div className="flex items-center gap-1.5">
                   <UserCog size={14} className="text-purple-500 flex-shrink-0" />
                   <span>{t("common.supervisor")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("sourceFarm", <div className="flex items-center gap-1.5">
                   <Warehouse size={14} className="text-amber-500 flex-shrink-0" />
                   <span>{t("ops.trip.source_farm")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("totalShops", <div className="flex items-center justify-center gap-1.5">
                   <ShoppingBag size={14} className="text-cyan-500 flex-shrink-0" />
                   <span>{t("ops.trip.shops")}</span>
                 </div>, true)}
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("totalBirds", <div className="flex items-center justify-center gap-1.5">
                   <Bird size={14} className="text-blue-500 flex-shrink-0" />
                   <span>{t("common.birds")}</span>
                 </div>, true)}
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5">
                   <Scale size={14} className="text-orange-500 flex-shrink-0" />
                   <span>{t("ops.trip.weight_kg")}</span>
                 </div>, true)}
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="text-orange-500" /><span>W.L</span></div>
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 {sortable("totalMortality", <div className="flex items-center justify-center gap-1.5">
                   <HeartPulse size={14} className="text-rose-500 flex-shrink-0" />
                   <span>MOR</span>
                 </div>, true)}
               </th>
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
+              <th className={`px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider ${stickyHeadCellClass}`}>
                 <div className="flex items-center justify-center gap-1.5"><Layers3 size={14} className="text-indigo-500" /><span>Load</span></div>
               </th>
             </tr>
@@ -250,22 +262,15 @@ function TripMasterTable({
                 return (
                   <tr
                     key={trip.id}
-                    ref={(element) => {
-                      if (element) rowRefs.current.set(trip.id, element);
-                      else rowRefs.current.delete(trip.id);
-                    }}
-                    tabIndex={0}
-                    onClick={() => onRowClick(trip)}
-                    onKeyDown={(event) => handleRowKeyDown(event, index)}
-                    aria-selected={isSelected}
-                    className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                    {...selection.getRowProps(trip, index)}
+                    className={`cursor-pointer border-l-4 border-l-transparent outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
-                        ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
-                      : `border-l-4 border-l-transparent hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
+                        ? tableSelectedRowClass
+                      : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
                     <td className="px-4 py-5 text-center text-[13px] text-slate-500 font-medium w-10">
-                      {isSelected ? <Check size={16} className="text-blue-500 inline" /> : serialNo}
+                      <RowSelectMark selected={isSelected} serialNo={serialNo} label={`Trip ${trip.tripNo} selected`} />
                     </td>
                     {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
                     <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{localizeTripViewText(trip.tripNo, language)}</td>

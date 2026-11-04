@@ -150,7 +150,9 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         onRefresh={() => void handleRefresh()}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
-        exportEnabled={Boolean(filter.shopName.trim()) && filteredSales.length > 0 && !isLoading}
+        // Exports are valid for every displayed result set: an All Shops date
+        // range is just as useful as a single-shop filter.
+        exportEnabled={filteredSales.length > 0 && !isLoading}
         refreshing={isLoading}
         unassignedBirds={assignmentNoticeBirds}
         assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}

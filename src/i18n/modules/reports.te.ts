@@ -52,6 +52,9 @@ export default {
   'shop_ledger.col.closing': 'ముగింపు',
   'shop_ledger.tx_count': '{count} లావాదేవీలు',
   'shop_ledger.tx_showing': '{total} లావాదేవీలలో {shown} చూపిస్తున్నాం',
+  'shop_ledger.cumulative.by_load': 'లోడ్ వారీగా',
+  'shop_ledger.cumulative.total': 'మొత్తం',
+  'shop_ledger.cumulative.load': 'లోడ్',
 
   // ── Table ─────────────────────────────────────────────────────────
   'shop_ledger.loading_records': 'షాప్ లెడ్జర్ రికార్డులు లోడ్ అవుతున్నాయి…',
@@ -99,6 +102,13 @@ export default {
   'shop_ledger.pdf_generating_shop': '{shop} ప్రివ్యూ రూపొందుతోంది…',
   'shop_ledger.pdf_check': 'PDF చూడండి',
   'shop_ledger.pdf_hide': 'దాచండి',
+
+  // ── View Shop Ledger detail modal ─────────────────────────────────
+  'shop_ledger.detail.prev_shop': 'మునుపటి షాప్',
+  'shop_ledger.detail.next_shop': 'తదుపరి షాప్',
+  'shop_ledger.detail.download_pdf': 'PDF డౌన్‌లోడ్',
+  'shop_ledger.detail.downloading': 'PDF సిద్ధమవుతోంది…',
+  'shop_ledger.detail.select_shop_hint': 'లెడ్జర్‌ను చూడటానికి ఒక షాప్‌ను ఎంచుకోండి.',
 
   // ── WhatsApp modal (UI chrome — the message body itself stays
   //    English because it is the business text delivered to shops) ──

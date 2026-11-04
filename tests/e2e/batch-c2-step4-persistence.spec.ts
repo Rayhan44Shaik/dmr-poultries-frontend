@@ -1,6 +1,7 @@
 /**
  * Batch C2 — Browser Step 4 persistence journey (E2E-07).
- * Isolated PGlite harness on :4100 + Vite :5199 (see root playwright.config.ts).
+ * Isolated PGlite harness on :4100 + Vite :5199 by default (see
+ * batch-c2.playwright.config.ts; origin/owner configurable via env).
  */
 import { test, expect, type Page, type BrowserContext } from '@playwright/test';
 import fs from 'node:fs';
@@ -8,7 +9,7 @@ import path from 'node:path';
 
 // Same-origin /api via Vite proxy (required: session cookie is SameSite=Strict).
 const API = '/api';
-const USER = 'test-owner-4100';
+const USER = process.env.E2E_TEST_OWNER_USERNAME ?? 'test-owner-4100';
 const PASS = 'Test-only-password-123!';
 const EVIDENCE =
   process.env.C2_EVIDENCE_DIR ||

@@ -22,7 +22,9 @@ import {
   uniqueFuelExpenses,
   getLatestApprovedFuelExpensesPerVehicle,
   type FuelQuickTab,
+  effectiveStatus,
 } from "../utils/filterFuelExpenses";
+import { summarizeFuelBills } from "../utils/fuelSummary";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { useI18n } from "../../../../i18n";
@@ -131,7 +133,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     const names = new Map<string, string>();
     fuelBunks.forEach((item) => {
       const name = item.birdType.trim();
-      if (!name || isGenericOtherBunk(name)) return;
+      if (isGenericOtherBunk(name)) return;
       const key = name.toLocaleLowerCase();
       if (!names.has(key)) names.set(key, name);
     });
@@ -164,6 +166,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   }, []);
 
   // ── Base Filter Matching (before Quick Tab) for Live Tab Counters ──
+  // Deleted rows are kept here so the Deleted register tab (applied below)
+  // can see them; the active quick tabs filter them out again downstream.
   const baseFilteredBills = useMemo(() => {
     return filterFuelExpenses(deduplicatedExpenses, {
       fromDate,
@@ -171,6 +175,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       vehicleNo: vehicle === ALL_VEHICLES ? "" : vehicle,
       driverName: driver === ALL_DRIVERS ? "" : driver,
       petrolBunk: bunk === ALL_BUNKS ? "" : bunk,
+      includeDeleted: true,
       masterBunkNames: fuelBunks
         .map((item) => item.birdType.trim())
         .filter((name) => name && !isGenericOtherBunk(name)),
@@ -182,15 +187,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Live Tab Counts (All, Pending, Approved, Deleted) ──
   const tabCounts = useMemo(() => {
-    const approvedBills = baseFilteredBills.filter(
-      (b) => !b.deleted && b.status !== "Deleted" && (b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo)
-    );
-    const latestApproved = getLatestApprovedFuelExpensesPerVehicle(approvedBills);
+    const approvedBills = baseFilteredBills.filter((b) => !b.deleted && b.status !== "Deleted" && effectiveStatus(b) === "Approved");
 
     return {
       all: baseFilteredBills.filter((b) => !b.deleted && b.status !== "Deleted").length,
       pending: baseFilteredBills.filter((b) => !b.deleted && b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length,
-      approved: latestApproved.length,
+      approved: getLatestApprovedFuelExpensesPerVehicle(approvedBills).length,
       deleted: baseFilteredBills.filter((b) => b.deleted === true || b.status === "Deleted").length,
     };
   }, [baseFilteredBills]);
@@ -212,6 +214,14 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     return sortedBills.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   }, [sortedBills, currentPage, pageSize]);
 
+  // ── Stay on the nearest valid page when the filtered set shrinks ──
+  // (e.g. the last item on a page is deleted). Filters, sort and the
+  // selected tab are retained — only an out-of-range page is clamped.
+  const totalPages = Math.max(1, Math.ceil(sortedBills.length / pageSize));
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   // ── Selected Bill Object ──
   const selectedBill = useMemo(() => {
     return allFilteredBills.find((b) => b.id === selectedId) || null;
@@ -227,12 +237,11 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     sourceType !== "All" ||
     search.trim() !== "";
 
-  // ── Summary Totals for KPI Cards ──
+  // ── Summary Totals for KPI Cards + table footer (all filtered bills) ──
+  // Distance is the backend-saved trip distance deduplicated per trip;
+  // mileage is Total Distance ÷ Total Fuel Litres (null when litres are 0).
   const summaryTotals = useMemo(() => {
-    const totalLitres = allFilteredBills.reduce((sum, b) => sum + (b.litres || 0), 0);
-    const totalAmount = allFilteredBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const pendingCount = allFilteredBills.filter((b) => b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length;
-    const approvedCount = allFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo).length;
+    const summary = summarizeFuelBills(allFilteredBills);
     const bunkMap = new Map<string, { name: string; bills: number; litres: number; amount: number }>();
     allFilteredBills.forEach((bill) => {
       const name = bill.petrolBunk?.trim() || "Other";
@@ -243,18 +252,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       bunkMap.set(name, current);
     });
 
-    const billsWithMeter = allFilteredBills.filter((b) => b.meterReading > 0 && b.litres > 0);
-    const avgMileage =
-      billsWithMeter.length > 0 && totalLitres > 0
-        ? Math.min(6.5, Math.max(3.0, (billsWithMeter.length * 85) / totalLitres))
-        : null;
-
     return {
-      totalLitres,
-      totalAmount,
-      pendingCount,
-      approvedCount,
-      avgMileage,
+      ...summary,
       bunkDetails: [...bunkMap.values()].sort((a, b) => b.amount - a.amount),
     };
   }, [allFilteredBills]);
@@ -305,7 +304,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       setViewingBill(target);
       setViewModalOpen(true);
     } else {
-      showNotification(language === "te" ? "దయచేసి చూడటానికి ఒక బిల్లును ఎంచుకోండి." : "Please select a fuel bill to view.", "info");
+      showNotification(language === "te" ? "దయచేసి చూడటానికి ఒక బillitను ఎంచుకోండి." : "Please select a fuel bill to view.", "info");
     }
   }, [selectedBill, showNotification, language]);
 
@@ -343,7 +342,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       return;
     }
     requestDelete(target.id, {
-      label: language === "te" ? `ఇంధన బిల్లును తొలగిస్తోంది ${target.billNo}` : `Deleting fuel bill ${target.billNo}`,
+      label: language === "te" ? `ఇNDERనం బillitను తొలగించ datas ${target.billNo}` : `Deleting fuel bill ${target.billNo}`,
     });
   }, [selectedBill, requestDelete, showNotification, language, t]);
 
@@ -417,7 +416,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           { label: "Total Bills", value: String(allFilteredBills.length) },
           { label: "Total Litres", value: `${summaryTotals.totalLitres.toFixed(2)} L` },
           { label: "Total Cost", value: `₹ ${summaryTotals.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}` },
-          { label: "Approved Bills", value: String(summaryTotals.approvedCount) },
+          { label: "Total Distance", value: summaryTotals.totalDistance != null ? `${summaryTotals.totalDistance.toFixed(2)} km` : "—" },
+          { label: "Avg Mileage", value: summaryTotals.avgMileage != null ? `${summaryTotals.avgMileage.toFixed(2)} km/L` : "—" },
           { label: "Pending Bills", value: String(summaryTotals.pendingCount) },
         ],
         numericColumns: [6, 7, 8, 9],
@@ -466,6 +466,21 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         b.petrolBunk || "—",
         b.sourceType === "TRIP" || !!b.tripNo ? "Approved" : b.status,
       ]);
+      // Filtered totals row (whole filtered set, not just the current page).
+      rows.push([
+        `TOTAL (${allFilteredBills.length} filtered bills)`,
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        Number(summaryTotals.totalLitres.toFixed(2)),
+        "",
+        Number(summaryTotals.totalAmount.toFixed(2)),
+        summaryTotals.totalDistance != null ? Number(summaryTotals.totalDistance.toFixed(2)) : "—",
+        summaryTotals.avgMileage != null ? `${summaryTotals.avgMileage.toFixed(2)} km/L` : "—",
+      ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
       exportToExcel("Fuel Expenses Register", headers, rows, filename);
       showNotification(t("ops.fuel.excel_exported"), "success");
@@ -484,9 +499,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   return (
     <div
-      className={`w-full space-y-5 animate-in fade-in duration-200 ${
-        embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"
-      }`}
+      className={`w-full space-y-5 animate-in fade-in duration-200 ${embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"}`}
     >
       {/* ── Filters Card with Unified Action Toolbar (Status dropdown removed) ── */}
       <FuelFilters
@@ -517,6 +530,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}
         hasFilters={hasFilters}
+        canExport={allFilteredBills.length > 0}
         refreshing={refreshing}
       />
 
@@ -527,7 +541,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
             totalLitres={summaryTotals.totalLitres}
             totalAmount={summaryTotals.totalAmount}
             pendingCount={summaryTotals.pendingCount}
-            approvedCount={summaryTotals.approvedCount}
+            totalDistance={summaryTotals.totalDistance === 0 ? null : summaryTotals.totalDistance}
             avgMileage={summaryTotals.avgMileage}
             bunkDetails={summaryTotals.bunkDetails}
           />
@@ -589,7 +603,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           tabCounts={tabCounts}
           includeMasterBunks={includeMasterBunks}
           onIncludeMasterBunksChange={(next) => { setIncludeMasterBunks(next); setCurrentPage(1); }}
-          filteredTotals={hasFilters ? { records: allFilteredBills.length, litres: summaryTotals.totalLitres, amount: summaryTotals.totalAmount } : null}
+          filteredTotals={allFilteredBills.length > 0 ? { records: allFilteredBills.length, litres: summaryTotals.totalLitres, amount: summaryTotals.totalAmount, distance: summaryTotals.totalDistance, mileage: summaryTotals.avgMileage } : null}
         />
 
         <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
@@ -627,9 +641,9 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           viewingBill &&
           viewingBill.sourceType !== "TRIP" &&
           !viewingBill.tripNo &&
-          viewingBill.status !== "Approved" &&
+          effectiveStatus(viewingBill) !== "Approved" &&
           !viewingBill.deleted &&
-          viewingBill.status !== "Deleted"
+          effectiveStatus(viewingBill) !== "Deleted"
         )}
         onEdit={(billToEdit) => {
           setViewModalOpen(false);

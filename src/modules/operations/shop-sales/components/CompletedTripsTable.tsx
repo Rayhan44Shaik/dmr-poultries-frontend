@@ -1,9 +1,8 @@
-import React, { useCallback, useRef, useState, type ReactNode } from "react";
+import React, { useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowUp,
   ArrowDown,
-  Check,
   Hash,
   Calendar,
   Truck,
@@ -18,6 +17,9 @@ import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
 import type { RateEntrySortKey } from "../hooks/useCompletedTrips";
 import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../shared/ui/RowSelectMark";
 
 interface Props {
   trips: Trip[];
@@ -105,33 +107,29 @@ function CompletedTripsTable({
   onSortChange,
 }: Props) {
   const { t, language } = useI18n();
-  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
-
-  const selectRow = useCallback(
-    (trip: Trip) => onRowSelect?.(trip) ?? onRowClick?.(trip),
-    [onRowClick, onRowSelect],
-  );
-
-  const handleRowKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-      // Let the Enter Rates / Modify Rates button keep its own keyboard action.
-      if (event.target !== event.currentTarget) return;
-      const currentTrip = trips[rowIndex];
-      if (!currentTrip) return;
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        selectRow(currentTrip);
+  // Shared single-row selection: pointer clicks toggle (the page's
+  // onRowClick), keyboard arrows/Space/Home/End set without toggling (the
+  // page's onRowSelect). Inner tooltip buttons keep their own keys.
+  const selection = useTableRowSelection<Trip>({
+    rows: trips,
+    getId: (trip) => trip.id,
+    selectedId: selectedRowId,
+    toggleOnReselect: true,
+    getRowLabel: (trip) => `Trip ${trip.tripNo}`,
+    onSelect: (trip, _index, via) => {
+      if (via === "keyboard") {
+        if (onRowSelect) onRowSelect(trip);
+        else onRowClick?.(trip);
         return;
       }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      event.preventDefault();
-      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
-      if (!nextTrip) return;
-      selectRow(nextTrip);
-      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+      onRowClick?.(trip);
     },
-    [selectRow, trips],
-  );
+    onDeselect: () => {
+      // Pointer toggle-off: re-fire the page's toggle with the selected row.
+      const current = trips.find((trip) => trip.id === selectedRowId);
+      if (current) onRowClick?.(current);
+    },
+  });
 
   const sortable = (key: RateEntrySortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -203,22 +201,16 @@ function CompletedTripsTable({
               return (
                 <tr
                   key={trip.id}
-                  ref={(element) => {
-                    if (element) rowRefs.current.set(trip.id, element);
-                    else rowRefs.current.delete(trip.id);
-                  }}
-                  tabIndex={onRowClick || onRowSelect ? 0 : undefined}
-                  onClick={() => onRowClick?.(trip)}
-                  onKeyDown={(event) => handleRowKeyDown(event, index)}
-                  aria-selected={isSelected}
+                  {...(onRowClick || onRowSelect ? selection.getRowProps(trip, index) : {})}
+                  aria-selected={onRowClick || onRowSelect ? isSelected : undefined}
                   className={`${onRowClick || onRowSelect ? "cursor-pointer" : ""} outline-none border-t transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isSelected
-                      ? "bg-emerald-50/60 border-l-4 border-l-emerald-300 ring-1 ring-inset ring-emerald-200"
-                      : `border-l-4 border-l-transparent ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
+                      ? tableSelectedRowClass
+                      : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
                   }`}
                 >
                   <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-10">
-                    {isSelected ? <Check size={16} className="inline text-emerald-600" /> : serialNo}
+                    <RowSelectMark selected={isSelected} serialNo={serialNo} label={`Selected trip ${trip.tripNo}`} />
                   </td>
                   {/* Keep 2d logo in header but working start from name S */}
                   <td className="px-4 py-4 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>

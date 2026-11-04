@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, useDeferredValue } from "react";
-import { History } from "lucide-react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
+import TripListHeader from "../components/TripListHeader";
+import { resolveVisibleTripSelection } from "../utils/tripListSelection";
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
 import { TripHistoryViewModal } from "../components/TripViewModal";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
@@ -359,6 +360,13 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     [completedTrips, currentPage, pageSize],
   );
 
+  /**
+   * The selection View/table may use: only a trip on the currently visible
+   * page counts. Anything else is stale, so View stays disabled and no row
+   * highlights until the user picks a visible trip again.
+   */
+  const visibleSelectedRowId = resolveVisibleTripSelection(selectedRowId, paginatedTrips);
+
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(totalCompletedTrips / pageSize));
     if (currentPage <= maxPage) return;
@@ -413,12 +421,29 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const handleViewSelected = () => {
-    const trip = completedTrips.find((t) => t.id === selectedRowId);
+    const trip = paginatedTrips.find((t) => t.id === visibleSelectedRowId);
     if (trip) {
       openView(trip);
     } else {
       showNotification(t("ops.trip.no_trip_selected"), "info");
     }
+  };
+
+  /** Page navigation drops the selection unless it stays on the new page. */
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    const start = (page - 1) * pageSize;
+    setSelectedRowId((current) =>
+      resolveVisibleTripSelection(current, completedTrips.slice(start, start + pageSize)),
+    );
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+    setSelectedRowId((current) =>
+      resolveVisibleTripSelection(current, completedTrips.slice(0, size)),
+    );
   };
 
   // `completedTrips` is already the full locally verified filtered result;
@@ -585,10 +610,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         onExportPDF={() => void handleExportPDF()}
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}
-        onViewSelected={handleViewSelected}
-        showViewButton={selectedRowId !== null}
         hasFilters={hasFilters}
-        viewButtonRef={viewButtonRef}
       />
 
       {hasFilters && filterResultsReady && !isLoading && (
@@ -603,37 +625,40 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       )}
 
       <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
-        {/* Header — neatly like Recent Trip Activity, same at top */}
-        <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
-              <History className="w-5 h-5" />
-            </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_list")}</h3>
-          </div>
-        </div>
-
-        <TripMasterTable
-          trips={paginatedTrips}
-          isLoading={isLoading}
-          selectedRowId={selectedRowId}
-          onRowClick={handleRowClick}
-          onRowSelect={(trip) => setSelectedRowId(trip.id)}
-          startIndex={(currentPage - 1) * pageSize}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSortChange={handleSortChange}
+        <TripListHeader
+          title={t("ops.trip.trip_list")}
+          viewLabel={t("common.view")}
+          viewDisabledTitle={t("ops.trip.select_trip_to_view")}
+          viewEnabledTitle={t("ops.trip.view_selected_trip")}
+          viewDisabled={visibleSelectedRowId == null}
+          onView={handleViewSelected}
+          viewButtonRef={viewButtonRef}
         />
+
+        {/* Single coordinated scroll viewport: sticky column headings and rows
+          share one horizontal + vertical scroll; toolbar stays above, and the
+          footer pagination never scrolls away with the wide table. */}
+        <div className="overflow-auto max-h-[clamp(20rem,72vh,56rem)] min-h-[16rem]">
+          <TripMasterTable
+            trips={paginatedTrips}
+            isLoading={isLoading}
+            selectedRowId={visibleSelectedRowId}
+            onRowClick={handleRowClick}
+            onRowSelect={(trip) => setSelectedRowId(trip.id)}
+            startIndex={(currentPage - 1) * pageSize}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSortChange={handleSortChange}
+            scrollable={false}
+          />
+        </div>
         {shouldShowPagination(totalCompletedTrips) && (
           <Pagination
             page={currentPage}
             pageSize={pageSize}
             totalItems={totalCompletedTrips}
-            onPageChange={setCurrentPage}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
           />
         )}
       </div>
@@ -645,6 +670,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             viewRequestSeqRef.current += 1;
             setViewOpen(false);
             setSelectedTrip(null);
+            viewButtonRef.current?.focus();
           }}
         />
       )}

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
-  API, login, shot, getTrip, createTrip, openTripStep, saveJson, EVIDENCE, ensureDieselRow,
+  login, shot, getTrip, createTrip, openTripStep, saveJson, EVIDENCE, ensureDieselRow,
 } from './batch-c3b.helpers';
 
 const PNG = Buffer.from(
@@ -89,7 +89,7 @@ test.describe('C3 Step 5 diesel browser matrix', () => {
     await expect(page.getByText(/diesel/i).first()).toBeVisible();
     await page.waitForTimeout(1500);
 
-    let body = await getTrip(page, trip.id);
+    const body = await getTrip(page, trip.id);
     const entries = body.dieselEntries ?? [];
     saveJson('c3b-step5-owned-api', { tripId: trip.id, dieselEntries: entries });
     expect(entries.length).toBe(1);

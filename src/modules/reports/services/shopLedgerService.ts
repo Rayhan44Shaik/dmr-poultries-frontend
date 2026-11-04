@@ -5,6 +5,7 @@
  * no localStorage authority, no client-side reconstruction, no 10-row limit.
  */
 import { apiGet } from "../../../api";
+import type { LedgerTransaction } from "../components/ShopLedgerPDF";
 
 export type ShopLedgerEntryType = "sale" | "collection" | "correction";
 
@@ -61,6 +62,15 @@ export interface ShopLedgerResponse {
   meta?: ShopLedgerMeta;
 }
 
+export interface ShopLedgerLoadBreakdown {
+  load: number;
+  birds: number;
+  weight: number;
+  mortalityBirds: number;
+  mortalityWeight: number;
+  weightLoss: number;
+}
+
 export interface ShopLedgerCumulativeQuantity {
   shopId: number;
   shopName: string;
@@ -75,6 +85,62 @@ export interface ShopLedgerCumulativeQuantity {
     boxWeight: number;
     weightModeBirds: number;
   }>;
+  /** Per-load delivered/mortality/weight-loss actuals. Same normalized rows
+   *  as the shop totals, grouped by load — sums equal the shop totals. */
+  deliveriesByLoad: ShopLedgerLoadBreakdown[];
+}
+
+export interface ShopLedgerCumulativeRow extends ShopLedgerCumulativeQuantity {
+  status: string;
+  openingBalance: number;
+  sale: number;
+  approvedCollection: number;
+  closingBalance: number;
+}
+
+export async function fetchShopLedgerCumulative(filters: {
+  shopId?: number;
+  fromDate?: string;
+  toDate?: string;
+  reportType?: "all" | "sales" | "collection";
+} = {}): Promise<ShopLedgerCumulativeRow[]> {
+  const params: Record<string, string> = {};
+  if (filters.shopId != null) params.shopId = String(filters.shopId);
+  if (filters.fromDate) params.fromDate = filters.fromDate;
+  if (filters.toDate) params.toDate = filters.toDate;
+  if (filters.reportType) params.reportType = filters.reportType;
+  const { data } = await apiGet<ShopLedgerCumulativeRow[]>(
+    "/operations/shop-ledger/cumulative",
+    { params },
+  );
+  return (data ?? []).map((row) => ({
+    shopId: Number(row.shopId),
+    shopName: String(row.shopName ?? ""),
+    status: String(row.status ?? "Active"),
+    birds: Number(row.birds ?? 0),
+    weight: Number(row.weight ?? 0),
+    mortalityBirds: Number(row.mortalityBirds ?? 0),
+    mortalityWeight: Number(row.mortalityWeight ?? 0),
+    weightLoss: Number(row.weightLoss ?? 0),
+    openingBalance: Number(row.openingBalance ?? 0),
+    sale: Number(row.sale ?? 0),
+    approvedCollection: Number(row.approvedCollection ?? 0),
+    closingBalance: Number(row.closingBalance ?? 0),
+    mortalityByLoad: (row.mortalityByLoad ?? []).map((load) => ({
+      load: Number(load.load ?? 1),
+      boxBirds: Number(load.boxBirds ?? 0),
+      boxWeight: Number(load.boxWeight ?? 0),
+      weightModeBirds: Number(load.weightModeBirds ?? 0),
+    })),
+    deliveriesByLoad: (row.deliveriesByLoad ?? []).map((load) => ({
+      load: Number(load.load ?? 1),
+      birds: Number(load.birds ?? 0),
+      weight: Number(load.weight ?? 0),
+      mortalityBirds: Number(load.mortalityBirds ?? 0),
+      mortalityWeight: Number(load.mortalityWeight ?? 0),
+      weightLoss: Number(load.weightLoss ?? 0),
+    })),
+  }));
 }
 
 export async function fetchShopLedgerCumulativeQuantities(filters: {
@@ -99,6 +165,14 @@ export async function fetchShopLedgerCumulativeQuantities(filters: {
       boxBirds: Number(load.boxBirds ?? 0),
       boxWeight: Number(load.boxWeight ?? 0),
       weightModeBirds: Number(load.weightModeBirds ?? 0),
+    })),
+    deliveriesByLoad: (row.deliveriesByLoad ?? []).map((load) => ({
+      load: Number(load.load ?? 1),
+      birds: Number(load.birds ?? 0),
+      weight: Number(load.weight ?? 0),
+      mortalityBirds: Number(load.mortalityBirds ?? 0),
+      mortalityWeight: Number(load.mortalityWeight ?? 0),
+      weightLoss: Number(load.weightLoss ?? 0),
     })),
   }));
 }
@@ -159,11 +233,9 @@ export async function fetchShopLedger(
         subShopName: String(row.subShopName ?? ""),
         remarks: String(row.remarks ?? ""),
         date: String(row.date ?? ""),
-        type: (row.type === "correction"
-          ? row.referenceType === "collection"
-            ? "collection"
-            : "sale"
-          : row.type ?? "sale") as ShopLedgerEntryType,
+        // The backend preserves correction rows so an amount-only adjustment
+        // never masquerades as a second sale with zero birds and weight.
+        type: (row.type ?? "sale") as ShopLedgerEntryType,
         referenceType: String(row.referenceType ?? ""),
         referenceId: Number(row.referenceId ?? 0),
         referenceNo: String(row.referenceNo ?? ""),
@@ -194,4 +266,79 @@ export async function fetchShopLedger(
   } finally {
     if (inflightReads.get(key) === request) inflightReads.delete(key);
   }
+}
+
+// ─── Shared ledger row mapping — the exact LedgerTransaction shape the shop
+//     ledger table, cumulative view and Shop Ledger PDF already consume.
+//     Birds/weight/rate belong to sale rows (backend trip-delivery detail);
+//     collections carry their number. Lives here (not in the page) so the
+//     detail modal and every other consumer share one mapping — never a
+//     second ledger calculation system.
+const txParticulars = (row: ShopLedgerRow): string => {
+  // Particulars = shop name only. Trip/collection reference numbers are still
+  // kept on the transaction (collectionNo) for search, but never shown here.
+  return row.shopName || row.description || row.referenceNo || "Ledger";
+};
+
+export const mapLedgerRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
+  const isSale = row.type === "sale";
+  return {
+    id: row.id,
+    createdAt: row.createdAt ?? undefined,
+    date: row.date,
+    particulars: txParticulars(row),
+    birds: isSale ? row.birds : 0,
+    weight: isSale ? row.weight : 0,
+    farmBirds: isSale ? row.farmBirds : 0,
+    farmWeight: isSale ? row.farmWeight : 0,
+    mortalityBirds: isSale ? row.mortalityBirds : 0,
+    mortalityWeight: isSale ? row.mortalityWeight : 0,
+    weightLoss: isSale ? row.weightLoss : 0,
+    rate: isSale ? row.rate : 0,
+    debit: Number(row.debit) || 0,
+    credit: Number(row.credit) || 0,
+    balance: Number(row.balance) || 0,
+    type: row.type,
+    paymentMode: row.paymentMode ?? undefined,
+    collectionNo: row.referenceNo || undefined,
+    loadLabel: isSale && row.loadLabel ? row.loadLabel : undefined,
+    subShopName: row.subShopName?.trim() || undefined,
+    remarks: row.remarks?.trim() || undefined,
+  };
+};
+
+/** Fetch the COMPLETE ledger, walking server pagination until every row has
+ *  arrived — without this, All-Shops ranges with more than one page of
+ *  transactions would silently truncate at the server's page size. */
+export async function fetchAllLedgerPages(filters: {
+  shopId?: number;
+  fromDate?: string;
+  toDate?: string;
+}): Promise<ShopLedgerResponse> {
+  const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
+  const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
+  const dedupeRows = (rows: ShopLedgerRow[]): ShopLedgerRow[] => {
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+      const key = row.id > 0
+        ? `${row.type}:id:${row.id}`
+        : `${row.shopId}:${row.type}:${row.referenceType}:${row.referenceId}:${row.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  if (totalPages <= 1) return { ...first, data: dedupeRows(first.data) };
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      fetchShopLedger({ ...filters, page: index + 2, limit: 500 }),
+    ),
+  );
+  return {
+    ...first,
+    data: dedupeRows([
+      ...first.data,
+      ...rest.flatMap((page) => page.data),
+    ]),
+  };
 }

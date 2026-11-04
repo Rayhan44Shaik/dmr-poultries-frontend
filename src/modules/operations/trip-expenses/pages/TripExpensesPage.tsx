@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Calendar,
@@ -35,10 +35,16 @@ import {
   opsFilterCardClass, opsFilterLabelClass, opsInputClass, opsPdfButtonClass, opsPrimaryButtonClass, opsTableCardClass,
   opsTableDivideClass, opsTableHeadRowClass, opsTableRowClass, opsViewButtonClass,
 } from "../../../../shared/ui/operationsStyles";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../shared/ui/RowSelectMark";
 import { useI18n } from "../../../../i18n";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { approveManualExpense, createManualExpense, deleteManualExpense, listManualExpenses, listTripExpenses, updateManualExpense, type ExpenseDetail, type ManualExpense, type TripExpenseRow } from "../services/tripExpensesService";
+import GeneralExpensesTable from "../../vehicle-trips/components/Step_5/GeneralExpensesTable";
+import DieselExpensesTable from "../../vehicle-trips/components/Step_5/DieselExpensesTable";
+import { calculateTripExpenseTotals } from "../../vehicle-trips/utils/dieselExpenseBreakdown";
 import { ManualExpenseForm } from "../components/ManualExpenseForm";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
@@ -208,37 +214,131 @@ function EmployeeCountCell({ count, employees }: { count: number; employees: { n
   );
 }
 
-function ExpenseView({ expense, history, onSelect, onClose }: { expense: TripExpenseRow | null; history: TripExpenseRow[]; onSelect: (row: TripExpenseRow) => void; onClose: () => void }) {
+/** Saved breakdown names that already own a Step 5 sheet slot. */
+const STEP5_KNOWN_OTHER_NAMES = new Set(["Loading", "Tiffin", "Tea / RC", "RTO", "Driver Bata", "Helper Bata"]);
+
+function step5AmountByName(details: ExpenseDetail[], name: string): number {
+  return details.find((item) => item.name === name)?.amount ?? 0;
+}
+
+/**
+ * Saved automatic trip-expense row → Trip Completion Step 5 sheet shape, so the
+ * read-only Step 5 tables (GeneralExpensesTable + DieselExpensesTable) render
+ * the exact saved values with the Step 5 presentation and totals.
+ */
+function expenseToStep5Sheet(expense: TripExpenseRow): Record<string, unknown> {
+  const customs = expense.otherBreakdown
+    .filter((item) => !STEP5_KNOWN_OTHER_NAMES.has(item.name))
+    .slice(0, 3);
+  const sheet: Record<string, unknown> = {
+    meals: expense.meals,
+    loading: expense.loading,
+    mealsTiffin: expense.tiffin,
+    vehicleMaintenance: expense.vehicleMaintenance,
+    vehicleMaintenanceNote: expense.vehicleMaintenanceNote || "",
+    othersRC: step5AmountByName(expense.otherBreakdown, "Tea / RC"),
+    others1Amt: expense.rto,
+    others2Amt: expense.supervisorPc,
+    others2Name: "SUPERVISOR (PC)",
+    destinationTolls: "",
+    endMeter: "",
+    remarks: expense.remarks || "",
+  };
+  customs.forEach((item, index) => {
+    const slot = index + 3;
+    sheet[`others${slot}Name`] = item.name;
+    sheet[`others${slot}Amt`] = item.amount;
+  });
+  expense.dieselBreakdown.forEach((bill, index) => {
+    const slot = index + 1;
+    sheet[`dieselLtr${slot}`] = bill.litres;
+    sheet[`dieselRate${slot}`] = bill.rate;
+    sheet[`dieselAmount${slot}`] = bill.amount;
+    sheet[`dieselBunk${slot}`] = bill.bunk || "";
+    sheet[`dieselSubmitted${slot}`] = true;
+  });
+  return sheet;
+}
+
+/**
+ * Automatic trip-expense View — read-only, in the Trip Completion Step 5
+ * locked style. The large Expense Bill / history layout is gone; the saved
+ * Step 5 values render through the same Step 5 tables, with the saved total.
+ */
+function ExpenseView({ expense, onClose }: { expense: TripExpenseRow | null; onClose: () => void }) {
   if (!expense) return null;
-  const detailRows = [
-    ["Advance", expense.advanceAmount], ["Meals", expense.meals], ["Loading", expense.loading],
-    ["Tiffin", expense.tiffin], ["Supervisor PC", expense.supervisorPc], ["Vehicle Maintenance", expense.vehicleMaintenance],
-    ["RTO", expense.rto], ["Diesel", expense.diesel], ["Other Expenses", expense.others],
-  ] as const;
-  return <AppShellModal open onClose={onClose} panelClassName="max-w-[96rem] bg-white" ariaLabelledBy="expense-view-title">
+  const sheetData = expenseToStep5Sheet(expense);
+  const teaRc = step5AmountByName(expense.otherBreakdown, "Tea / RC");
+  const totalExpenses1 =
+    expense.meals + expense.loading + expense.tiffin + expense.vehicleMaintenance + teaRc;
+  const customs = expense.otherBreakdown
+    .filter((item) => !STEP5_KNOWN_OTHER_NAMES.has(item.name))
+    .slice(0, 3);
+  const customsTotal = customs.reduce((sum, item) => sum + item.amount, 0);
+  const totalExpenses2Base = expense.rto + expense.supervisorPc + customsTotal;
+  const dieselLitres = expense.dieselBreakdown.reduce((sum, bill) => sum + Number(bill.litres || 0), 0);
+  const { expenseTotal: totalExpenses2 } = calculateTripExpenseTotals(totalExpenses2Base, expense.diesel, 0);
+  const dieselAmounts = expense.dieselBreakdown.map((bill) => {
+    const saved = Number(bill.amount);
+    return Number.isFinite(saved) && saved > 0 ? saved : Number(bill.litres || 0) * Number(bill.rate || 0);
+  });
+  const summaryBoxes = [
+    { label: "Captured", value: formatTripListDay(expense.tripDate), tone: "border-sky-100 bg-sky-50/40 text-slate-700", wide: true },
+    { label: "Vehicle", value: formatVehicleNumber(expense.vehicleNo) || "—", tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500" },
+    { label: "Advance", value: money(expense.advanceAmount), tone: "border-emerald-100 bg-emerald-50/40 text-emerald-500" },
+    { label: "Total Expenses", value: money(totalExpenses1 + totalExpenses2), tone: "border-rose-100 bg-rose-50/40 text-rose-500" },
+    { label: "Total Diesel", value: money(expense.diesel), sub: `${dieselLitres.toFixed(2)} L`, tone: "border-blue-100 bg-blue-50/40 text-blue-500" },
+    { label: "Grand Total", value: money(expense.totalExpense), tone: "border-slate-200 bg-slate-50/60 text-slate-700" },
+  ];
+  return <AppShellModal open onClose={onClose} panelClassName="max-w-5xl bg-white" ariaLabelledBy="expense-view-title">
     <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4">
       <div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600"><ReceiptText size={25}/></span><div><h2 id="expense-view-title" className="text-lg font-semibold text-slate-900">Expense Bill — {expense.tripNo}</h2><p className="text-xs font-normal text-slate-500"><Truck size={12} className="mr-1 inline"/>{formatVehicleNumber(expense.vehicleNo)} · {expense.supervisorName || expense.driverName || "Trip expense"}</p></div></div>
       <div className="flex items-center gap-3"><span className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold text-emerald-700"><CheckCircle2 size={14} className="mr-1 inline"/>Approved (Trip Completion)</span><button type="button" onClick={onClose} className="group rounded-full border border-slate-200 bg-white p-2.5 text-slate-500 shadow-sm transition-all duration-200 hover:bg-slate-100 active:scale-90" aria-label="Close"><span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={18}/></span></button></div>
     </div>
-    <div className="grid min-h-[600px] grid-cols-1 md:grid-cols-[360px_1fr]">
-      <aside className="border-b border-slate-200 bg-slate-50/80 p-4 md:border-b-0 md:border-r">
-        <div className="mb-3 flex items-center justify-between px-2"><span className="text-xs font-bold uppercase tracking-wider text-slate-500"><Truck size={14} className="mr-1 inline"/>Trip Expense History</span><span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-600">{history.length}</span></div>
-        <div className="max-h-[545px] space-y-2 overflow-y-auto pr-1">{history.map((row) => <button key={row.id} type="button" onClick={() => onSelect(row)} className={`w-full rounded-xl border p-3 text-left transition-all ${row.id === expense.id ? "border-emerald-400 bg-emerald-50 shadow-sm ring-2 ring-emerald-500/20" : "border-slate-200 bg-white hover:border-emerald-200"}`}>
-          <div className="flex items-center justify-between gap-2"><span className="text-sm font-medium text-slate-800">{formatTripListDay(row.tripDate)}</span><span className="rounded-lg bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">{row.tripNo}</span></div>
-          <div className="mt-2 flex items-center justify-between text-xs"><span className="font-normal text-slate-500">{formatVehicleNumber(row.vehicleNo)}</span><span className="font-semibold text-emerald-700">{money(row.totalExpense)}</span></div>
-        </button>)}</div>
-      </aside>
-      <section key={expense.id} className="flex min-w-0 flex-col overflow-y-auto p-5 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-1 motion-safe:duration-200 sm:p-6">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="overflow-hidden rounded-xl border border-slate-200">{[["Trip Number", expense.tripNo], ["Date", formatTripListDay(expense.tripDate)], ["Vehicle", formatVehicleNumber(expense.vehicleNo)], ["Supervisor", expense.supervisorName || "—"], ["Driver", expense.driverName || "—"], ["Employees", String(expense.employeeCount)]].map(([label,value]) => <div key={label} className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-0"><span className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span><span className="text-sm font-medium text-slate-800">{value}</span></div>)}</div>
-          <div className="overflow-hidden rounded-xl border border-slate-200">{detailRows.map(([label,value]) => <div key={label} className="flex items-center justify-between gap-4 border-b border-slate-100 px-4 py-3 last:border-0"><span className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</span><span className={`text-sm font-semibold ${value > 0 ? "text-emerald-700" : "text-slate-600"}`}>{money(value)}</span></div>)}</div>
+    <section key={expense.id} className="bg-white p-4 sm:p-5">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-[minmax(180px,1.25fr)_repeat(5,minmax(0,1fr))]">
+          {summaryBoxes.map((box) => (
+            <div key={box.label} className={`min-w-0 rounded-xl border px-3 py-2.5 shadow-sm ${box.wide ? "col-span-2 sm:col-span-1" : ""} ${box.tone}`}>
+              <p className="truncate text-[13px] font-semibold uppercase tracking-wide text-slate-400">{box.label}</p>
+              <p className="mt-1 truncate text-[15px] font-bold tabular-nums text-slate-800">{box.value}</p>
+              {"sub" in box && box.sub ? <p className="text-[11px] font-semibold tabular-nums text-slate-500">{box.sub}</p> : null}
+            </div>
+          ))}
         </div>
-        {expense.dieselBreakdown.length > 0 && <div className="mt-4 rounded-xl border border-slate-200 p-4"><div className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">Diesel Bill Details</div><div className="grid gap-2 sm:grid-cols-2">{expense.dieselBreakdown.map((bill,index) => <div key={`${bill.bunk}-${index}`} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs"><span className="font-semibold text-slate-700">{bill.bunk || `Diesel ${index+1}`} · {bill.litres.toFixed(2)} L</span><span className="font-bold text-emerald-700">{money(bill.amount)}</span></div>)}</div></div>}
-        <div className="mt-4 rounded-xl border border-slate-200 p-4"><div className="text-xs font-bold uppercase tracking-wide text-slate-400">Remarks / Operator Notes</div><div className="mt-2 text-sm font-semibold text-slate-700">{expense.remarks || "No remarks"}</div></div>
-        <div className="my-4 flex items-center justify-between rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white px-5 py-4"><span className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Total Trip Expense</span><span className="text-xl font-semibold text-emerald-700">{money(expense.totalExpense)}</span></div>
-        <div className="mt-auto flex justify-end border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="group inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-200 active:scale-95"><span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={15}/></span>Close</button></div>
-      </section>
-    </div>
+        <div className="mt-3 space-y-3">
+          <GeneralExpensesTable
+            sheetData={sheetData}
+            handleChange={() => undefined}
+            pickupTolls={0}
+            totalExpenses1={totalExpenses1}
+            totalExpenses2={totalExpenses2}
+            totalAllExpenses={totalExpenses1 + totalExpenses2}
+            totalDistanceCovered={0}
+            averageKmLtr=""
+            openingMeter={0}
+            destMeter={0}
+            readOnly
+            dieselOtherAmount={0}
+            hideMeters
+            mealEmployeeCount={expense.employeeCount}
+          />
+          <DieselExpensesTable
+            tripId={expense.id}
+            sheetData={sheetData}
+            handleChange={() => undefined}
+            applyBatchUpdates={() => undefined}
+            dieselAmounts={dieselAmounts}
+            totalDieselAmount={expense.diesel}
+            destMeter={0}
+            readOnly
+          />
+        </div>
+        <div className="mt-3 rounded-xl border border-slate-200 p-4"><div className="text-xs font-bold uppercase tracking-wide text-slate-400">Remarks / Operator Notes</div><div className="mt-2 text-sm font-semibold text-slate-700">{expense.remarks || "No remarks"}</div></div>
+        <div className="my-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white px-5 py-4"><span className="text-sm font-semibold uppercase tracking-wide text-emerald-700">Total Trip Expense</span><span className="text-xl font-semibold text-emerald-700">{money(expense.totalExpense)}</span></div>
+        <div className="flex justify-end border-t border-slate-100 pt-4"><button type="button" onClick={onClose} className="group inline-flex h-10 items-center gap-2 rounded-xl bg-slate-100 px-5 text-sm font-semibold text-slate-700 transition-all duration-200 hover:bg-slate-200 active:scale-95"><span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={15}/></span>Close</button></div>
+      </div>
+    </section>
   </AppShellModal>;
 }
 
@@ -480,7 +580,8 @@ export default function TripExpensesPage() {
     }
   };
   const visibleManualRows = page === 1 ? manualRows : [];
-  const selectableRows = [
+  type ExpenseRowRef = { kind: "manual" | "trip"; id: number };
+  const selectableRows: ExpenseRowRef[] = [
     ...visibleManualRows.map((row) => ({ kind: "manual" as const, id: row.id })),
     ...rows.map((row) => ({ kind: "trip" as const, id: row.id })),
   ];
@@ -493,29 +594,53 @@ export default function TripExpensesPage() {
     setSelectedManualId(null);
     setSelectedId(id);
   };
-  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, kind: "manual" | "trip", id: number, rowIndex: number) => {
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      const nextIndex = Math.max(0, Math.min(selectableRows.length - 1, rowIndex + (event.key === "ArrowDown" ? 1 : -1)));
-      const next = selectableRows[nextIndex];
-      if (!next) return;
-      selectExpenseRow(next.kind, next.id);
-      requestAnimationFrame(() => document.querySelector<HTMLTableRowElement>(`[data-expense-row-index="${nextIndex}"]`)?.focus());
-      return;
-    }
-    if (event.key === " " || event.key === "Enter") {
-      event.preventDefault();
-      selectExpenseRow(kind, id);
-      if (event.key === "Enter") {
-        if (kind === "manual") {
-          const manual = visibleManualRows.find((row) => row.id === id);
-          if (manual) setViewingManual(manual);
-        } else {
-          openTrip(id);
-        }
+  // Single shared selection across the manual + automatic row groups: click
+  // toggles, arrows/Home/End/Space move, Enter opens, Escape clears.
+  const expenseSelection = useTableRowSelection<ExpenseRowRef>({
+    rows: selectableRows,
+    getId: (row) => `${row.kind}:${row.id}`,
+    selectedId:
+      selectedManualId !== null
+        ? `manual:${selectedManualId}`
+        : selectedId !== null
+          ? `trip:${selectedId}`
+          : null,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (row) => {
+      if (row.kind === "manual") {
+        const manual = visibleManualRows.find((entry) => entry.id === row.id);
+        return `Manual expense ${manual?.expenseNo ?? row.id}`;
       }
-    }
-  };
+      const trip = rows.find((entry) => entry.id === row.id);
+      return `Trip ${trip?.tripNo ?? row.id}`;
+    },
+    onSelect: (row, _index, via) => {
+      if (via === "keyboard") {
+        selectExpenseRow(row.kind, row.id);
+        return;
+      }
+      if (row.kind === "manual") {
+        setSelectedId(null);
+        setSelectedManualId(selectedManualId === row.id ? null : row.id);
+      } else {
+        setSelectedManualId(null);
+        setSelectedId(selectedId === row.id ? null : row.id);
+      }
+    },
+    onDeselect: () => {
+      setSelectedId(null);
+      setSelectedManualId(null);
+    },
+    onPrimaryAction: (row) => {
+      if (row.kind === "manual") {
+        const manual = visibleManualRows.find((entry) => entry.id === row.id);
+        if (manual) setViewingManual(manual);
+      } else {
+        openTrip(row.id);
+      }
+    },
+  });
   const canView = Boolean(selectedId);
 
   return <div className="w-full space-y-5">
@@ -634,8 +759,8 @@ export default function TripExpensesPage() {
             {page === 1 && manualRows.map((row, index) => {
               const viewManual = () => setViewingManual(row);
               const selected = selectedManualId === row.id;
-              return <tr key={`manual-${row.id}`} tabIndex={0} data-expense-row-index={index} className={`${opsTableRowClass} cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${selected ? "bg-emerald-50/80 shadow-[inset_4px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"}`} aria-selected={selected} onClick={() => { setSelectedId(null); setSelectedManualId(selected ? null : row.id); }} onDoubleClick={viewManual} onKeyDown={(event) => handleRowKeyDown(event, "manual", row.id, index)}>
-                <td className={`${tdClass} text-slate-500`}>{selected ? <CheckCircle2 size={16} className="mx-auto text-emerald-600" /> : index + 1}</td>
+              return <tr key={`manual-${row.id}`} {...expenseSelection.getRowProps({ kind: "manual", id: row.id }, index)} data-expense-row-index={index} className={`${opsTableRowClass} cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${selected ? tableSelectedRowClass : "hover:bg-slate-50/80"}`} onDoubleClick={viewManual}>
+                <td className={`${tdClass} text-slate-500`}><RowSelectMark selected={selected} serialNo={index + 1} label={`Selected manual expense ${row.expenseNo}`} /></td>
                 <td className="px-2 py-4 text-center align-middle">
                   <button type="button" onClick={viewManual} className="text-[13px] font-bold text-violet-600 hover:underline" title="View expense details">{row.expenseNo}</button>
                 </td>
@@ -654,15 +779,12 @@ export default function TripExpensesPage() {
               const selected = selectedId === row.id;
               return <tr
                 key={row.id}
-                tabIndex={0}
+                {...expenseSelection.getRowProps({ kind: "trip", id: row.id }, visibleManualRows.length + index)}
                 data-expense-row-index={visibleManualRows.length + index}
-                aria-selected={selected}
-                onClick={() => { setSelectedManualId(null); setSelectedId(row.id === selectedId ? null : row.id); }}
                 onDoubleClick={() => { setSelectedId(row.id); openTrip(row.id); }}
-                onKeyDown={(event) => handleRowKeyDown(event, "trip", row.id, visibleManualRows.length + index)}
-                className={`${opsTableRowClass} cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${selected ? "bg-emerald-50/80 shadow-[inset_4px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"}`}
+                className={`${opsTableRowClass} cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${selected ? tableSelectedRowClass : "hover:bg-slate-50/80"}`}
               >
-                <td className={`${tdClass} text-slate-500`}>{selected ? <CheckCircle2 size={16} className="mx-auto text-emerald-600" /> : manualRows.length + (page - 1) * pageSize + index + 1}</td>
+                <td className={`${tdClass} text-slate-500`}><RowSelectMark selected={selected} serialNo={manualRows.length + (page - 1) * pageSize + index + 1} label={`Selected trip ${row.tripNo}`} /></td>
                 <td className="px-2 py-4 text-center align-middle">
                   <span className="inline-block max-w-full truncate whitespace-nowrap text-[13px] font-bold text-emerald-600" title={row.tripNo}>{row.tripNo}</span>
                 </td>
@@ -685,7 +807,7 @@ export default function TripExpensesPage() {
       </div>
       {total > 0 && <Pagination page={page} pageSize={pageSize} totalItems={total} onPageChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}/>}
     </div>
-    <ExpenseView expense={viewTrip} history={rows} onSelect={setViewTrip} onClose={() => setViewTrip(null)}/>
+    <ExpenseView expense={viewTrip} onClose={() => setViewTrip(null)}/>
     <ManualExpenseView
       expense={viewingManual}
       history={manualRows}

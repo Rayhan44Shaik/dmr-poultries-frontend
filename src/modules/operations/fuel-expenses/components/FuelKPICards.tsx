@@ -1,5 +1,5 @@
 import React from "react";
-import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp, Gauge, MapPin } from "lucide-react";
+import { Fuel, IndianRupee, FileText, TrendingUp, Gauge, MapPin } from "lucide-react";
 import { compactKpiValue, KpiCardGrid, KpiMetricValue, type KpiCardItem } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
 
@@ -7,7 +7,7 @@ interface Props {
   totalLitres: number;
   totalAmount: number;
   pendingCount: number;
-  approvedCount: number;
+  totalDistance: number | null;
   avgMileage: number | null;
   recentTripMileage?: number | null;
   bunkDetails?: Array<{ name: string; bills: number; litres: number; amount: number }>;
@@ -17,7 +17,7 @@ export function FuelKPICards({
   totalLitres,
   totalAmount,
   pendingCount,
-  approvedCount,
+  totalDistance,
   avgMileage,
   recentTripMileage = null,
   bunkDetails = [],
@@ -27,7 +27,7 @@ export function FuelKPICards({
   const litres = compactKpiValue(totalLitres, 2);
   const cost = compactKpiValue(totalAmount, 2);
   const pending = compactKpiValue(pendingCount);
-  const approved = compactKpiValue(approvedCount);
+  const distance = totalDistance !== null ? compactKpiValue(totalDistance, 0) : null;
   const mileage = avgMileage !== null ? compactKpiValue(avgMileage, 2) : null;
   const recentMileage = recentTripMileage !== null && recentTripMileage !== undefined ? compactKpiValue(recentTripMileage, 2) : null;
 
@@ -38,7 +38,7 @@ export function FuelKPICards({
       id: "litres",
       label: t("ops.fuel.total_fuel"),
       value: <KpiMetricValue metric={litres} unit="L" />,
-      tooltip: isTe ? `మొత్తం ఇంధనం: ${litres.exact} లీటర్లు` : `Total Fuel: ${litres.exact} Litres`,
+      tooltip: isTe ? `మొత్తం ఇంధనం: ${litres.exact} లీటర్` : `Total Fuel: ${litres.exact} Litres`,
       Icon: Fuel,
       tone: "blue",
     },
@@ -59,12 +59,20 @@ export function FuelKPICards({
       tone: "amber",
     },
     {
-      id: "approved",
-      label: t("ops.fuel.approved_bills"),
-      value: <KpiMetricValue metric={approved} />,
-      tooltip: isTe ? `ఆమోదించబడింది: ${approved.exact}` : `Approved: ${approved.exact}`,
-      Icon: CheckCircle,
-      tone: "cyan",
+      id: "distance",
+      label: "TOTAL DISTANCE",
+      value: distance ? <KpiMetricValue metric={distance} unit="km" /> : "—",
+      tooltip: isTe ? `మొత్తంстояние: ${distance?.exact} кіломੀਟർ` : `Total Distance: ${distance?.exact ?? "—"} km`,
+      Icon: Gauge,
+      tone: "violet",
+    },
+    {
+      id: "mileage",
+      label: t("ops.fuel.avg_efficiency"),
+      value: mileage ? <KpiMetricValue metric={mileage} unit="KM/L" /> : "—",
+      tooltip: mileage ? (isTe ? `ఫ్లీట్ సామర్థ్యం: ${mileage.exact} KM/L` : `Fleet Efficiency: ${mileage.exact} KM/L`) : isTe ? "మైలేజ్ డేటా లేదు" : "No mileage data",
+      Icon: TrendingUp,
+      tone: "violet",
     },
     {
       id: "bunks",
@@ -76,14 +84,6 @@ export function FuelKPICards({
       Icon: MapPin,
       tone: "rose",
     },
-    {
-      id: "mileage",
-      label: t("ops.fuel.avg_efficiency"),
-      value: mileage ? <KpiMetricValue metric={mileage} unit="KM/L" /> : "—",
-      tooltip: mileage ? (isTe ? `ఫ్లీట్ సామర్థ్యం: ${mileage.exact} KM/L` : `Fleet Efficiency: ${mileage.exact} KM/L`) : (isTe ? "మైలేజ్ డేటా లేదు" : "No mileage data"),
-      Icon: TrendingUp,
-      tone: "violet",
-    },
   ];
 
   if (recentMileage) {
@@ -91,7 +91,7 @@ export function FuelKPICards({
       id: "recent-mileage",
       label: t("ops.fuel.recent_trip_mileage"),
       value: <KpiMetricValue metric={recentMileage} unit="KM/L" />,
-      tooltip: isTe ? `ఇటీవలి ట్రిప్: ${recentMileage.exact} KM/L` : `Recent Trip: ${recentMileage.exact} KM/L`,
+      tooltip: isTe ? `ఇటేవలి ట్రిప్: ${recentMileage.exact} KM/L` : `Recent Trip: ${recentMileage.exact} KM/L`,
       Icon: Gauge,
       tone: "rose",
     });

@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, Store, ArrowUpDown, BadgeIndianRupee } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Calendar, Truck, UserCog, Warehouse, Store, ArrowUpDown, BadgeIndianRupee } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -7,7 +7,6 @@ import {
   opsInputClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
-  opsViewButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
@@ -46,10 +45,7 @@ interface Props {
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
-  onViewSelected?: () => void;
-  showViewButton?: boolean;
   hasFilters?: boolean;
-  viewButtonRef?: React.Ref<HTMLButtonElement>;
   totalCount?: number;
 }
 
@@ -81,10 +77,7 @@ function TripFilters({
   onExportPDF,
   onRefresh,
   onExportExcel,
-  onViewSelected,
-  showViewButton = false,
   hasFilters = false,
-  viewButtonRef,
 }: Props) {
   const { t, language } = useI18n();
   // Option lists may be either legacy strings or id-backed dropdown options.
@@ -301,18 +294,6 @@ function TripFilters({
         </div>
 
         <div className="md:col-span-4 xl:col-span-1 flex min-w-0 items-center gap-2 justify-end flex-wrap xl:flex-nowrap">
-          {onViewSelected && (
-            <button
-              ref={viewButtonRef}
-              type="button"
-              onClick={onViewSelected} disabled={!showViewButton}
-              className={`group relative ${opsViewButtonClass}`}
-              aria-label={t("common.view")}
-            >
-              <span className={`inline-flex ${showViewButton ? "motion-safe:group-hover:animate-[var(--animate-action-view)]" : ""}`}><Eye size={15} /></span>
-              {t("common.view")}
-            </button>
-          )}
           <FilterResetButton
             count={countActiveFilters(
               search.trim() !== "",

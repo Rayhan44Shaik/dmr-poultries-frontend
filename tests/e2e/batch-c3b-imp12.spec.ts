@@ -58,8 +58,8 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
 
     // 4. Box/bird/weight totals from the API (DB-backed).
     let body = await getTrip(page, trip.id);
-    expect(body.boxDetails.map((b: any) => Number(b.birds))).toEqual([100, 100]);
-    expect(body.boxDetails.map((b: any) => Number(b.weight))).toEqual([200, 200]);
+    expect(body.boxDetails.map((b: Record<string, unknown>) => Number(b.birds))).toEqual([100, 100]);
+    expect(body.boxDetails.map((b: Record<string, unknown>) => Number(b.weight))).toEqual([200, 200]);
     saveJson('c3b-imp12-dataset-a', { tripId: trip.id, boxes: body.boxDetails });
     await shot(page, 'c3b-imp12-dataset-a-committed');
 
@@ -71,7 +71,7 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
     ).toBeVisible({ timeout: 20_000 });
     const afterDuplicate = await getTrip(page, trip.id);
     expect(afterDuplicate.boxDetails.length).toBe(2);
-    expect(afterDuplicate.boxDetails.map((b: any) => Number(b.birds))).toEqual([100, 100]);
+    expect(afterDuplicate.boxDetails.map((b: Record<string, unknown>) => Number(b.birds))).toEqual([100, 100]);
     await shot(page, 'c3b-imp12-duplicate-file-rejected');
     await page.getByRole('button', { name: /cancel/i }).first().click();
 
@@ -108,9 +108,9 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
     await page.getByRole('button', { name: /replace and save/i }).click();
     await expect(page.getByRole('button', { name: /import excel \/ pdf/i })).toBeVisible({ timeout: 20_000 });
     body = await getTrip(page, trip.id);
-    expect(body.boxDetails.map((b: any) => Number(b.boxNo))).toEqual([1, 2]);
-    expect(body.boxDetails.map((b: any) => Number(b.birds))).toEqual([25, 25]);
-    expect(body.boxDetails.map((b: any) => Number(b.weight))).toEqual([50, 50]);
+    expect(body.boxDetails.map((b: Record<string, unknown>) => Number(b.boxNo))).toEqual([1, 2]);
+    expect(body.boxDetails.map((b: Record<string, unknown>) => Number(b.birds))).toEqual([25, 25]);
+    expect(body.boxDetails.map((b: Record<string, unknown>) => Number(b.weight))).toEqual([50, 50]);
     saveJson('c3b-imp12-dataset-b', { tripId: trip.id, boxes: body.boxDetails });
     await refreshTripStep(page, trip.id, 3);
     const gridB = await readPickupGrid(page);
@@ -121,7 +121,7 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
     // 13–15. Shop deliveries must be governed by dataset B only.
     const shopA = fixtures.shops.find((s) => /Alpha/.test(String(s.shopName))) ?? fixtures.shops[0];
     const shopB = fixtures.shops.find((s) => /Bravo/.test(String(s.shopName))) ?? fixtures.shops[1];
-    const delivery = (shop: Record<string, any>, key: string, box: number) => ({
+    const delivery = (shop: Record<string, unknown>, key: string, box: number) => ({
       id: 0,
       clientKey: key,
       shopId: shop.id,
@@ -164,11 +164,11 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
     const withDeliveries = await getTrip(page, trip.id);
     const savedDeliveries = withDeliveries.deliveries ?? [];
     expect(savedDeliveries.length).toBe(2);
-    const shopNames = savedDeliveries.map((d: any) => String(d.shopName));
+    const shopNames = savedDeliveries.map((d: Record<string, unknown>) => String(d.shopName));
     expect(shopNames.some((n: string) => n.includes(String(shopA.shopName)))).toBeTruthy();
     expect(shopNames.some((n: string) => n.includes(String(shopB.shopName)))).toBeTruthy();
     // Available capacity must come from dataset B (25 birds/box), never A (100).
-    expect((withDeliveries.boxDetails ?? []).map((b: any) => Number(b.birds))).toEqual([25, 25]);
+    expect((withDeliveries.boxDetails ?? []).map((b: Record<string, unknown>) => Number(b.birds))).toEqual([25, 25]);
 
     // 16. No dataset A fingerprint may remain: re-importing A succeeds again.
     await openTripStep(page, trip.id, 3);
@@ -176,7 +176,7 @@ test.describe('C3 IMP-12 latest-dataset browser journey', () => {
     await page.getByRole('button', { name: /replace and save/i }).click();
     await expect(page.getByRole('button', { name: /import excel \/ pdf/i })).toBeVisible({ timeout: 20_000 });
     const reimported = await getTrip(page, trip.id);
-    expect(reimported.boxDetails.map((b: any) => Number(b.birds))).toEqual([100, 100]);
+    expect(reimported.boxDetails.map((b: Record<string, unknown>) => Number(b.birds))).toEqual([100, 100]);
     saveJson('c3b-imp12-reimport-a-after-erase', { tripId: trip.id, boxes: reimported.boxDetails });
     await shot(page, 'c3b-imp12-reimport-a-after-erase');
   });

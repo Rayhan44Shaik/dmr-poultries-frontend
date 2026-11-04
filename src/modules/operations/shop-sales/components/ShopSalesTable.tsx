@@ -28,6 +28,9 @@ import { useI18n } from "../../../../i18n";
 import type { Shop } from "../../../masters/shops/types/shop";
 import ShopSaleEditModal from "./ShopSaleEditModal";
 import type { LoadSaleDraft } from "./ShopSaleEditModal";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../shared/ui/RowSelectMark";
 
 interface Props {
   sales: ShopSale[];
@@ -81,7 +84,6 @@ function ShopSalesTable({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingSale, setEditingSale] = useState<ShopSale | null>(null);
   const [saving, setSaving] = useState(false);
-  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const tableRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -121,7 +123,10 @@ function ShopSalesTable({
   };
 
   const startEditingSale = useCallback((sale: ShopSale) => {
-    if (!sale.editable || saving) return;
+    // A locked Shop Sale still opens the complete trip-delivery view.  The
+    // modal receives the backend-authoritative read-only state and never
+    // exposes a mutation action for an expired trip.
+    if (saving) return;
     setSelectedId(sale.id);
     setEditingSale(sale);
   }, [saving]);
@@ -140,24 +145,18 @@ function ShopSalesTable({
     if (editingSale && editingSale.id !== sale.id) setEditingSale(null);
   }, [editingSale, saving]);
 
-  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      const sale = sales[rowIndex];
-      if (sale) handleRowSelect(sale);
-      return;
-    }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-
-    event.preventDefault();
-    const nextIndex = event.key === "ArrowDown" ? rowIndex + 1 : rowIndex - 1;
-    const nextSale = sales[nextIndex];
-    if (!nextSale) return;
-    handleRowSelect(nextSale);
-    // Keep keyboard navigation visual and predictable even after React applies
-    // the new selected-row state.
-    requestAnimationFrame(() => rowRefs.current.get(nextSale.id)?.focus());
-  }, [handleRowSelect, sales]);
+  // Shared single-row selection: click/focus selects (never the Add Shop
+  // dialog), arrows/Home/End move, Space selects without scrolling. The
+  // sale-number Edit button keeps its own keyboard behaviour.
+  const selection = useTableRowSelection<ShopSale>({
+    rows: sales,
+    getId: (sale) => sale.id,
+    selectedId,
+    allowEscapeClear: true,
+    getRowLabel: (sale) => `Shop sale ${sale.saleNo || sale.tripNo || sale.id}`,
+    onSelect: (sale) => handleRowSelect(sale),
+    onDeselect: () => { if (!saving) setSelectedId(null); },
+  });
 
   const selectedBlockedByAssignment = Boolean(
     selectedSale &&
@@ -232,28 +231,21 @@ function ShopSalesTable({
               return (
                 <tr
                   key={sale.id}
-                  ref={(element) => {
-                    if (element) rowRefs.current.set(sale.id, element);
-                    else rowRefs.current.delete(sale.id);
-                  }}
-                  tabIndex={0}
+                  {...selection.getRowProps(sale, index)}
                   onFocus={() => handleRowSelect(sale)}
-                  onClick={() => handleRowSelect(sale)}
-                  onKeyDown={(event) => handleRowKeyDown(event, index)}
-                  aria-selected={isSelected}
                   className={`cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
-                    isEditing ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]" : isSelected ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"
+                    isEditing ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]" : isSelected ? tableSelectedRowClass : "hover:bg-slate-50/80"
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
-                  <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">{startIndex + index + 1}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500"><RowSelectMark selected={isSelected} serialNo={startIndex + index + 1} label={`Selected shop sale ${sale.saleNo || sale.tripNo || sale.id}`} /></td>
                   <td className="px-4 py-5 text-[13px] font-semibold whitespace-nowrap">
                     <button
                       type="button"
-                      disabled={!lock.editable || saving}
+                      disabled={saving}
                       onClick={(event) => { event.stopPropagation(); startEditingSale(sale); }}
-                      aria-label={`${t("common.edit")} ${sale.saleNo || sale.tripNo || "shop sale"}`}
-                      title={lock.editable ? "Edit trip shop deliveries" : lock.message}
-                      className={`rounded-md text-emerald-700 underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${lock.editable && !saving ? "cursor-pointer hover:text-emerald-900 hover:underline" : "cursor-not-allowed text-slate-400"}`}
+                      aria-label={`${lock.editable ? t("common.edit") : "View"} ${sale.saleNo || sale.tripNo || "shop sale"}`}
+                      title={lock.editable ? "Edit trip shop deliveries" : `View locked trip details. ${lock.message}`}
+                      className={`rounded-md underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${saving ? "cursor-not-allowed text-slate-400" : lock.editable ? "cursor-pointer text-emerald-700 hover:text-emerald-900 hover:underline" : "cursor-pointer text-slate-600 hover:text-slate-900 hover:underline"}`}
                     >{sale.saleNo || sale.tripNo || "—"}</button>
                   </td>
                   <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
@@ -273,7 +265,7 @@ function ShopSalesTable({
           </tbody>
         </table>
       </div>
-      {editingSale ? <ShopSaleEditModal key={editingSale.id} sale={editingSale} shops={shops} deliveries={editingTripDeliveries} saving={saving} onClose={() => setEditingSale(null)} onSaveLoad={saveEditing} /> : null}
+      {editingSale ? <ShopSaleEditModal key={editingSale.id} sale={editingSale} shops={shops} deliveries={editingTripDeliveries} saving={saving} readOnly={!shopSaleLockState(editingSale).editable} lockMessage={shopSaleLockState(editingSale).message} onClose={() => setEditingSale(null)} onSaveLoad={saveEditing} /> : null}
     </div>
   );
 }

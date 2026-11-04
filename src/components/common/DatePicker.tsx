@@ -857,6 +857,8 @@ export function DatePicker({
             startMonth={startMonthBound}
             endMonth={endMonthBound}
             weekStartsOn={WEEK_STARTS_ON}
+            showOutsideDays
+            fixedWeeks
             showWeekNumber={showWeekNumbers}
             disabled={disabledMatcher}
             classNames={DAY_PICKER_CLASS_NAMES as any}

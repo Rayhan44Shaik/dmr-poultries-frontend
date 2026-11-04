@@ -149,6 +149,7 @@ export default {
   'accounts.farmpay.notif_reset': 'All changes reset',
   'accounts.farmpay.notif_filters_cleared': 'Filters cleared. Showing the last complete week.',
   'accounts.farmpay.totals_for': 'Totals for all {count} filtered trips',
+  'accounts.farmpay.totals_for_rows': 'Totals for all {count} filtered rows',
   'accounts.farmpay.total_birds': 'Total DC Birds',
   'accounts.farmpay.total_weight': 'Total DC Weight',
   'accounts.farmpay.total_amount': 'Total Amount',

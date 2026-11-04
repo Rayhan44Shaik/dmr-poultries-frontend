@@ -1,10 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import React, { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowDown,
   ArrowUp,
   Calendar,
-  Check,
   CheckCircle,
   Eye,
   FileImage,
@@ -20,13 +19,18 @@ import {
   Droplets,
   ExternalLink,
   Loader2,
+  Route,
 } from "lucide-react";
 import type { FuelExpense, FuelSortKey } from "../types/fuelExpense";
+import { fuelTripLabel, fuelTripLoads, hasFuelLoadBreakdown } from "../utils/fuelSummary";
 import type { FuelQuickTab } from "../utils/filterFuelExpenses";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { BillPreviewLink } from "../../vehicle-trips/components/Step_5/BillPreviewLink";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../shared/ui/RowSelectMark";
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { reverseGeocode } from "../../vehicle-trips/utils/reverseGeocode";
@@ -51,7 +55,13 @@ interface Props {
   tabCounts?: { all: number; pending: number; approved: number; deleted: number };
   includeMasterBunks?: boolean;
   onIncludeMasterBunksChange?: (next: boolean) => void;
-  filteredTotals?: { records: number; litres: number; amount: number } | null;
+  filteredTotals?: {
+    records: number;
+    litres: number;
+    amount: number;
+    distance: number | null;
+    mileage: number | null;
+  } | null;
 }
 
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
@@ -244,6 +254,79 @@ function BunkGpsTooltip({
   );
 }
 
+/**
+ * Linked-trip cell in the Trip List load idiom: a plain trip number for a
+ * single-load (or unlinked) bill, and the same dotted-underline +
+ * floating-card breakdown once the linked trip has two or more loads. Each
+ * load row names its DC/farm context, and the card identifies this bill's
+ * own diesel entry within the trip.
+ */
+function FuelTripLoadCell({ bill }: { bill: FuelExpense }) {
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const loads = fuelTripLoads(bill);
+  const showBreakdown = hasFuelLoadBreakdown(bill);
+  const label = fuelTripLabel(bill);
+  if (!showBreakdown) {
+    return <span className="font-semibold text-slate-700">{label}</span>;
+  }
+  const openTooltip = (element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const estimatedHeight = 60 + loads.length * 32;
+    const top =
+      rect.bottom + estimatedHeight + 12 <= window.innerHeight ? rect.bottom + 8 : rect.top - estimatedHeight - 8;
+    setPosition({
+      left: Math.max(12, Math.min(window.innerWidth - 280 - 12, rect.left + rect.width / 2 - 140)),
+      top: Math.max(8, top),
+    });
+  };
+  return (
+    <span className="inline-flex items-center justify-start" onMouseLeave={() => setPosition(null)}>
+      <button
+        type="button"
+        aria-label={`${label} by load`}
+        onMouseEnter={(event) => openTooltip(event.currentTarget)}
+        onFocus={(event) => openTooltip(event.currentTarget)}
+        onBlur={() => setPosition(null)}
+        className="rounded border-b border-dotted border-current px-0.5 font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+      >
+        {label} · {loads.length} loads
+      </button>
+      {position &&
+        createPortal(
+          <span
+            role="tooltip"
+            style={{ left: position.left, top: position.top }}
+            className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl"
+          >
+            <span className="mb-2 block border-b border-slate-100 pb-2 font-bold text-slate-700">
+              {label} by load
+            </span>
+            {loads.map((load) => (
+              <span
+                key={load.load}
+                className="flex items-center justify-between gap-5 rounded-md px-1.5 py-1.5 odd:bg-slate-50"
+              >
+                <span>Load {load.load}</span>
+                <span className="text-right font-bold text-slate-900">
+                  {load.farmName?.trim() || "—"}
+                  <span className="block font-semibold tabular-nums text-slate-500">
+                    DC {Number(load.dcWeight ?? 0).toFixed(2)} kg · {Math.round(Number(load.birds ?? 0)).toLocaleString()} birds
+                  </span>
+                </span>
+              </span>
+            ))}
+            {bill.tripFuelEntryIndex != null && (
+              <span className="mt-1 block rounded-md bg-emerald-50 px-1.5 py-1.5 font-semibold text-emerald-800">
+                This bill: diesel entry #{bill.tripFuelEntryIndex}
+              </span>
+            )}
+          </span>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
 export function FuelBillTable({
   bills,
   isLoading = false,
@@ -266,41 +349,25 @@ export function FuelBillTable({
   filteredTotals,
 }: Props) {
   const { t, language } = useI18n();
-  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
   const selectedBill = bills.find((bill) => bill.id === selectedId) || null;
 
-  const handleRowSelect = useCallback(
-    (bill: FuelExpense) => {
-      onSelect(selectedId === bill.id ? null : bill.id);
+  // Single shared selection: click toggles, deleted rows are skipped,
+  // Enter opens the bill, Escape clears.
+  const selection = useTableRowSelection<FuelExpense>({
+    rows: bills,
+    getId: (bill) => bill.id,
+    isRowSelectable: (bill) => !(bill.deleted === true || bill.status === "Deleted"),
+    selectedId,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (bill) => `Fuel bill ${bill.billNo || bill.id}`,
+    onSelect: (bill) => onSelect(bill.id),
+    onDeselect: () => onSelect(null),
+    onPrimaryAction: (bill) => {
+      onSelect(bill.id);
+      onView?.(bill);
     },
-    [onSelect, selectedId],
-  );
-
-  const handleRowKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-      if (event.target !== event.currentTarget) return;
-      const currentBill = bills[rowIndex];
-      if (!currentBill) return;
-      if (event.key === "Enter") {
-        event.preventDefault();
-        onSelect(currentBill.id);
-        onView?.(currentBill);
-        return;
-      }
-      if (event.key === " ") {
-        event.preventDefault();
-        handleRowSelect(currentBill);
-        return;
-      }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-      event.preventDefault();
-      const nextBill = bills[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
-      if (!nextBill) return;
-      handleRowSelect(nextBill);
-      requestAnimationFrame(() => rowRefs.current.get(nextBill.id)?.focus());
-    },
-    [bills, handleRowSelect, onSelect, onView],
-  );
+  });
 
   const sortable = (key: FuelSortKey, content: ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -439,6 +506,9 @@ export function FuelBillTable({
                 {sortable("date", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}
               </th>
               <th className="px-4 py-4 text-left">
+                {sortable("tripNo", <div className="flex items-center gap-1.5"><Route size={14} className="shrink-0 text-teal-600" /><span>Trip / Load</span></div>)}
+              </th>
+              <th className="px-4 py-4 text-left">
                 {sortable("vehicleNo", <div className="flex items-center gap-1.5"><Truck size={14} className="shrink-0 text-indigo-500" /><span>Vehicle</span></div>)}
               </th>
               <th className="px-4 py-4 text-left">
@@ -467,7 +537,7 @@ export function FuelBillTable({
           <tbody className="divide-y divide-slate-100">
             {isLoading && !bills.length ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-sm font-medium text-slate-400">
+                <td colSpan={12} className="py-12 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
                     {t("ops.fuel.loading")}
@@ -476,7 +546,7 @@ export function FuelBillTable({
               </tr>
             ) : bills.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.fuel.no_records")}</td>
+                <td colSpan={12} className="py-12 text-center text-[13px] font-medium text-slate-400">{t("ops.fuel.no_records")}</td>
               </tr>
             ) : (
               bills.map((bill, index) => {
@@ -485,25 +555,18 @@ export function FuelBillTable({
                 return (
                   <tr
                     key={bill.id}
-                    ref={(element) => {
-                      if (element) rowRefs.current.set(bill.id, element);
-                      else rowRefs.current.delete(bill.id);
-                    }}
-                    tabIndex={0}
-                    onClick={() => handleRowSelect(bill)}
+                    {...selection.getRowProps(bill, index)}
                     onDoubleClick={() => onView?.(bill)}
-                    onKeyDown={(event) => handleRowKeyDown(event, index)}
-                    aria-selected={isSelected}
-                    className={`cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                    className={`cursor-pointer border-l-4 border-l-transparent outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isDeleted
-                        ? "border-l-4 border-l-red-400 bg-red-50/50 hover:bg-red-50/80"
+                        ? "border-l-red-400 bg-red-50/50 hover:bg-red-50/80"
                         : isSelected
-                          ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50"
+                          ? tableSelectedRowClass
                           : "hover:bg-slate-50/80"
                     }`}
                   >
                     <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">
-                      {isSelected ? <Check size={16} className="inline text-emerald-600" /> : startIndex + index + 1}
+                      <RowSelectMark selected={isSelected && !isDeleted} serialNo={startIndex + index + 1} label={`Fuel bill ${bill.billNo || bill.id} selected`} />
                     </td>
                     <td className="px-4 py-5 text-[13px] font-semibold whitespace-nowrap">
                       <button
@@ -520,6 +583,7 @@ export function FuelBillTable({
                       </button>
                     </td>
                     <td className="whitespace-nowrap px-4 py-5 text-[13px] font-medium text-slate-600">{formatTripListDay(bill.date, language)}</td>
+                    <td className="whitespace-nowrap px-4 py-5 text-[13px]"><FuelTripLoadCell bill={bill} /></td>
                     <td className="whitespace-nowrap px-4 py-5 text-[13px] font-semibold text-slate-700">{localizeTripViewText(formatVehicleNumber(bill.vehicleNo), language)}</td>
                     <td className="whitespace-nowrap px-4 py-5 text-[13px]">
                       <div className="font-semibold text-slate-700">{localizeTripViewText(bill.supervisorName || "—", language)}</div>
@@ -553,7 +617,7 @@ export function FuelBillTable({
           </tbody>
           {filteredTotals && filteredTotals.records > 0 && <tfoot className="border-t-2 border-slate-200 bg-slate-50/90"><tr>
             <td className="px-4 py-4 text-center font-bold text-slate-500">Σ</td>
-            <td colSpan={4} className="px-4 py-4 text-left"><div className="text-sm font-extrabold text-emerald-700">Overall Total</div><div className="text-[11px] font-medium text-slate-500">{filteredTotals.records} filtered bills · not just this page</div></td>
+            <td colSpan={5} className="px-4 py-4 text-left"><div className="text-sm font-extrabold text-emerald-700">Overall Total</div><div className="text-[11px] font-medium text-slate-500">{filteredTotals.records} filtered bills · not just this page</div><div className="mt-1 text-[11px] font-bold tabular-nums text-slate-600">Total Distance: {filteredTotals.distance != null ? `${filteredTotals.distance.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} km` : "—"} · Avg Mileage: {filteredTotals.mileage != null ? `${filteredTotals.mileage.toFixed(2)} km/L` : "—"}</div></td>
             <td className="px-4 py-4 text-center text-slate-400">—</td>
             <td className="px-4 py-4 text-center text-sm font-extrabold tabular-nums text-cyan-700">{filteredTotals.litres.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} L</td>
             <td className="px-4 py-4 text-center text-slate-400">—</td>

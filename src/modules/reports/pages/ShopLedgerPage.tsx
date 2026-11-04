@@ -5,7 +5,6 @@ import React, {
   useEffect,
   useRef,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   ArrowDownLeft,
   ArrowUpDown,
@@ -23,6 +22,8 @@ import {
   FileStack,
   FileText,
   Filter,
+  Hash,
+  HeartPulse,
   IndianRupee,
   Layers,
   ListChecks,
@@ -32,6 +33,8 @@ import {
   Search,
   Square,
   Store,
+  TrendingDown,
+  Wallet,
   Weight,
   X,
 } from "lucide-react";
@@ -50,6 +53,13 @@ import {
   countActiveFilters,
 } from "../../../ui";
 import ViewLanguageToggle from "../../../ui/ViewLanguageToggle";
+import BrandMark from "../../../ui/BrandMark";
+import {
+  CumulativeQuantityCell,
+  CumulativeLoadPopover,
+  type CumulativeLoadTip,
+} from "../components/CumulativeQuantityCell";
+import type { CumulativeQuantityMetric } from "../utils/cumulativeLoadBreakdown";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../masters/components/MasterDropdown";
@@ -67,14 +77,13 @@ import {
 } from "../../../shared/ui/paginationStyles";
 import { exportToExcel } from "../../../utils/exportUtils";
 import {
-  fetchShopLedger,
-  fetchShopLedgerCumulativeQuantities,
-  type ShopLedgerResponse,
+  fetchAllLedgerPages,
+  fetchShopLedgerCumulative,
+  mapLedgerRowToTx as mapRowToTx,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
 import {
   generateShopLedgerPDF,
-  buildShopLedgerCumulativeRows,
   prepareShopLedgerPdfAssets,
 } from "../components/ShopLedgerPDF";
 import type {
@@ -90,6 +99,20 @@ import {
   recalculateStatementBalances,
   scopeShopLedgersForPdf,
 } from "../utils/shopLedgerBalances";
+import {
+  formatDisplayDate,
+  formatLedgerDateWithDay,
+  weekdayOf,
+} from "../utils/shopLedgerDates";
+import { tableSelectedRowClass } from "../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../shared/ui/RowSelectMark";
+import ShopLedgerDetailModal from "../components/ShopLedgerDetailModal";
+import {
+  adjacentShopDetailId,
+  findShopDetailIndex,
+  pageForRowIndex,
+} from "../utils/shopLedgerDetailNav";
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -178,224 +201,7 @@ function ShopLedgerWhatsAppIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-// ─── Ledger row mapping — keeps the existing LedgerTransaction shape that the
-//     table + PDF exports already consume. Birds/weight/rate belong to
-//     sale rows (backend trip-delivery detail); collections carry their number.
-const txParticulars = (row: ShopLedgerRow): string => {
-  // Particulars = shop name only. Trip/collection reference numbers are still
-  // kept on the transaction (collectionNo) for search, but never shown here.
-  return row.shopName || row.description || row.referenceNo || "Ledger";
-};
-
-const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
-  const isSale = row.type === "sale";
-  return {
-    id: row.id,
-    createdAt: row.createdAt ?? undefined,
-    date: row.date,
-    particulars: txParticulars(row),
-    birds: isSale ? row.birds : 0,
-    weight: isSale ? row.weight : 0,
-    farmBirds: isSale ? row.farmBirds : 0,
-    farmWeight: isSale ? row.farmWeight : 0,
-    mortalityBirds: isSale ? row.mortalityBirds : 0,
-    mortalityWeight: isSale ? row.mortalityWeight : 0,
-    weightLoss: isSale ? row.weightLoss : 0,
-    rate: isSale ? row.rate : 0,
-    debit: Number(row.debit) || 0,
-    credit: Number(row.credit) || 0,
-    balance: Number(row.balance) || 0,
-    type: row.type,
-    paymentMode: row.paymentMode ?? undefined,
-    collectionNo: row.referenceNo || undefined,
-    loadLabel: isSale && row.loadLabel ? row.loadLabel : undefined,
-    subShopName: row.subShopName?.trim() || undefined,
-    remarks: row.remarks?.trim() || undefined,
-  };
-};
-
-/** yyyy-MM-dd → dd-MM-yyyy (day-month-year) for table cells and exports. */
-const formatDisplayDate = (value: string): string => {
-  const parts = value.split("-");
-  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
-};
-
-const WEEKDAY_SHORT = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-] as const;
-/** Telugu short weekdays — same order as WEEKDAY_SHORT (Sunday first). The
- *  active language decides which set renders; underlying dates never change. */
-const WEEKDAY_SHORT_TE = [
-  "ఆది",
-  "సోమ",
-  "మంగళ",
-  "బుధ",
-  "గురు",
-  "శుక్ర",
-  "శని",
-] as const;
-
-/** yyyy-MM-dd → short weekday ("Mon" / "సోమ"). Parsed LOCALLY — a UTC parse
- *  would roll the day back one in IST and label Tuesday rows as Monday. */
-const weekdayOf = (value: string, language: "en" | "te" = "en"): string => {
-  const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "";
-  const [year, month, day] = parts;
-  const dow = new Date(year, month - 1, day).getDay();
-  return (language === "te" ? WEEKDAY_SHORT_TE : WEEKDAY_SHORT)[dow];
-};
-
-/** Compact ledger date: "Sun, 9 Aug 2026" (weekday follows UI language). */
-const formatLedgerDateWithDay = (
-  value: string,
-  language: "en" | "te" = "en",
-): string => {
-  const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return value;
-  const [year, month, day] = parts;
-  const monthLabel = new Intl.DateTimeFormat("en", { month: "short" }).format(
-    new Date(year, month - 1, day),
-  );
-  return `${weekdayOf(value, language)}, ${day} ${monthLabel} ${year}`;
-};
-
 const round2 = (value: number): number => Math.round(value * 100) / 100;
-
-function CumulativeMortalityCell({
-  row,
-  kind,
-}: {
-  row: ShopLedgerCumulativeRow;
-  kind: "birds" | "weight";
-}) {
-  const [anchor, setAnchor] = useState<DOMRect | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const loads = row.mortalityByLoad ?? [];
-  const boxBirds = loads.reduce((sum, load) => sum + load.boxBirds, 0);
-  const weightBirds = loads.reduce((sum, load) => sum + load.weightModeBirds, 0);
-  const open = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect) setAnchor(rect);
-  };
-  const close = () => setAnchor(null);
-  const popoverWidth = Math.min(320, window.innerWidth - 24);
-  const estimatedHeight = Math.min(390, 142 + loads.length * 94);
-  const top = anchor
-    ? anchor.bottom + estimatedHeight + 12 <= window.innerHeight
-      ? anchor.bottom + 8
-      : Math.max(12, anchor.top - estimatedHeight - 8)
-    : 0;
-  const left = anchor
-    ? Math.min(window.innerWidth - popoverWidth - 12, Math.max(12, anchor.right - popoverWidth))
-    : 0;
-
-  return (
-    <>
-      <button
-        ref={buttonRef}
-        type="button"
-        onMouseEnter={open}
-        onMouseLeave={close}
-        onFocus={open}
-        onBlur={close}
-        aria-label={`${row.shop} mortality breakdown`}
-        className="inline-flex min-w-[58px] items-center justify-end rounded-md px-1.5 py-1 text-right tabular-nums transition hover:bg-rose-50 hover:text-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-      >
-        {kind === "birds"
-          ? row.mortalityBirds.toLocaleString()
-          : row.mortalityWeight.toFixed(2)}
-      </button>
-      {anchor && createPortal(
-        <div
-          role="tooltip"
-          style={{ position: "fixed", top, left, width: popoverWidth }}
-          className="pointer-events-none z-[10000] overflow-hidden rounded-xl border border-slate-200 bg-white text-left shadow-2xl shadow-slate-900/20"
-        >
-          <div className="border-b border-slate-200 bg-gradient-to-r from-rose-50 to-orange-50 px-3.5 py-2.5">
-            <p className="truncate text-xs font-extrabold text-slate-900">{row.shop}</p>
-            <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-600">Mortality by load and mode</p>
-          </div>
-          <div className="space-y-2 p-3">
-            {loads.length ? loads.map((load) => (
-              <div key={load.load} className="overflow-hidden rounded-lg border border-slate-200 bg-slate-50/70">
-                <div className="border-b border-slate-200 bg-slate-100 px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-indigo-700">
-                  Load {load.load}
-                </div>
-                <div className="grid grid-cols-2 divide-x divide-slate-200">
-                  <div className="px-2.5 py-2">
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Box mode</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-rose-700 tabular-nums">{load.boxBirds.toLocaleString()} birds</p>
-                    <p className="text-[10px] font-semibold text-rose-600 tabular-nums">{load.boxWeight.toFixed(2)} kg</p>
-                  </div>
-                  <div className="px-2.5 py-2">
-                    <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Weight mode</p>
-                    <p className="mt-0.5 text-xs font-extrabold text-violet-700 tabular-nums">{load.weightModeBirds.toLocaleString()} birds</p>
-                    <p className="text-[10px] font-semibold text-slate-400">Count only</p>
-                  </div>
-                </div>
-              </div>
-            )) : (
-              <div className="rounded-lg bg-slate-50 px-3 py-4 text-center text-xs font-semibold text-slate-500">No mortality recorded</div>
-            )}
-          </div>
-          <div className="grid grid-cols-2 divide-x divide-slate-200 border-t border-slate-200 bg-slate-900 text-white">
-            <div className="px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Box total</p>
-              <p className="text-xs font-extrabold tabular-nums">{boxBirds.toLocaleString()} birds · {row.mortalityWeight.toFixed(2)} kg</p>
-            </div>
-            <div className="px-3 py-2">
-              <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Weight total</p>
-              <p className="text-xs font-extrabold tabular-nums">{weightBirds.toLocaleString()} birds</p>
-            </div>
-          </div>
-        </div>,
-        document.body,
-      )}
-    </>
-  );
-}
-
-/** Fetch the COMPLETE ledger, walking server pagination until every row has
- *  arrived — without this, All-Shops ranges with more than one page of
- *  transactions would silently truncate at the server's page size. */
-async function fetchAllLedgerPages(filters: {
-  shopId?: number;
-  fromDate?: string;
-  toDate?: string;
-}): Promise<ShopLedgerResponse> {
-  const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
-  const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
-  const dedupeRows = (rows: ShopLedgerRow[]): ShopLedgerRow[] => {
-    const seen = new Set<string>();
-    return rows.filter((row) => {
-      const key = row.id > 0
-        ? `${row.type}:id:${row.id}`
-        : `${row.shopId}:${row.type}:${row.referenceType}:${row.referenceId}:${row.date}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
-  if (totalPages <= 1) return { ...first, data: dedupeRows(first.data) };
-  const rest = await Promise.all(
-    Array.from({ length: totalPages - 1 }, (_, index) =>
-      fetchShopLedger({ ...filters, page: index + 2, limit: 500 }),
-    ),
-  );
-  return {
-    ...first,
-    data: dedupeRows([
-      ...first.data,
-      ...rest.flatMap((page) => page.data),
-    ]),
-  };
-}
 
 const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
@@ -576,6 +382,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     shops.forEach((shop: Shop) => map.set(shop.shopName, shop));
     return map;
   }, [shops]);
+  // Map from shopId -> Shop for ID-based reconciliation (e.g. cumulative view)
+  const shopIdMap = useMemo(() => {
+    const map = new Map<number, Shop>();
+    shops.forEach((shop: Shop) => map.set(shop.id, shop));
+    return map;
+  }, [shops]);
 
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -583,7 +395,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [reportType, setReportType] = useState<ReportTypeFilter>("all");
   const [searchValue, setSearchValue] = useState("");
   const [viewMode, setViewMode] = useState<LedgerViewMode>("transactions");
-  const [selectedCumulativeShop, setSelectedCumulativeShop] = useState<string | null>(null);
+  const [selectedCumulativeShopId, setSelectedCumulativeShopId] = useState<number | null>(null);
 
   // Applied values are committed only when the user clicks Search. The input
   // controls above are draft values; changing them does not affect the table
@@ -618,9 +430,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [showNotification, t]);
 
   const selectedShopId = useMemo(() => {
-    return appliedSelectedShop === "All Shops"
-      ? undefined
-      : shopMasterMap.get(appliedSelectedShop)?.id;
+    if (appliedSelectedShop === "All Shops") return undefined;
+    // shopMasterMap keys are shop names (strings), matching appliedSelectedShop
+    return shopMasterMap.get(appliedSelectedShop)?.id;
   }, [appliedSelectedShop, shopMasterMap]);
 
   const buildLedger = useCallback(
@@ -882,7 +694,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const key = `${from}|${to}|${shop}`;
       const hit = ledgerCacheRef.current.get(key);
       if (hit) return hit;
-      const shopId = shopMasterMap.get(shop)?.id;
+      const shopId = shops.find((s) => s.shopName === shop)?.id;
       if (shopId == null) return null;
       const ledger = await buildLedger(from, to, shopId);
       ledgerCacheRef.current.set(key, ledger);
@@ -954,7 +766,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               a.localeCompare(b, "en", { sensitivity: "base" }),
             )
             .map(([shop, periodRows]) => {
-              const master = shopMasterMap.get(shop);
+              const master = shops.find((s) => s.shopName === shop);
               const allRows = allRowsByShop.get(shop) ?? [];
               const rowShopId = allRows.find((row) => row.shopId != null)?.shopId;
               const openingBalance = round2(
@@ -1014,74 +826,32 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      const quantitiesPromise = appliedReportType === "collection"
-        ? Promise.resolve([])
-        : fetchShopLedgerCumulativeQuantities({
-            fromDate: appliedDateFrom || undefined,
-            toDate: appliedDateTo || undefined,
-          });
-      let rows: ShopLedgerCumulativeRow[];
-      if (appliedSelectedShop === "All Shops") {
-        const statements = await getBulkPdfLedgers(appliedDateFrom, appliedDateTo);
-        rows = buildShopLedgerCumulativeRows(
-          statements.map((entry) => ({
-            ...entry,
-            // Keep the carried opening row, but aggregate only the activity
-            // selected by the report filter for this date span.
-            data: filterStatementByType(entry.data, appliedReportType),
-          })),
-        );
-      } else {
-        rows = buildShopLedgerCumulativeRows([
-          {
-            shop: appliedSelectedShop,
-            data: filterStatementByType(ledgerData, appliedReportType),
-          },
-        ]);
-      }
-      const quantities = await quantitiesPromise;
-      if (appliedReportType === "collection") return rows;
-      // Cumulative is a main-shop statement. Step-4 sub-shop labels remain on
-      // transaction detail, but must never split opening/sale/closing here.
-      const quantityKey = (shop: string) => shop.trim().toLocaleUpperCase("en-IN");
-      const byShop = new Map(quantities.map((item) => [quantityKey(item.shopName), item]));
-      const merged = rows.map((row) => {
-        const quantity = byShop.get(quantityKey(row.shop));
-        return quantity ? {
-          ...row,
-          birds: quantity.birds,
-          weight: quantity.weight,
-          farmBirds: quantity.birds + quantity.mortalityBirds,
-          farmWeight: quantity.weight + quantity.mortalityWeight + quantity.weightLoss,
-          mortalityBirds: quantity.mortalityBirds,
-          mortalityWeight: quantity.mortalityWeight,
-          weightLoss: quantity.weightLoss,
-          mortalityByLoad: quantity.mortalityByLoad,
-        } : row;
+      const selectedShopId = appliedSelectedShop === "All Shops"
+        ? undefined
+        : shopMasterMap.get(appliedSelectedShop)?.id;
+      const authoritative = await fetchShopLedgerCumulative({
+        shopId: selectedShopId,
+        fromDate: appliedDateFrom || undefined,
+        toDate: appliedDateTo || undefined,
+        reportType: appliedReportType,
       });
-      const existing = new Set(merged.map((row) => quantityKey(row.shop)));
-      for (const quantity of quantities) {
-        const key = quantityKey(quantity.shopName);
-        if (existing.has(key)) continue;
-        merged.push({
-          shop: quantity.shopName,
-          birds: quantity.birds,
-          weight: quantity.weight,
-          farmBirds: quantity.birds + quantity.mortalityBirds,
-          farmWeight: quantity.weight + quantity.mortalityWeight + quantity.weightLoss,
-          mortalityBirds: quantity.mortalityBirds,
-          mortalityWeight: quantity.mortalityWeight,
-          weightLoss: quantity.weightLoss,
-          mortalityByLoad: quantity.mortalityByLoad,
-          openingBalance: 0,
-          sale: 0,
-          collection: 0,
-          closingBalance: 0,
-        });
-      }
-      return merged.sort((a, b) =>
-        a.shop.localeCompare(b.shop, "en", { sensitivity: "base" })
-      );
+      return authoritative.map((row): ShopLedgerCumulativeRow => ({
+        shopId: row.shopId,
+        shop: row.shopName,
+        birds: row.birds,
+        weight: row.weight,
+        farmBirds: row.birds + row.mortalityBirds,
+        farmWeight: row.weight + row.mortalityWeight + row.weightLoss,
+        mortalityBirds: row.mortalityBirds,
+        mortalityWeight: row.mortalityWeight,
+        weightLoss: row.weightLoss,
+        mortalityByLoad: row.mortalityByLoad,
+        deliveriesByLoad: row.deliveriesByLoad,
+        openingBalance: row.openingBalance,
+        sale: row.sale,
+        collection: row.approvedCollection,
+        closingBalance: row.closingBalance,
+      }));
     };
     setCumulativeLoading(true);
     setCumulativeError(null);
@@ -1103,20 +873,22 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return () => {
       cancelled = true;
     };
+    // refreshNonce re-reads the server after sale/collection changes anywhere,
+    // so cumulative totals stay in sync with the Transactions table.
   }, [
     appliedDateFrom,
     appliedDateTo,
     appliedSelectedShop,
     appliedReportType,
-    ledgerData,
-    getBulkPdfLedgers,
+    shopMasterMap,
+    refreshNonce,
   ]);
 
   const visibleCumulativeRows = useMemo(() => {
     const needle = appliedSearchTerm.trim().toLowerCase();
     if (!needle) return cumulativeRows;
-    return cumulativeRows.filter((row) =>
-      [
+    return cumulativeRows.filter((row) => {
+      const values = [
         row.shop,
         row.farmBirds,
         row.birds,
@@ -1129,8 +901,23 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         row.sale,
         row.collection,
         row.closingBalance,
-      ].some((value) => String(value).toLowerCase().includes(needle)),
-    );
+        ...(row.mortalityByLoad ?? []).flatMap((load) => [
+          load.load, load.boxBirds, load.boxWeight, load.weightModeBirds,
+        ]),
+        ...(row.deliveriesByLoad ?? []).flatMap((load) => [
+          load.load, load.birds, load.weight,
+          load.mortalityBirds, load.mortalityWeight, load.weightLoss,
+        ]),
+      ];
+      return values.some((value) => {
+        const numeric = typeof value === "number";
+        return [
+          String(value),
+          numeric ? value.toLocaleString("en-IN") : "",
+          numeric ? formatAmount(value) : "",
+        ].some((candidate) => candidate.toLowerCase().includes(needle));
+      });
+    });
   }, [cumulativeRows, appliedSearchTerm]);
 
   const cumulativeTotalPages = Math.max(
@@ -1142,6 +929,58 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const start = (cumulativeSafePage - 1) * pageSize;
     return visibleCumulativeRows.slice(start, start + pageSize);
   }, [visibleCumulativeRows, cumulativeSafePage, pageSize]);
+
+  // ── Single floating per-load tooltip for the cumulative table ──
+  // Only one card is ever open and content renders solely while open. The
+  // tip records the table scope its anchor was measured in; any page, filter,
+  // view, selection or data change makes the scope mismatch and the stale
+  // card simply never renders — no cascading effect render needed. Scroll,
+  // resize, Escape and outside taps close it via the popover listeners.
+  const [loadTip, setLoadTip] = useState<CumulativeLoadTip | null>(null);
+  const loadTipScope = [
+    cumulativeSafePage,
+    appliedSearchTerm,
+    viewMode,
+    selectedCumulativeShopId ?? "",
+    visibleCumulativeRows.length,
+    cumulativeLoading,
+  ].join("|");
+  const openLoadTip = useCallback(
+    (tip: Omit<CumulativeLoadTip, "scope">) =>
+      setLoadTip({ ...tip, scope: loadTipScope }),
+    [loadTipScope],
+  );
+  const closeLoadTip = useCallback(() => setLoadTip(null), []);
+
+  /** Translated tooltip captions per metric — labels stay in the UI language. */
+  const cumulativeTipText = useMemo(() => {
+    const byLoad = t("shop_ledger.cumulative.by_load");
+    const total = t("shop_ledger.cumulative.total");
+    const loadWord = t("shop_ledger.cumulative.load");
+    const labels: Record<CumulativeQuantityMetric, string> = {
+      birds: t("ops.mortality.col.delivered_birds"),
+      mortalityBirds: t("ops.mortality.col.mortality"),
+      weight: t("ops.mortality.col.delivery_weight"),
+      mortalityWeight: t("ops.mortality.col.mortality_weight"),
+      weightLoss: t("ops.mortality.col.weight_loss"),
+    };
+    const config = {} as Record<
+      CumulativeQuantityMetric,
+      { subtitle: string; totalLabel: string; formatValue: (value: number) => string }
+    >;
+    (Object.keys(labels) as CumulativeQuantityMetric[]).forEach((metric) => {
+      const label = labels[metric];
+      config[metric] = {
+        subtitle: `${label} ${byLoad}`,
+        totalLabel: `${total} ${label}`,
+        formatValue:
+          metric === "birds" || metric === "mortalityBirds"
+            ? (value: number) => Math.round(value).toLocaleString()
+            : (value: number) => Number(value || 0).toFixed(2),
+      };
+    });
+    return { loadWord, config };
+  }, [t]);
 
   const cumulativeTotals = useMemo(
     () =>
@@ -1167,6 +1006,145 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       ),
     [visibleCumulativeRows],
   );
+
+  /** Full filtered-range mortality breakdown for the cumulative TOTAL row.
+   * This intentionally aggregates the same authoritative per-shop/load data
+   * used by the MOR cells, rather than the currently paginated rows. */
+  const cumulativeMortalityTotalRow = useMemo<ShopLedgerCumulativeRow>(() => {
+    const byLoad = new Map<number, {
+      load: number;
+      boxBirds: number;
+      boxWeight: number;
+      weightModeBirds: number;
+    }>();
+
+    visibleCumulativeRows.forEach((row) => {
+      (row.mortalityByLoad ?? []).forEach((load) => {
+        const loadNo = Number.isFinite(load.load) && load.load > 0 ? Math.floor(load.load) : 1;
+        const current = byLoad.get(loadNo) ?? {
+          load: loadNo,
+          boxBirds: 0,
+          boxWeight: 0,
+          weightModeBirds: 0,
+        };
+        current.boxBirds += Number(load.boxBirds) || 0;
+        current.boxWeight += Number(load.boxWeight) || 0;
+        current.weightModeBirds += Number(load.weightModeBirds) || 0;
+        byLoad.set(loadNo, current);
+      });
+    });
+
+    return {
+      shop: "TOTAL",
+      birds: cumulativeTotals.birds,
+      weight: cumulativeTotals.weight,
+      farmBirds: cumulativeTotals.farmBirds,
+      farmWeight: cumulativeTotals.farmWeight,
+      mortalityBirds: cumulativeTotals.mortalityBirds,
+      mortalityWeight: cumulativeTotals.mortalityWeight,
+      weightLoss: cumulativeTotals.weightLoss,
+      openingBalance: cumulativeTotals.openingBalance,
+      sale: cumulativeTotals.sale,
+      collection: cumulativeTotals.collection,
+      closingBalance: cumulativeTotals.closingBalance,
+      mortalityByLoad: Array.from(byLoad.values()).sort((a, b) => a.load - b.load),
+    };
+  }, [cumulativeTotals, visibleCumulativeRows]);
+
+  // ── Cumulative universal row selection — one mint-highlighted shop at a
+  //     time over the FULL filtered scope (never just the visible page).
+  //     Stable shopId identity; rows without a shop id are never selectable.
+  //     Click toggles, Enter opens the View dialog, Escape clears.
+  const [detailShopId, setDetailShopId] = useState<number | null>(null);
+  const selectCumulativeShop = useCallback((shopId: number, globalIndex: number) => {
+    setSelectedCumulativeShopId(shopId);
+    const targetPage = pageForRowIndex(globalIndex, pageSize);
+    if (targetPage !== cumulativeSafePage) setCurrentPage(targetPage);
+  }, [pageSize, cumulativeSafePage]);
+  const clearCumulativeSelection = useCallback(() => setSelectedCumulativeShopId(null), []);
+  const openCumulativeDetail = useCallback((shopId: number) => {
+    setSelectedCumulativeShopId(shopId);
+    setDetailShopId(shopId);
+  }, []);
+  const cumulativeSelection = useTableRowSelection<ShopLedgerCumulativeRow>({
+    rows: visibleCumulativeRows,
+    getId: (row, index) => row.shopId ?? -1_000_000 - index,
+    isRowSelectable: (row) => row.shopId != null,
+    selectedId: selectedCumulativeShopId,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (row) => `Shop ${row.shop}`,
+    onSelect: (row, globalIndex) => {
+      if (row.shopId == null) return;
+      selectCumulativeShop(row.shopId, globalIndex);
+    },
+    onDeselect: clearCumulativeSelection,
+    onPrimaryAction: (row) => {
+      if (row.shopId == null) return;
+      openCumulativeDetail(row.shopId);
+    },
+  });
+
+  // ── View Shop Ledger detail modal state ─────────────────────
+  const openDetailForSelection = useCallback(() => {
+    if (selectedCumulativeShopId != null) setDetailShopId(selectedCumulativeShopId);
+  }, [selectedCumulativeShopId]);
+  const detailIndex = detailShopId == null
+    ? -1
+    : findShopDetailIndex(visibleCumulativeRows, detailShopId);
+  const detailRow = detailIndex >= 0 ? visibleCumulativeRows[detailIndex] : undefined;
+  const prevDetailShopId = detailShopId == null
+    ? null
+    : adjacentShopDetailId(visibleCumulativeRows, detailShopId, -1);
+  const nextDetailShopId = detailShopId == null
+    ? null
+    : adjacentShopDetailId(visibleCumulativeRows, detailShopId, 1);
+  const navigateDetailShop = useCallback((shopId: number) => {
+    setSelectedCumulativeShopId(shopId);
+    setDetailShopId(shopId);
+    const index = findShopDetailIndex(visibleCumulativeRows, shopId);
+    if (index >= 0) {
+      const targetPage = pageForRowIndex(index, pageSize);
+      if (targetPage !== cumulativeSafePage) setCurrentPage(targetPage);
+    }
+  }, [visibleCumulativeRows, pageSize, cumulativeSafePage]);
+  // A cleared selection unmounts the modal via the detailRow guard below, so
+  // a stale shop can never keep showing under a cleared selection.
+  // Keep keyboard and modal navigation visible: after the table page follows
+  // the selection, bring the active row into view without page jumps.
+  useEffect(() => {
+    if (selectedCumulativeShopId == null || viewMode !== "cumulative") return;
+    const element = document.querySelector(
+      `[data-cum-shop-id="${selectedCumulativeShopId}"]`,
+    );
+    if (element instanceof HTMLElement) {
+      element.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [selectedCumulativeShopId, cumulativeSafePage, viewMode]);
+  // A cumulative selection is temporary UI state, same as the Transactions
+  // table: touching/clicking anywhere outside another cumulative row clears
+  // it. Clicks inside the table toolbar (toggle / View), the statement
+  // dialog, or another row keep it — otherwise the View button could never
+  // fire and the open dialog would unmount under itself.
+  useEffect(() => {
+    if (selectedCumulativeShopId == null || viewMode !== "cumulative") return;
+    const clearOutsideShop = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element) {
+        if (
+          target.closest("[data-cum-shop-id]") ||
+          target.closest("[data-ledger-toolbar]") ||
+          target.closest('[role="dialog"]')
+        ) {
+          return;
+        }
+      }
+      clearCumulativeSelection();
+    };
+    document.addEventListener("pointerdown", clearOutsideShop);
+    return () => document.removeEventListener("pointerdown", clearOutsideShop);
+  }, [selectedCumulativeShopId, viewMode, clearCumulativeSelection]);
+  const detailMaster = detailShopId != null ? shopIdMap.get(detailShopId) : undefined;
 
   // ─── PDF preview modal state ────────────────────────────────
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewState | null>(null);
@@ -2177,7 +2155,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             throw new Error(`No WhatsApp number on file for ${shop}.`);
           }
 
-          const shopId = shopMasterMap.get(shop)?.id;
+          const shopId = shops.find((s) => s.shopName === shop)?.id;
           if (shopId == null) {
             throw new Error(`Shop ${shop} is not in the shops master.`);
           }
@@ -2750,14 +2728,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
         <div className="flex flex-col gap-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-teal-50/80 border border-teal-100 flex items-center justify-center text-teal-600 shadow-inner">
-              <BookOpen className="w-5 h-5" aria-hidden="true" />
-            </div>
+            {viewMode === "cumulative" ? (
+              <BrandMark size="xs" label="DMR Poultries" />
+            ) : (
+              <div className="h-9 w-9 rounded-xl bg-teal-50/80 border border-teal-100 flex items-center justify-center text-teal-600 shadow-inner">
+                <BookOpen className="w-5 h-5" aria-hidden="true" />
+              </div>
+            )}
             <h3 className="text-base font-bold text-slate-800 tracking-tight">
               {t("shop_ledger.title")}
             </h3>
           </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
+          <div data-ledger-toolbar className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
             <button
               type="button"
               role="switch"
@@ -2767,32 +2749,43 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 const nextMode = viewMode === "transactions" ? "cumulative" : "transactions";
                 setViewMode(nextMode);
                 setCurrentPage(1);
-                if (nextMode === "transactions") setSelectedCumulativeShop(null);
+                if (nextMode === "transactions") setSelectedCumulativeShopId(null);
                 else setSelectedLedgerRowIndex(-1);
               }}
-              className={`group relative grid min-h-11 min-w-[272px] grid-cols-2 overflow-hidden rounded-full border p-1 outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-offset-2 ${
-                viewMode === "transactions"
-                  ? "border-emerald-300/70 bg-emerald-50/90 shadow-inner shadow-emerald-200/70 focus-visible:ring-emerald-400/60"
-                  : "border-indigo-300/70 bg-indigo-50/90 shadow-inner shadow-indigo-200/70 focus-visible:ring-indigo-400/60"
-              }`}
+              className="group relative grid min-h-11 min-w-[272px] grid-cols-2 overflow-hidden rounded-full bg-slate-100/90 p-1 outline-none ring-1 ring-inset ring-slate-200 transition focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
             >
               <span
                 aria-hidden="true"
-                className={`absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full transition-all duration-300 ease-out motion-reduce:transition-none ${
-                  viewMode === "transactions"
-                    ? "left-1 bg-gradient-to-r from-emerald-500 to-teal-600 shadow-md shadow-emerald-500/30"
-                    : "left-[50%] bg-gradient-to-r from-indigo-500 to-violet-600 shadow-md shadow-indigo-500/30"
+                className={`absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm ring-1 ring-slate-200 transition-all duration-300 ease-out motion-reduce:transition-none ${
+                  viewMode === "transactions" ? "left-1" : "left-[50%]"
                 }`}
               />
-              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "transactions" ? "text-white" : "text-emerald-700"}`}>
+              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "transactions" ? "text-emerald-700" : "text-slate-500"}`}>
                 <ListChecks size={15} strokeWidth={2.5} aria-hidden="true" />
                 {t("shop_ledger.view.transactions")}
               </span>
-              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "cumulative" ? "text-white" : "text-indigo-700"}`}>
+              <span className={`relative z-10 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-bold transition-colors duration-300 ${viewMode === "cumulative" ? "text-indigo-700" : "text-slate-500"}`}>
                 <Layers size={15} strokeWidth={2.5} aria-hidden="true" />
                 {t("shop_ledger.view.cumulative")}
               </span>
             </button>
+            {viewMode === "cumulative" && (
+              <button
+                type="button"
+                onClick={openDetailForSelection}
+                disabled={selectedCumulativeShopId == null}
+                title={selectedCumulativeShopId == null ? t("shop_ledger.detail.select_shop_hint") : undefined}
+                aria-label={t("common.view")}
+                className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-4 text-xs font-bold shadow-sm transition-all outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 ${
+                  selectedCumulativeShopId == null
+                    ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400 opacity-70"
+                    : "border-emerald-200 bg-white text-emerald-700 ring-1 ring-inset ring-emerald-100 hover:-translate-y-0.5 hover:bg-emerald-50/70 hover:shadow active:translate-y-0"
+                }`}
+              >
+                <Eye size={14} strokeWidth={2.5} aria-hidden="true" />
+                {t("common.view")}
+              </button>
+            )}
             {(appliedDateFrom || appliedDateTo) && (
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
                 {appliedDateFrom && appliedDateTo
@@ -2954,8 +2947,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               color: "text-blue-600",
                             }
                           : {
-                              text: t("shop_ledger.tx_type.sale"),
-                              color: "text-emerald-600",
+                              text: t("shop_ledger.tx_type.correction"),
+                              color: "text-amber-600",
                             };
                     const isSelected = activeSelectedLedgerRowIndex === idx;
                     return (
@@ -3086,21 +3079,36 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         </div>
 
         {viewMode === "cumulative" && (
-          <div className="w-full overflow-x-auto animate-in fade-in slide-in-from-right-1 duration-200">
-            <table className="w-full min-w-[1550px] text-[13px] text-left border-collapse">
-              <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
-                <tr className="text-xs font-bold uppercase tracking-wider">
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><ListChecks size={15} className="text-indigo-500" />{t("shop_ledger.col.s_no")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={15} className="text-emerald-500" />{t("common.shop")}</span></th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivered_birds")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Mortality birds across every load and sub-shop for this main shop">{t("ops.mortality.col.mortality")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap">{t("ops.mortality.col.delivery_weight")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Mortality weight in kg (Box-mode mortality; Weight-mode mortality is counted in birds)">{t("ops.mortality.col.mortality_weight")}</th>
-                  <th className="px-3 py-3 text-right whitespace-nowrap" title="Farm weight minus delivered weight minus mortality weight, summed across all loads">{t("ops.mortality.col.weight_loss")}</th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Scale size={15} className="text-indigo-500" />{t("shop_ledger.col.opening")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowUpRight size={15} className="text-emerald-500" />{t("shop_ledger.col.sale")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowDownLeft size={15} className="text-blue-500" />{t("shop_ledger.col.collection")}</span></th>
-                  <th className="px-3 py-3"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><IndianRupee size={15} className="text-violet-500" />{t("shop_ledger.col.closing")}</span></th>
+          <div className="max-h-[62vh] w-full overflow-auto animate-in fade-in slide-in-from-right-1 duration-200">
+            <table className="w-full min-w-[1550px] table-fixed text-[13px] text-left border-separate border-spacing-0">
+              {/* Fixed layout: compact S.No, wide Shop, evenly split quantity
+                  and financial columns. Financial cells never wrap. */}
+              <colgroup>
+                <col className="w-[3.5%]" />
+                <col className="w-[16.5%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[8%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+                <col className="w-[10%]" />
+              </colgroup>
+              <thead className="sticky top-0 z-20 border-b border-slate-200 bg-slate-50 text-slate-600 shadow-[0_1px_0_0_#e2e8f0]">
+                <tr className="text-[11px] font-bold uppercase tracking-wider">
+                  <th className="sticky top-0 z-20 bg-slate-50 px-2 py-3.5"><span className="inline-flex w-full items-center justify-center gap-1.5 whitespace-nowrap"><Hash size={14} className="text-indigo-500 shrink-0" />{t("shop_ledger.col.s_no")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center gap-1.5 whitespace-nowrap"><Store size={14} className="text-emerald-500 shrink-0" />{t("common.shop")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Bird size={14} className="text-blue-500 shrink-0" />{t("ops.mortality.col.delivered_birds")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5" title="Mortality birds across every load and sub-shop for this main shop"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><HeartPulse size={14} className="text-rose-500 shrink-0" />{t("ops.mortality.col.mortality")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Weight size={14} className="text-cyan-500 shrink-0" />{t("ops.mortality.col.delivery_weight")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5" title="Mortality weight in kg (Box-mode mortality; Weight-mode mortality is counted in birds)"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Scale size={14} className="text-orange-500 shrink-0" />{t("ops.mortality.col.mortality_weight")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5" title="Farm weight minus delivered weight minus mortality weight, summed across all loads"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><TrendingDown size={14} className="text-amber-500 shrink-0" />{t("ops.mortality.col.weight_loss")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><Wallet size={14} className="text-indigo-500 shrink-0" />{t("shop_ledger.col.opening")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowUpRight size={14} className="text-emerald-500 shrink-0" />{t("shop_ledger.col.sale")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><ArrowDownLeft size={14} className="text-teal-500 shrink-0" />{t("shop_ledger.col.collection")}</span></th>
+                  <th className="sticky top-0 z-20 bg-slate-50 px-3 py-3.5"><span className="inline-flex w-full items-center justify-end gap-1.5 whitespace-nowrap"><IndianRupee size={14} className="text-violet-500 shrink-0" />{t("shop_ledger.col.closing")}</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -3113,21 +3121,28 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 ) : (
                   <>
                     {pagedCumulativeRows.map((row, index) => {
+                      const globalIndex = (cumulativeSafePage - 1) * pageSize + index;
                       const rowLabel = row.shop;
-                      const selected = selectedCumulativeShop === rowLabel;
+                      const rowId = row.shopId ?? `row-${globalIndex}`;
+                      const selectable = row.shopId != null;
+                      const selected = selectable && selectedCumulativeShopId === row.shopId;
                       return (
                       <tr
-                        key={rowLabel}
-                        onClick={() => setSelectedCumulativeShop(selected ? null : rowLabel)}
-                        className={`cursor-pointer transition-colors ${selected ? "bg-emerald-100/80 shadow-[inset_4px_0_0_#10b981]" : "hover:bg-emerald-50/80"}`}
+                        key={rowId}
+                        data-cum-shop-id={row.shopId ?? undefined}
+                        {...(selectable ? cumulativeSelection.getRowProps(row, globalIndex) : {})}
+                        className={`${selectable ? "cursor-pointer" : ""} transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${selected ? tableSelectedRowClass : "hover:bg-emerald-50/80"}`}
                       >
-                        <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{(cumulativeSafePage - 1) * pageSize + index + 1}</td>
-                        <td className="px-3 py-3 text-xs font-semibold text-slate-800 truncate" title={rowLabel}>{rowLabel}</td>
-                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.birds.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right text-xs"><CumulativeMortalityCell row={row} kind="birds" /></td>
-                        <td className="px-3 py-3 text-right text-xs tabular-nums">{row.weight.toFixed(2)}</td>
-                        <td className="px-3 py-2 text-right text-xs"><CumulativeMortalityCell row={row} kind="weight" /></td>
-                        <td className="px-3 py-3 text-right text-xs font-semibold tabular-nums text-amber-700" title={`${row.shop}: ${row.farmWeight.toFixed(2)} farm kg − ${row.weight.toFixed(2)} delivered kg − ${row.mortalityWeight.toFixed(2)} mortality kg`}>{row.weightLoss.toFixed(2)}</td>
+                        <td className="px-2 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums"><RowSelectMark selected={selected} serialNo={globalIndex + 1} label={`${rowLabel} selected`} /></td>
+                        <td className="px-3 py-3 text-xs font-semibold text-slate-800" title={rowLabel}><span className="block truncate whitespace-nowrap">{rowLabel}</span></td>
+                        <td className="px-3 py-3 text-right text-xs text-blue-700 tabular-nums">{row.birds.toLocaleString()}</td>
+                        <CumulativeQuantityCell row={row} metric="mortalityBirds" display={row.mortalityBirds.toLocaleString()}
+                          label={t("ops.mortality.col.mortality")}
+                          tipKey={`${rowId}:mortalityBirds`} openTip={loadTip} onOpen={openLoadTip} onClose={closeLoadTip} title="Mortality birds across every load and sub-shop for this main shop"
+                          cellClassName="px-3 py-2 text-right text-xs text-rose-700 tabular-nums" buttonClassName="hover:bg-rose-50" />
+                        <td className="px-3 py-3 text-right text-xs text-cyan-700 tabular-nums">{row.weight.toFixed(2)}</td>
+                        <td className="px-3 py-2 text-right text-xs text-orange-700 tabular-nums">{row.mortalityWeight.toFixed(2)}</td>
+                        <td className="px-3 py-3 text-right text-xs font-semibold tabular-nums text-amber-700">{row.weightLoss.toFixed(2)}</td>
                         {[row.openingBalance, row.sale, row.collection, row.closingBalance].map((value, valueIndex) => (
                           <td key={valueIndex} className={`px-3 py-3 text-right text-xs font-bold whitespace-nowrap tabular-nums ${value < 0 ? "text-rose-600" : valueIndex === 2 ? "text-blue-600" : valueIndex === 1 ? "text-emerald-600" : "text-slate-800"}`}>
                             {formatAmount(value)}
@@ -3142,7 +3157,19 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <div>{formatLedgerNumber(cumulativeTotals.birds)}</div>
                         <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Farm Birds {formatLedgerNumber(cumulativeTotals.birds + cumulativeTotals.mortalityBirds)}</div>
                       </td>
-                      <td className="px-3 py-3 text-right text-xs tabular-nums">{cumulativeTotals.mortalityBirds.toLocaleString()}</td>
+                      <CumulativeQuantityCell
+                        row={cumulativeMortalityTotalRow}
+                        metric="mortalityBirds"
+                        display={cumulativeTotals.mortalityBirds.toLocaleString()}
+                        label={t("ops.mortality.col.mortality")}
+                        tipKey="cumulative-total:mortalityBirds"
+                        openTip={loadTip}
+                        onOpen={openLoadTip}
+                        onClose={closeLoadTip}
+                        title="Mortality birds by load for the complete selected date range"
+                        cellClassName="px-3 py-3 text-right text-xs font-bold tabular-nums"
+                        buttonClassName="hover:bg-rose-50"
+                      />
                       <td className="px-3 py-3 text-right text-xs tabular-nums">
                         <div>{cumulativeTotals.weight.toFixed(2)}</div>
                         <div className="mt-0.5 text-[10px] font-semibold text-emerald-700">Farm Weight {formatLedgerNumber(cumulativeTotals.weight + cumulativeTotals.mortalityWeight + cumulativeTotals.weightLoss)}</div>
@@ -3157,6 +3184,23 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 )}
               </tbody>
             </table>
+            {loadTip && loadTip.scope === loadTipScope && cumulativeTipText.config[loadTip.metric] && (
+              <CumulativeLoadPopover
+                tip={loadTip}
+                subtitle={cumulativeTipText.config[loadTip.metric].subtitle}
+                loadWord={cumulativeTipText.loadWord}
+                totalLabel={cumulativeTipText.config[loadTip.metric].totalLabel}
+                totalDisplay={cumulativeTipText.config[loadTip.metric].formatValue(
+                  loadTip.metric === "birds" ? loadTip.row.birds
+                  : loadTip.metric === "mortalityBirds" ? loadTip.row.mortalityBirds
+                  : loadTip.metric === "weight" ? loadTip.row.weight
+                  : loadTip.metric === "mortalityWeight" ? loadTip.row.mortalityWeight
+                  : loadTip.row.weightLoss,
+                )}
+                formatValue={cumulativeTipText.config[loadTip.metric].formatValue}
+                onClose={closeLoadTip}
+              />
+            )}
           </div>
         )}
 
@@ -3182,12 +3226,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             totalItems={visibleCumulativeRows.length}
             onPageChange={(page) => {
               setCurrentPage(page);
-              setSelectedCumulativeShop(null);
+              setSelectedCumulativeShopId(null);
             }}
             onPageSizeChange={(size) => {
               setPageSize(size);
               setCurrentPage(1);
-              setSelectedCumulativeShop(null);
+              setSelectedCumulativeShopId(null);
             }}
             disabled={cumulativeLoading || ledgerRefreshing}
           />
@@ -3931,6 +3975,37 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
           </div>
         </AppShellModal>
+      )}
+
+      {/* ── VIEW SHOP LEDGER — on-screen statement for the selected shop.
+               Same authoritative rows the per-shop PDF prints; Previous/Next
+               walk the full filtered cumulative scope. ─────────── */}
+      {detailRow && detailShopId != null && selectedCumulativeShopId === detailShopId && (
+        <ShopLedgerDetailModal
+          filters={{
+            shopId: detailShopId,
+            shopName: detailRow.shop,
+            fromDate: appliedDateFrom,
+            toDate: appliedDateTo,
+            reportType: appliedReportType,
+            searchTerm: appliedSearchTerm,
+            ownerName: detailMaster?.ownerName || undefined,
+            mobile: detailMaster?.phoneNumber || undefined,
+            city: detailMaster?.city || undefined,
+          }}
+          identity={{
+            shopNumber: detailMaster?.shopNumber,
+            ownerName: detailMaster?.ownerName || undefined,
+            phoneNumber: detailMaster?.phoneNumber || undefined,
+            city: detailMaster?.city || undefined,
+          }}
+          prevShopId={prevDetailShopId}
+          nextShopId={nextDetailShopId}
+          onNavigate={navigateDetailShop}
+          onClose={() => setDetailShopId(null)}
+          t={t}
+          language={language}
+        />
       )}
     </div>
   );

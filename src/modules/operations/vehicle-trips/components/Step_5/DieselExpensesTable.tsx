@@ -1,13 +1,13 @@
 // src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { AlertTriangle, Plus, Pencil, Trash2, Gauge, CheckCircle2, Circle, Upload, MapPin, Loader2 } from "lucide-react";
+import { AlertTriangle, Plus, Gauge, CheckCircle2, Circle, Upload, MapPin, Loader2 } from "lucide-react";
 import {
   submitTripDiesel,
   updateTripDiesel,
-  deleteTripDiesel,
   handleApiError,
 } from "../../services/tripHeaderApiService";
+
 import type { Trip } from "../../types/trip";
 import {
   isMeterInvalid,
@@ -17,14 +17,14 @@ import {
 } from "../../utils/meterValidation";
 import { GpsAddressText } from "../GpsAddressText";
 import { BillPreviewLink } from "./BillPreviewLink";
-import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
+
 import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
-import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
-import { useI18n } from "../../../../../i18n";
 import { compressImageFile } from "../../../../../utils/compressImage";
 import { captureGpsQuiet } from "../../utils/captureGps";
 import { loadBirdTypes } from "../../../../masters/bird-types/services/birdTypeService";
 import type { BirdType } from "../../../../masters/bird-types/types/birdType";
+
+import { useI18n } from "../../../../../i18n";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -125,21 +125,23 @@ export default function DieselExpensesTable({
   readOnly = false,
   isRentedVehicle = false,
 }: DieselExpensesTableProps) {
-  const gpsRequestRef = useRef<Record<number, number>>({});
   const { t } = useI18n();
   const { showNotification: showCornerNotification } = useSafeNotification();
+  const gpsRequestRef = useRef<Record<number, number>>({});
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({});
+  const [meterErrors, setMeterErrors] = useState<{ [key: number]: string }>({});
+  const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
+  const [busyRow, setBusyRow] = useState<number | null>(null);
   const [fuelBunks, setFuelBunks] = useState<BirdType[]>([]);
   useEffect(() => {
     let active = true;
     void loadBirdTypes().then((rows) => {
       if (active) setFuelBunks(rows.filter((row) => row.category === "Fuel Bunk" && row.status === "Active"));
     }).catch(() => { if (active) setFuelBunks([]); });
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
-  const [meterErrors, setMeterErrors] = useState<{ [key: number]: string }>({});
-  const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
-  const [busyRow, setBusyRow] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<number | null>(null);
   const [, setIsEditingSubmitted] = useState(false);
   const [draftData, setDraftData] = useState<Record<string, any>>({});
@@ -150,7 +152,9 @@ export default function DieselExpensesTable({
    *  dropped on remount so a leftover S.No 01 does not reappear. */
   const keepEmptySlotsRef = useRef<Set<number>>(new Set());
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
-    typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : `diesel-${Date.now()}`
   );
 
   const today = new Date();
@@ -181,8 +185,28 @@ export default function DieselExpensesTable({
   const blockInvalidChar = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
   };
+
+  /** Validate that a single diesel bill litres is in valid range (0, 100].
+   * Returns { valid, message } for the caller to display inline.
+   */
+  const validateLitresRange = (value: number): { valid: boolean; message: string | null } => {
+    if (value <= 0 || !Number.isFinite(value)) return { valid: false, message: t("ops.trip.diesel_ltr_must_be_positive") };
+    if (value > 100) return { valid: false, message: t("ops.trip.diesel_exceeds_100_litres") };
+    return { valid: true, message: null };
+  };
+
+  /** Inline validation message for litres range. Displayed below the litres field. */
+  const litresRangeError = (num: number): string | null => {
+    const data = sheetData;
+    const ltr = data[`dieselLtr${num}`];
+    const litresNum = Number(ltr);
+    const range = validateLitresRange(litresNum);
+    return range.message ?? null;
+  };
+
   /** Blur on wheel so focused number fields don't nudge values while scrolling.
-   *  Do not call preventDefault — React registers wheel as passive. */
+   *  Do not call preventDefault — React registers wheel as passive.
+   */
   const blockWheelChange = (e: React.WheelEvent<HTMLInputElement>) => {
     e.currentTarget.blur();
   };
@@ -204,48 +228,6 @@ export default function DieselExpensesTable({
     } else {
       handleChange(field, value);
     }
-  };
-
-  const startEdit = (num: number) => {
-    const newDraft: Record<string, any> = {};
-    const fields = [
-      "dieselLtr",
-      "dieselRate",
-      "dieselAmount",
-      "dieselMeter",
-      "dieselBunk",
-      "dieselBunkSource",
-      "dieselFuelBunkId",
-      "dieselOtherBunk",
-      "dieselGpsLat",
-      "dieselGpsLon",
-      "dieselGpsAccuracy",
-      "dieselGpsCapturedAt",
-      "dieselImage",
-      "dieselImageName",
-      "dieselClientKey",
-      "dieselId",
-    ];
-    fields.forEach((f) => {
-      newDraft[`${f}${num}`] = sheetData[`${f}${num}`] ?? "";
-    });
-    const existingBunk = String(sheetData[`dieselBunk${num}`] || "").trim();
-    const existingSource = String(sheetData[`dieselBunkSource${num}`] || "").toUpperCase();
-    if (existingBunk && (existingSource === "OTHER" || (fuelBunks.length > 0 && !fuelBunks.some((bunk) => bunk.birdType === existingBunk)))) {
-      newDraft[`dieselBunk${num}`] = OTHER_BUNK_VALUE;
-      newDraft[`dieselOtherBunk${num}`] = existingBunk;
-    }
-    setDraftData(newDraft);
-    setEditingRow(num);
-  };
-
-  const cancelEdit = () => {
-    if (editingRow !== null) {
-      gpsRequestRef.current[editingRow] = (gpsRequestRef.current[editingRow] ?? 0) + 1;
-      setIsFetchingGPS((prev) => ({ ...prev, [editingRow]: false }));
-    }
-    setDraftData({});
-    setEditingRow(null);
   };
 
   const handleAddRow = () => {
@@ -364,35 +346,7 @@ export default function DieselExpensesTable({
       if (editingRow === index) {
         setDraftData((prev) => ({ ...prev, ...imagePatch }));
       } else if (rowWasSubmitted) {
-        const newDraft: Record<string, any> = {};
-        const fields = [
-          "dieselLtr",
-          "dieselRate",
-          "dieselMeter",
-          "dieselBunk",
-          "dieselBunkSource",
-          "dieselFuelBunkId",
-          "dieselOtherBunk",
-          "dieselGpsLat",
-          "dieselGpsLon",
-          "dieselGpsAccuracy",
-          "dieselGpsCapturedAt",
-          "dieselImage",
-          "dieselImageName",
-          "dieselClientKey",
-          "dieselId",
-        ];
-        fields.forEach((f) => {
-          newDraft[`${f}${index}`] = sheetData[`${f}${index}`] ?? "";
-        });
-        const existingBunk = String(sheetData[`dieselBunk${index}`] || "").trim();
-        const existingSource = String(sheetData[`dieselBunkSource${index}`] || "").toUpperCase();
-        if (existingBunk && (existingSource === "OTHER" || (fuelBunks.length > 0 && !fuelBunks.some((bunk) => bunk.birdType === existingBunk)))) {
-          newDraft[`dieselBunk${index}`] = OTHER_BUNK_VALUE;
-          newDraft[`dieselOtherBunk${index}`] = existingBunk;
-        }
-        Object.assign(newDraft, imagePatch);
-        setDraftData(newDraft);
+        setDraftData({ ...sheetData, ...imagePatch });
         setIsEditingSubmitted(true);
         setEditingRow(index);
       }
@@ -413,8 +367,7 @@ export default function DieselExpensesTable({
     e.target.value = "";
   };
 
-  /**
-   * Open the bill file picker in the SAME user click.
+  /** Open the bill file picker in the SAME user click.
    * Browsers block file dialogs opened after setTimeout/async — that was why
    * Upload Bill appeared to do nothing on already-submitted diesel rows.
    */
@@ -427,37 +380,6 @@ export default function DieselExpensesTable({
     }
     input.value = "";
     input.click();
-  };
-
-  const handleClearRow = (num: number) => {
-    if (sheetData[`dieselSubmitted${num}`]) return;
-    gpsRequestRef.current[num] = (gpsRequestRef.current[num] ?? 0) + 1;
-    setIsFetchingGPS((prev) => ({ ...prev, [num]: false }));
-    applyBatchUpdates({
-      [`dieselLtr${num}`]: "",
-      [`dieselRate${num}`]: "",
-      [`dieselMeter${num}`]: "",
-      [`dieselBunk${num}`]: "",
-      [`dieselBunkSource${num}`]: "",
-      [`dieselFuelBunkId${num}`]: "",
-      [`dieselOtherBunk${num}`]: "",
-      [`dieselGpsLat${num}`]: "",
-      [`dieselGpsLon${num}`]: "",
-      [`dieselGpsAccuracy${num}`]: "",
-      [`dieselGpsCapturedAt${num}`]: "",
-      [`dieselImage${num}`]: "",
-      [`dieselImageName${num}`]: "",
-      [`dieselClientKey${num}`]: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`,
-    });
-    if (fileInputRefs.current[num]) fileInputRefs.current[num]!.value = "";
-    keepEmptySlotsRef.current.delete(num);
-    setMeterErrors((prev) => {
-      const copy = { ...prev };
-      delete copy[num];
-      return copy;
-    });
-    if (rowIndices.length > 1) setRowIndices((prev) => prev.filter((id) => id !== num));
-    notifyUser(t("ops.trip.row_cancelled", { row: num }), "success");
   };
 
   const handleGetOtherLocation = (index: number) => {
@@ -489,347 +411,22 @@ export default function DieselExpensesTable({
     });
   };
 
-  const absoluteDestMeter = destMeter || 0;
-  const rowIndicesKey = rowIndices.join(",");
-
-  /**
-   * Diesel readings are ordered only against other diesel bills. A filling
-   * may occur before or after the farm reading, so row 1 has no farm-meter
-   * minimum; row N must still be greater than the previous diesel bill.
-   */
-  const getMinAllowedMeter = (num: number, overrideData?: Record<string, unknown>) => {
-    const ordered = [...rowIndices].sort((a, b) => a - b);
-    const pos = ordered.indexOf(num);
-    const prior = pos > 0 ? ordered.slice(0, pos).reverse() : [];
-
-    for (const i of prior) {
-      let prevVal: unknown;
-      if (overrideData && overrideData[`dieselMeter${i}`] !== undefined) {
-        prevVal = overrideData[`dieselMeter${i}`];
-      } else if (editingRow === i && draftData[`dieselMeter${i}`] !== undefined) {
-        prevVal = draftData[`dieselMeter${i}`];
-      } else {
-        prevVal = sheetData[`dieselMeter${i}`];
-      }
-      if (prevVal !== undefined && prevVal !== "" && Number.isFinite(Number(prevVal)) && Number(prevVal) > 0) {
-        return {
-          minAllowed: Number(prevVal),
-          referenceLabel: t("ops.trip.row_label", { row: i, meter: Number(prevVal) }),
-        };
-      }
+  const handleBunkChange = (num: number, value: string) => {
+    if (value === OTHER_BUNK_VALUE) {
+      handleFieldChange(`dieselBunk${num}`, num, OTHER_BUNK_VALUE);
+      handleFieldChange(`dieselBunkSource${num}`, num, "OTHER");
+      handleFieldChange(`dieselFuelBunkId${num}`, num, "");
+    } else {
+      const master = fuelBunks.find((bunk) => bunk.birdType === value);
+      handleFieldChange(`dieselBunk${num}`, num, value);
+      handleFieldChange(`dieselBunkSource${num}`, num, "MASTER");
+      handleFieldChange(`dieselFuelBunkId${num}`, num, master?.id ?? "");
+      handleFieldChange(`dieselOtherBunk${num}`, num, "");
     }
-    return { minAllowed: 0, referenceLabel: "" };
   };
 
-  /** Resolve meter value for a row (draft / override / sheet). */
-  const resolveMeterValue = useCallback(
-    (row: number, overrideData?: Record<string, unknown>): unknown => {
-      if (overrideData && overrideData[`dieselMeter${row}`] !== undefined) {
-        return overrideData[`dieselMeter${row}`];
-      }
-      if (editingRow === row && draftData[`dieselMeter${row}`] !== undefined) {
-        return draftData[`dieselMeter${row}`];
-      }
-      return sheetData[`dieselMeter${row}`];
-    },
-    [editingRow, draftData, sheetData]
-  );
-
-  /** Visible S.No for a table row index (01, 02…). */
-  const snoForRow = useCallback(
-    (row: number) => {
-      const idx = rowIndices.indexOf(row);
-      const display = idx >= 0 ? idx : row - 1;
-      return String(display + 1).padStart(2, "0");
-    },
-    [rowIndices]
-  );
-
-  const formatMeterChainMsg = useCallback(
-    (issue: {
-      sno: string;
-      meter: number;
-      prevSno: string;
-      prevMeter: number;
-      laterThanSubmitted?: boolean;
-    }) => {
-      if (issue.laterThanSubmitted) {
-        return t("ops.trip.meter_later_below_short", {
-          laterSno: issue.sno,
-          laterMeter: issue.meter,
-          meter: issue.prevMeter,
-        });
-      }
-      return t("ops.trip.meter_chain_banner", {
-        sno: issue.sno,
-        meter: issue.meter,
-        prevSno: issue.prevSno === "Farm" ? t("ops.trip.last_entered_meter") : issue.prevSno,
-        prevMeter: issue.prevMeter,
-      });
-    },
-    [t]
-  );
-
-  /** Scan all visible rows and flag any reading that is ≤ the previous one. */
-  const scanMeterChainErrors = useCallback(
-    (overrideData?: Record<string, unknown>): { [key: number]: string } => {
-      const slots = collectDieselMeterSlots(rowIndices, (row) => resolveMeterValue(row, overrideData), (row) => {
-        const idx = rowIndices.indexOf(row);
-        return idx >= 0 ? idx : row - 1;
-      });
-      const issues = findMeterChainIssues(slots);
-      const errs: { [key: number]: string } = {};
-      for (const issue of issues) {
-        errs[issue.row] = formatMeterChainMsg(issue);
-      }
-      return errs;
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rowIndicesKey, resolveMeterValue, formatMeterChainMsg]
-  );
-
-  // Flag bad chains on load / when dest meter or rows change (e.g. 36981 after 36985).
-  useEffect(() => {
-    const errs = scanMeterChainErrors();
-    setMeterErrors((old) => {
-      const oldKeys = Object.keys(old);
-      const newKeys = Object.keys(errs);
-      const same =
-        oldKeys.length === newKeys.length && newKeys.every((k) => old[Number(k)] === errs[Number(k)]);
-      return same ? old : errs;
-    });
-  }, [scanMeterChainErrors]);
-
-  /** Single top banner: prefer live chain scan, else any stored meterErrors message. */
-  const chainBannerMessages = (() => {
-    const slots = collectDieselMeterSlots(
-      rowIndices,
-      (row) => resolveMeterValue(row),
-      (row) => {
-        const idx = rowIndices.indexOf(row);
-        return idx >= 0 ? idx : row - 1;
-      }
-    );
-    const fromScan = findMeterChainIssues(slots).map(formatMeterChainMsg);
-    if (fromScan.length) return [fromScan[0]];
-    const fromState = Object.keys(meterErrors)
-      .map((k) => meterErrors[Number(k)])
-      .filter(Boolean);
-    return fromState.length ? [fromState[0]] : [];
-  })();
-
-  const meterViolation = (num: number, value: unknown, overrideData?: Record<string, unknown>): string | null => {
-    if (value === "" || value == null) return null;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return null;
-    const endMeter = Number(overrideData?.endMeter ?? draftData.endMeter ?? sheetData.endMeter ?? 0);
-    if (endMeter > 0 && n > endMeter) {
-      return t("ops.trip.meter_exceeds_end", { meter: endMeter });
-    }
-    const { minAllowed } = getMinAllowedMeter(num, overrideData);
-    if (minAllowed > 0 && isMeterInvalid(n, minAllowed)) {
-      // Prefer S.No-style message when the previous bar is another diesel row.
-      const slots = collectDieselMeterSlots(
-        rowIndices,
-        (row) => (row === num ? n : resolveMeterValue(row, overrideData)),
-        (row) => {
-          const idx = rowIndices.indexOf(row);
-          return idx >= 0 ? idx : row - 1;
-        }
-      );
-      const issue = findMeterChainIssues(slots).find((i) => i.row === num);
-      if (issue) return formatMeterChainMsg(issue);
-      return t("ops.trip.meter_must_gt", { min: minAllowed });
-    }
-    return null;
-  };
-
-  const handleMeterChange = (num: number, raw: string) => {
-    const value = raw === "" ? "" : Number(raw);
-    handleFieldChange(`dieselMeter${num}`, num, value);
-    const draftSnap =
-      editingRow === num
-        ? { ...draftData, [`dieselMeter${num}`]: value }
-        : { ...sheetData, [`dieselMeter${num}`]: value };
-    // Full chain scan so bill-2 < bill-1 is always caught immediately.
-    setMeterErrors(scanMeterChainErrors(draftSnap));
-  };
-
-  /** Later bills already lower than the meter we're about to save for `num`. */
-  const laterBillsBlocking = (num: number, useDraft = false) => {
-    const data = useDraft && editingRow === num ? { ...sheetData, ...draftData } : sheetData;
-    const reading = Number(data[`dieselMeter${num}`]);
-    if (!Number.isFinite(reading) || reading <= 0) return [];
-    const slots = collectDieselMeterSlots(
-      rowIndices,
-      (row) => (row === num ? reading : resolveMeterValue(row, useDraft ? data : undefined)),
-      (row) => {
-        const idx = rowIndices.indexOf(row);
-        return idx >= 0 ? idx : row - 1;
-      }
-    );
-    return findLaterBillsBelow(slots, num, reading);
-  };
-
-  const rowReady = (num: number, useDraft = false) => {
-    const data = useDraft && editingRow === num ? draftData : sheetData;
-    const ltr = data[`dieselLtr${num}`];
-    const amount = data[`dieselAmount${num}`];
-    const reading = data[`dieselMeter${num}`];
-    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
-    const bunkName = selectedBunk === OTHER_BUNK_VALUE
-      ? String(data[`dieselOtherBunk${num}`] || "").trim()
-      : selectedBunk;
-    // Bunk city is optional (short city name). GPS + bill are mandatory.
-    const image = data[`dieselImage${num}`];
-    const lat = data[`dieselGpsLat${num}`];
-    const lon = data[`dieselGpsLon${num}`];
-    const meterErr = isRentedVehicle ? null : meterErrors[num] || meterViolation(num, reading, useDraft ? data : undefined);
-    const laterBlock = !isRentedVehicle && laterBillsBlocking(num, useDraft).length > 0;
-    return (
-      isPositive(ltr) &&
-      isPositive(amount) &&
-      (isRentedVehicle || isPositive(reading)) &&
-      bunkName.length > 0 &&
-      hasRealBill(image) &&
-      isValidGps(lat, lon) &&
-      !meterErr &&
-      !laterBlock
-    );
-  };
-
-  const rowBlockReason = (num: number, useDraft = false): string | null => {
-    const data = useDraft && editingRow === num ? draftData : sheetData;
-    const reasons: string[] = [];
-    if (meterErrors[num]) reasons.push(meterErrors[num]);
-    if (!isPositive(data[`dieselLtr${num}`])) reasons.push(t("ops.trip.diesel_ltr_required"));
-    if (!isPositive(data[`dieselAmount${num}`])) {
-      reasons.push(t("ops.trip.amount_greater_zero"));
-    }
-    if (!isRentedVehicle && !isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
-    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
-    const bunkName = selectedBunk === OTHER_BUNK_VALUE
-      ? String(data[`dieselOtherBunk${num}`] || "").trim()
-      : selectedBunk;
-    if (!bunkName) reasons.push(t("ops.trip.bunk_required"));
-    const meterErr = isRentedVehicle ? null : meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
-    if (meterErr && !reasons.includes(meterErr)) reasons.push(meterErr);
-    const later = laterBillsBlocking(num, useDraft);
-    if (later.length > 0) {
-      const issue = later[0];
-      reasons.push(t("ops.trip.meter_later_below", {
-        sno: snoForRow(num),
-        meter: Number(data[`dieselMeter${num}`]),
-        laterSno: issue.sno,
-        laterMeter: issue.meter,
-      }));
-    }
-    // GPS is mandatory; bunk city is optional free-text (Kodad / Vijayawada…).
-    if (!isValidGps(data[`dieselGpsLat${num}`], data[`dieselGpsLon${num}`])) {
-      reasons.push(t("ops.trip.gps_must_captured"));
-    }
-    if (!hasRealBill(data[`dieselImage${num}`])) reasons.push(t("ops.trip.bill_image_required"));
-    const meter = Number(data[`dieselMeter${num}`]);
-    const image = String(data[`dieselImage${num}`] || "");
-    const clientKey = String(data[`dieselClientKey${num}`] || "");
-    for (const other of rowIndices) {
-      if (other === num || !dieselSlotActive(sheetData, other)) continue;
-      if (meter > 0 && Number(sheetData[`dieselMeter${other}`]) === meter) {
-        reasons.push(t("ops.trip.duplicate_diesel_meter", { row: snoForRow(other), meter }));
-      }
-      if (image && image === String(sheetData[`dieselImage${other}`] || "")) {
-        reasons.push(t("ops.trip.duplicate_diesel_bill", { row: snoForRow(other) }));
-      }
-      if (clientKey && clientKey === String(sheetData[`dieselClientKey${other}`] || "")) {
-        reasons.push(t("ops.trip.duplicate_diesel_entry", { row: snoForRow(other) }));
-      }
-    }
-    const unique = Array.from(new Set(reasons));
-    return unique.length ? unique.map((reason) => `• ${reason}`).join("\n") : null;
-  };
-
-  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows).
-   *  Preserves local bill images when the API omits large imageData (common on multi-bill trips). */
-  const flattenDieselEntries = (saved: Trip | Record<string, unknown>): Record<string, unknown> => {
-    const updates: Record<string, unknown> = {};
-    const prev = sheetData as Record<string, unknown>;
-    // Keep any already-flattened diesel* keys the API may return.
-    for (const [k, v] of Object.entries(saved || {})) {
-      if (k.startsWith("diesel") && k !== "dieselEntries") updates[k] = v;
-    }
-    const entries = Array.isArray((saved as Trip)?.dieselEntries)
-      ? ((saved as Trip).dieselEntries as NonNullable<Trip["dieselEntries"]>)
-      : [];
-    // Clear every known sheet slot (current UI + API flatten keys) so deletes don't leave stale values.
-    const clearSlots = new Set<number>([
-      ...collectDieselSlotIndices(prev),
-      ...collectDieselSlotIndices(updates),
-      ...rowIndices,
-    ]);
-    const preservedImages = new Map<number, { data: unknown; name: unknown }>();
-    for (const i of clearSlots) {
-      if (hasRealBill(prev[`dieselImage${i}`])) {
-        preservedImages.set(i, {
-          data: prev[`dieselImage${i}`],
-          name: prev[`dieselImageName${i}`] ?? "",
-        });
-      }
-      updates[`dieselId${i}`] = "";
-      updates[`dieselLtr${i}`] = "";
-      updates[`dieselRate${i}`] = "";
-      updates[`dieselAmount${i}`] = "";
-      updates[`dieselMeter${i}`] = "";
-      updates[`dieselBunk${i}`] = "";
-      updates[`dieselGpsLat${i}`] = "";
-      updates[`dieselGpsLon${i}`] = "";
-      updates[`dieselGpsAccuracy${i}`] = "";
-      updates[`dieselGpsCapturedAt${i}`] = "";
-      updates[`dieselImage${i}`] = "";
-      updates[`dieselImageName${i}`] = "";
-      updates[`dieselSubmitted${i}`] = false;
-      updates[`dieselSubmittedAt${i}`] = "";
-      updates[`dieselClientKey${i}`] = "";
-    }
-    entries.forEach((entry, idx) => {
-      const raw = Number(entry.rowIndex);
-      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
-      const litres = entry.litres ?? "";
-      const rate = entry.rate ?? "";
-      const amount =
-        entry.amount != null
-          ? entry.amount
-          : litres !== "" && rate !== ""
-            ? Math.round(Number(litres) * Number(rate) * 100) / 100
-            : "";
-      updates[`dieselId${n}`] = entry.id ?? "";
-      updates[`dieselLtr${n}`] = litres;
-      updates[`dieselRate${n}`] = rate;
-      updates[`dieselAmount${n}`] = amount;
-      updates[`dieselMeter${n}`] = entry.meter ?? "";
-      updates[`dieselBunk${n}`] = entry.bunkName ?? "";
-      updates[`dieselBunkSource${n}`] = entry.bunkSource ?? "OTHER";
-      updates[`dieselFuelBunkId${n}`] = entry.fuelBunkId ?? "";
-      updates[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
-      updates[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
-      updates[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
-      updates[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
-      const serverImage = entry.imageData ?? "";
-      const kept = preservedImages.get(n);
-      updates[`dieselImage${n}`] = hasRealBill(serverImage)
-        ? serverImage
-        : kept?.data ?? "";
-      updates[`dieselImageName${n}`] = entry.imageName || kept?.name || "";
-      updates[`dieselSubmitted${n}`] = entry.submitted !== false;
-      updates[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
-      updates[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
-    });
-    return updates;
-  };
-
-  /** Rebuild visible row list from flattened sheet (unlimited). */
-  const rowsFromFlattened = (flattened: Record<string, unknown>): number[] => {
-    keepEmptySlotsRef.current.clear();
-    return dieselRowsFromSheet(flattened);
+  const handleBunkOtherChange = (num: number, value: string) => {
+    handleFieldChange(`dieselOtherBunk${num}`, num, value);
   };
 
   const handleRowSubmit = async (num: number) => {
@@ -947,7 +544,7 @@ export default function DieselExpensesTable({
         flattened[`dieselGpsAccuracy${num}`] = payload.gpsAccuracy ?? "";
         flattened[`dieselGpsCapturedAt${num}`] = payload.gpsCapturedAt ?? "";
         flattened[`dieselImage${num}`] = payload.imageData;
-        flattened[`dieselImageName${num}`] = payload.imageName ?? "";
+        flattened[`dieselImageName${num}`] = payload.imageName ?? flattened[`dieselImageName${num}`] ?? "";
         flattened[`dieselSubmitted${num}`] = true;
         flattened[`dieselClientKey${num}`] = payload.clientKey;
       }
@@ -963,9 +560,10 @@ export default function DieselExpensesTable({
       }
       flattened[`dieselSubmitted${num}`] = true;
       applyBatchUpdates(flattened);
-      setRowIndices(rowsFromFlattened(flattened));
-
-      cancelEdit();
+      // Leave edit mode so the submitted row locks; the visible row list is
+      // already correct, so no row-index rebuild is needed here.
+      setEditingRow(null);
+      setDraftData({});
       notifyUser(t("ops.trip.row_submitted", { row: num }), "success");
     } catch (err) {
       const raw = handleApiError(err);
@@ -980,24 +578,349 @@ export default function DieselExpensesTable({
     }
   };
 
-  const handleDeleteSubmitted = async (num: number) => {
-    const entryId = Number(sheetData[`dieselId${num}`]);
-    if (!entryId) return;
-    setBusyRow(num);
-    try {
-      const saved = await deleteTripDiesel(tripId, entryId);
-      const flattened = flattenDieselEntries(saved as Trip);
-      applyBatchUpdates(flattened);
-      setRowIndices(rowsFromFlattened(flattened));
-      notifyUser(t("ops.trip.row_deleted", { row: num }), "success");
-    } catch (err) {
-      notifyUser(handleApiError(err), "error");
-    } finally {
-      setBusyRow(null);
+  const absoluteDestMeter = destMeter || 0;
+  const rowIndicesKey = rowIndices.join(",");
+
+  /** Diesel readings are ordered only against other diesel bills. A filling
+   * may occur before or after the farm reading, so row 1 has no farm-meter
+   * minimum; row N must still be greater than the previous diesel bill.
+   */
+  const getMinAllowedMeter = (num: number, overrideData?: Record<string, unknown>) => {
+    const ordered = [...rowIndices].sort((a, b) => a - b);
+    const pos = ordered.indexOf(num);
+    const prior = pos > 0 ? ordered.slice(0, pos).reverse() : [];
+
+    for (const i of prior) {
+      let prevVal: unknown;
+      if (overrideData && overrideData[`dieselMeter${i}`] !== undefined) {
+        prevVal = overrideData[`dieselMeter${i}`];
+      } else if (editingRow === i && draftData[`dieselMeter${i}`] !== undefined) {
+        prevVal = draftData[`dieselMeter${i}`];
+      } else {
+        prevVal = sheetData[`dieselMeter${i}`];
+      }
+      if (prevVal !== undefined && prevVal !== "" && Number.isFinite(Number(prevVal)) && Number(prevVal) > 0) {
+        return {
+          minAllowed: Number(prevVal),
+          referenceLabel: t("ops.trip.row_label", { row: i, meter: Number(prevVal) }),
+        };
+      }
     }
+    return { minAllowed: 0, referenceLabel: "" };
   };
 
-  const { requestDelete, cancel, pendingItems } = usePendingDelete<number>((num) => handleDeleteSubmitted(num));
+  /** Resolve meter value for a row (draft / override / sheet). */
+  const resolveMeterValue = useCallback(
+    (row: number, overrideData?: Record<string, unknown>): unknown => {
+      if (overrideData && overrideData[`dieselMeter${row}`] !== undefined) {
+        return overrideData[`dieselMeter${row}`];
+      }
+      if (editingRow === row && draftData[`dieselMeter${row}`] !== undefined) {
+        return draftData[`dieselMeter${row}`];
+      }
+      return sheetData[`dieselMeter${row}`];
+    },
+    [editingRow, draftData, sheetData]
+  );
+
+  const formatMeterChainMsg = useCallback(
+    (issue: {
+      sno: string;
+      meter: number;
+      prevSno: string;
+      prevMeter: number;
+      laterThanSubmitted?: boolean;
+    }) => {
+      if (issue.laterThanSubmitted) {
+        return t("ops.trip.meter_later_below_short", {
+          laterSno: issue.sno,
+          laterMeter: issue.meter,
+          meter: issue.prevMeter,
+        });
+      }
+      return t("ops.trip.meter_chain_banner", {
+        sno: issue.sno,
+        meter: issue.meter,
+        prevSno: issue.prevSno === "Farm" ? t("ops.trip.last_entered_meter") : issue.prevSno,
+        prevMeter: issue.prevMeter,
+      });
+    },
+    [t]
+  );
+
+  /** Scan all visible rows and flag any reading that is ≤ the previous one. */
+  const scanMeterChainErrors = useCallback(
+    (overrideData?: Record<string, unknown>): { [key: number]: string } => {
+      const slots = collectDieselMeterSlots(rowIndices, (row) => resolveMeterValue(row, overrideData), (row) => {
+        const idx = rowIndices.indexOf(row);
+        return idx >= 0 ? idx : row - 1;
+      });
+      const issues = findMeterChainIssues(slots);
+      const errs: { [key: number]: string } = {};
+      for (const issue of issues) {
+        errs[issue.row] = formatMeterChainMsg(issue);
+      }
+      return errs;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rowIndicesKey, resolveMeterValue, formatMeterChainMsg]
+  );
+
+  // Flag bad chains on load / when dest meter or rows change (e.g. 36981 after 36985).
+  useEffect(() => {
+    const errs = scanMeterChainErrors();
+    setMeterErrors((old) => {
+      const oldKeys = Object.keys(old);
+      const newKeys = Object.keys(errs);
+      const same =
+        oldKeys.length === newKeys.length && newKeys.every((k) => old[Number(k)] === errs[Number(k)]);
+      return same ? old : errs;
+    });
+  }, [scanMeterChainErrors]);
+
+  /** Single top banner: prefer live chain scan, else any stored meterErrors message. */
+  const chainBannerMessages = (() => {
+    const slots = collectDieselMeterSlots(
+      rowIndices,
+      (row) => resolveMeterValue(row),
+      (row) => {
+        const idx = rowIndices.indexOf(row);
+        return idx >= 0 ? idx : row - 1;
+      }
+    );
+    const fromScan = findMeterChainIssues(slots).map(formatMeterChainMsg);
+    if (fromScan.length) return [fromScan[0]];
+    const fromState = Object.keys(meterErrors)
+      .map((k) => meterErrors[Number(k)])
+      .filter(Boolean);
+    return fromState.length ? [fromState[0]] : [];
+  })();
+
+  const meterViolation = (num: number, value: unknown, overrideData?: Record<string, unknown>): string | null => {
+    if (value === "" || value == null) return null;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return null;
+    const endMeter = Number(overrideData?.endMeter ?? draftData.endMeter ?? sheetData.endMeter ?? 0);
+    if (endMeter > 0 && n > endMeter) {
+      return t("ops.trip.meter_exceeds_end", { meter: endMeter });
+    }
+    const { minAllowed } = getMinAllowedMeter(num, overrideData);
+    if (minAllowed > 0 && isMeterInvalid(n, minAllowed)) {
+      // Prefer S.No-style message when the previous bar is another diesel row.
+      const slots = collectDieselMeterSlots(
+        rowIndices,
+        (row) => (row === num ? n : resolveMeterValue(row, overrideData)),
+        (row) => {
+          const idx = rowIndices.indexOf(row);
+          return idx >= 0 ? idx : row - 1;
+        }
+      );
+      const issue = findMeterChainIssues(slots).find((i) => i.row === num);
+      if (issue) return formatMeterChainMsg(issue);
+      return t("ops.trip.meter_must_gt", { min: minAllowed });
+    }
+    return null;
+  };
+
+  const handleMeterChange = (num: number, raw: string) => {
+    const value = raw === "" ? "" : Number(raw);
+    handleFieldChange(`dieselMeter${num}`, num, value);
+    const draftSnap =
+      editingRow === num
+        ? { ...draftData, [`dieselMeter${num}`]: value }
+        : { ...sheetData, [`dieselMeter${num}`]: value };
+    // Full chain scan so bill-2 < bill-1 is always caught immediately.
+    setMeterErrors(scanMeterChainErrors(draftSnap));
+  };
+
+  /** Visible S.No for a table row index (01, 02…). */
+  const snoForRow = useCallback(
+    (row: number) => {
+      const idx = rowIndices.indexOf(row);
+      const display = idx >= 0 ? idx : row - 1;
+      return String(display + 1).padStart(2, "0");
+    },
+    [rowIndices]
+  );
+
+  /** Later bills already lower than the meter we're about to save for `num`. */
+  const laterBillsBlocking = (num: number, useDraft = false) => {
+    const data = useDraft && editingRow === num ? { ...sheetData, ...draftData } : sheetData;
+    const reading = Number(data[`dieselMeter${num}`]);
+    if (!Number.isFinite(reading) || reading <= 0) return [];
+    const slots = collectDieselMeterSlots(
+      rowIndices,
+      (row) => (row === num ? reading : resolveMeterValue(row, useDraft ? data : undefined)),
+      (row) => {
+        const idx = rowIndices.indexOf(row);
+        return idx >= 0 ? idx : row - 1;
+      }
+    );
+    return findLaterBillsBelow(slots, num, reading);
+  };
+
+  const rowReady = (num: number, useDraft = false) => {
+    const data = useDraft && editingRow === num ? draftData : sheetData;
+    const ltr = data[`dieselLtr${num}`];
+    const amount = data[`dieselAmount${num}`];
+    const reading = data[`dieselMeter${num}`];
+    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
+    const bunkName = selectedBunk === OTHER_BUNK_VALUE
+      ? String(data[`dieselOtherBunk${num}`] || "").trim()
+      : selectedBunk;
+    // Bunk city is optional (short city name). GPS + bill are mandatory.
+    const image = data[`dieselImage${num}`];
+    const lat = data[`dieselGpsLat${num}`];
+    const lon = data[`dieselGpsLon${num}`];
+    const meterErr = isRentedVehicle ? null : meterErrors[num] || meterViolation(num, reading, useDraft ? data : undefined);
+    // Fix: single assignment with proper logic
+    const laterBlock = !isRentedVehicle && laterBillsBlocking(num, useDraft).length > 0;
+    const litresNum = Number(ltr);
+    const litresRange = validateLitresRange(litresNum);
+
+    return (
+      isPositive(ltr) &&
+      isPositive(amount) &&
+      (isRentedVehicle || isPositive(reading)) &&
+      bunkName.length > 0 &&
+      hasRealBill(image) &&
+      isValidGps(lat, lon) &&
+      !meterErr &&
+      litresRange.valid &&
+      !laterBlock
+    );
+  };
+
+  const rowBlockReason = (num: number, useDraft = false): string | null => {
+    const data = useDraft && editingRow === num ? draftData : sheetData;
+    const reasons: string[] = [];
+    if (meterErrors[num]) reasons.push(meterErrors[num]);
+    if (!isPositive(data[`dieselLtr${num}`])) reasons.push(t("ops.trip.diesel_ltr_required"));
+    if (!isPositive(data[`dieselAmount${num}`])) {
+      reasons.push(t("ops.trip.amount_greater_zero"));
+    }
+    if (!isRentedVehicle && !isPositive(data[`dieselMeter${num}`])) reasons.push(t("ops.trip.reading_required"));
+    const selectedBunk = String(data[`dieselBunk${num}`] || "").trim();
+    const bunkName = selectedBunk === OTHER_BUNK_VALUE
+      ? String(data[`dieselOtherBunk${num}`] || "").trim()
+      : selectedBunk;
+    if (!bunkName) reasons.push(t("ops.trip.bunk_required"));
+    const meterErr = isRentedVehicle ? null : meterViolation(num, data[`dieselMeter${num}`], useDraft ? data : undefined);
+    if (meterErr && !reasons.includes(meterErr)) reasons.push(meterErr);
+    const later = laterBillsBlocking(num, useDraft);
+    if (later.length > 0) {
+      const issue = later[0];
+      reasons.push(t("ops.trip.meter_later_below", {
+        sno: snoForRow(num),
+        meter: Number(data[`dieselMeter${num}`]),
+        laterSno: issue.sno,
+        laterMeter: issue.meter,
+      }));
+    }
+    // GPS is mandatory; bunk city is optional free-text (Kodad / Vijayawada…).
+    if (!isValidGps(data[`dieselGpsLat${num}`], data[`dieselGpsLon${num}`])) {
+      reasons.push(t("ops.trip.gps_must_captured"));
+    }
+    if (!hasRealBill(data[`dieselImage${num}`])) reasons.push(t("ops.trip.bill_image_required"));
+    const meter = Number(data[`dieselMeter${num}`]);
+    const image = String(data[`dieselImage${num}`] || "");
+    const clientKey = String(data[`dieselClientKey${num}`] || "");
+    for (const other of rowIndices) {
+      if (other === num || !dieselSlotActive(sheetData, other)) continue;
+      if (meter > 0 && Number(sheetData[`dieselMeter${other}`]) === meter) {
+        reasons.push(t("ops.trip.duplicate_diesel_meter", { row: snoForRow(other), meter }));
+      }
+      if (image && image === String(sheetData[`dieselImage${other}`] || "")) {
+        reasons.push(t("ops.trip.duplicate_diesel_bill", { row: snoForRow(other) }));
+      }
+      if (clientKey && clientKey === String(sheetData[`dieselClientKey${other}`] || "")) {
+        reasons.push(t("ops.trip.duplicate_diesel_entry", { row: snoForRow(other) }));
+      }
+    }
+    // Add litres range validation
+    const litresError = litresRangeError(num);
+    if (litresError && !reasons.includes(litresError)) reasons.push(litresError);
+    const unique = Array.from(new Set(reasons));
+    return unique.length ? unique.map((reason) => `• ${reason}`).join("\n") : null;
+  };
+
+  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows).
+   *  Preserves local bill images when the API omits large imageData (common on multi-bill trips).
+   */
+  const flattenDieselEntries = (saved: Trip | Record<string, unknown>): Record<string, unknown> => {
+    const updates: Record<string, unknown> = {};
+    const prev = sheetData as Record<string, unknown>;
+    // Keep any already-flattened diesel* keys the API may return.
+    for (const [k, v] of Object.entries(saved || {})) {
+      if (k.startsWith("diesel") && k !== "dieselEntries") updates[k] = v;
+    }
+    const entries = Array.isArray((saved as Trip)?.dieselEntries)
+      ? ((saved as Trip).dieselEntries as NonNullable<Trip["dieselEntries"]>)
+      : [];
+    // Clear every known sheet slot (current UI + API flatten keys) so deletes don't leave stale values.
+    const clearSlots = new Set<number>([
+      ...collectDieselSlotIndices(prev),
+      ...collectDieselSlotIndices(updates),
+      ...rowIndices,
+    ]);
+    const preservedImages = new Map<number, { data: unknown; name: unknown }>();
+    for (const i of clearSlots) {
+      if (hasRealBill(prev[`dieselImage${i}`])) {
+        preservedImages.set(i, {
+          data: prev[`dieselImage${i}`],
+          name: prev[`dieselImageName${i}`] ?? "",
+        });
+      }
+      updates[`dieselId${i}`] = "";
+      updates[`dieselLtr${i}`] = "";
+      updates[`dieselRate${i}`] = "";
+      updates[`dieselAmount${i}`] = "";
+      updates[`dieselMeter${i}`] = "";
+      updates[`dieselBunk${i}`] = "";
+      updates[`dieselGpsLat${i}`] = "";
+      updates[`dieselGpsLon${i}`] = "";
+      updates[`dieselGpsAccuracy${i}`] = "";
+      updates[`dieselGpsCapturedAt${i}`] = "";
+      updates[`dieselImage${i}`] = "";
+      updates[`dieselImageName${i}`] = "";
+      updates[`dieselSubmitted${i}`] = false;
+      updates[`dieselSubmittedAt${i}`] = "";
+      updates[`dieselClientKey${i}`] = "";
+    }
+    entries.forEach((entry, idx) => {
+      const raw = Number(entry.rowIndex);
+      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
+      const litres = entry.litres ?? "";
+      const rate = entry.rate ?? "";
+      const amount =
+        entry.amount != null
+          ? entry.amount
+          : litres !== "" && rate !== ""
+            ? Math.round(Number(litres) * Number(rate) * 100) / 100
+            : "";
+      updates[`dieselId${n}`] = entry.id ?? "";
+      updates[`dieselLtr${n}`] = litres;
+      updates[`dieselRate${n}`] = rate;
+      updates[`dieselAmount${n}`] = amount;
+      updates[`dieselMeter${n}`] = entry.meter ?? "";
+      updates[`dieselBunk${n}`] = entry.bunkName ?? "";
+      updates[`dieselBunkSource${n}`] = entry.bunkSource ?? "OTHER";
+      updates[`dieselFuelBunkId${n}`] = entry.fuelBunkId ?? "";
+      updates[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
+      updates[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
+      updates[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
+      updates[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
+      const serverImage = entry.imageData ?? "";
+      const kept = preservedImages.get(n);
+      updates[`dieselImage${n}`] = hasRealBill(serverImage)
+        ? serverImage
+        : kept?.data ?? "";
+      updates[`dieselImageName${n}`] = entry.imageName || kept?.name || "";
+      updates[`dieselSubmitted${n}`] = entry.submitted !== false;
+      updates[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
+    });
+    return updates;
+  };
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
@@ -1017,13 +940,14 @@ export default function DieselExpensesTable({
                 {!isLastRowSubmitted ? t("ops.trip.submit_current_entry") : t("ops.trip.ready_next_entry")}
               </span>
               <div
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold border shrink-0 ${
-                  absoluteDestMeter > 0 ? "bg-blue-50/70 border-blue-100 text-blue-500" : "bg-red-50/70 border-red-100 text-red-500"
-                }`}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold border shrink-0 ${`
+                  absoluteDestMeter > 0 ? "bg-blue-50/70 border-blue-100 text-blue-500"
+                  : "bg-red-50/70 border-red-100 text-red-500"
+                `}`}
               >
                 <Gauge size={12} />
                 <span>
-                  {t("ops.trip.last_entered_meter")} :-{" "}
+                  {t("ops.trip.last_entered_meter")} :-
                   {absoluteDestMeter > 0 ? `${absoluteDestMeter} KM` : t("ops.trip.dest_meter_missing")}
                 </span>
               </div>
@@ -1042,11 +966,11 @@ export default function DieselExpensesTable({
               type="button"
               onClick={handleAddRow}
               disabled={!canAddDieselRow}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-lg shadow-sm transition-all shrink-0 ${`
                 canAddDieselRow
                   ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-              }`}
+              `}`}
             >
               <Plus size={14} />
               <span>{t("ops.trip.add_diesel_entry")}</span>
@@ -1072,10 +996,10 @@ export default function DieselExpensesTable({
           <thead>
             <tr className="bg-slate-50/95 text-[12px] font-bold uppercase tracking-wide text-slate-600 border-b border-slate-200">
               <th className="py-2.5 px-1.5 text-center">{t("table.s_no")}</th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_ltr")} <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_rate")}</th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_amount")} <span className="text-red-500">*</span></th>
-              <th className="py-2.5 px-1.5 text-right">{t("ops.trip.diesel_reading")} {!isRentedVehicle && <span className="text-red-500">*</span>}</th>
+              <th className="py-2.5 px-1.5 text-center">{t("ops.trip.diesel_ltr")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1.5 text-center">{t("ops.trip.diesel_rate")}</th>
+              <th className="py-2.5 px-1.5 text-center">{t("ops.trip.diesel_amount")} <span className="text-red-500">*</span></th>
+              <th className="py-2.5 px-1.5 text-center">{t("ops.trip.diesel_reading")} {!isRentedVehicle && <span className="text-red-500">*</span>}</th>
               <th className="py-2.5 px-1.5 text-left">{t("ops.trip.bunk_address")}</th>
               <th className="py-2.5 px-2 text-left">GPS <span className="text-red-500">*</span></th>
               <th className="py-2.5 px-1.5 text-center">{t("ops.trip.bill_image_slip")} <span className="text-red-500">*</span></th>
@@ -1096,7 +1020,6 @@ export default function DieselExpensesTable({
               const bunkVal = getFieldValue(`dieselBunk${num}`, num) ?? "";
               const otherBunkVal = getFieldValue(`dieselOtherBunk${num}`, num) ?? "";
               const isOtherBunk = bunkVal === OTHER_BUNK_VALUE;
-              const isFetching = !!isFetchingGPS[num];
               const imageVal = getFieldValue(`dieselImage${num}`, num) ?? "";
               const imageNameVal = getFieldValue(`dieselImageName${num}`, num) || `BILL-${fallbackDateStr}-${String(num).padStart(3, "0")}.png`;
               const ltrNum = Number(ltrVal);
@@ -1122,9 +1045,11 @@ export default function DieselExpensesTable({
               const gpsLat = getFieldValue(`dieselGpsLat${num}`, num);
               const gpsLon = getFieldValue(`dieselGpsLon${num}`, num);
               const gpsOk = isValidGps(gpsLat, gpsLon);
+              const isFetching = !!isFetchingGPS[num];
+              const canSubmitRow = !locked && rowReady(num, editingRow === num);
               // Compact numeric inputs (S.No / Ltr / Rate columns are tighter).
               const inputBase =
-                "w-full min-w-0 box-border tabular-nums text-right pl-1 py-1.5 rounded-md border text-[12px] font-semibold outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
+                "w-full min-w-0 box-border tabular-nums text-center px-1 py-1.5 rounded-md border text-[12px] font-semibold outline-none transition-colors disabled:bg-slate-100 disabled:text-slate-600 disabled:cursor-default [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
               const inputOk = "bg-white border-slate-200 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15";
               const inputErr = "bg-red-50/70 border-red-400 text-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/15";
 
@@ -1139,259 +1064,156 @@ export default function DieselExpensesTable({
                       : "hover:bg-slate-50/70"
                   }`}
                 >
-                  <td className="py-2 px-0.5 text-center text-[11px] text-slate-500 font-semibold tabular-nums bg-slate-50/60">
-                    {String(idx + 1).padStart(2, "0")}
-                  </td>
-
-                  {/* Ltr */}
-                  <td className="py-2 px-1.5 align-middle">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        inputMode="decimal"
-                        disabled={locked}
-                        value={ltrVal}
-                        onKeyDown={blockInvalidChar}
-                        onWheel={blockWheelChange}
-                        onChange={(e) =>
-                          handleFieldChange(`dieselLtr${num}`, num, e.target.value === "" ? "" : Number(e.target.value))
-                        }
-                        placeholder="0.00"
-                        className={`${inputBase} ${inputOk} pr-5`}
-                        aria-label={t("ops.trip.diesel_ltr")}
-                      />
-                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">
-                        L
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Rate = Amount ÷ Litres (read-only) */}
-                  <td className="py-2 px-1.5 align-middle">
-                    <div className="w-full min-w-0 tabular-nums text-right pl-1.5 pr-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-[13px] font-bold text-slate-800 truncate" aria-label={t("ops.trip.diesel_rate")}>
-                      {rateDisplay === "—" ? "—" : `₹ ${rateDisplay}`}
-                    </div>
-                  </td>
-
-                  {/* Amount */}
-                  <td className="py-2 px-1.5 align-middle">
-                    <div className="relative">
-                      <input type="number" step="0.01" min="0" inputMode="decimal" disabled={locked}
-                        value={amountVal} onKeyDown={blockInvalidChar} onWheel={blockWheelChange}
-                        onChange={(e) => handleFieldChange(`dieselAmount${num}`, num, e.target.value === "" ? "" : Number(e.target.value))}
-                        placeholder="0.00" className={`${inputBase} ${inputOk} pr-5`} aria-label={t("ops.trip.diesel_amount")} />
-                      <span className="pointer-events-none absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400">₹</span>
-                    </div>
-                  </td>
-
-                  {/* Meter reading */}
-                  <td className="py-2 px-1.5 align-middle">
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min={rowMinAllowed > 0 ? rowMinAllowed : 0}
-                        inputMode="numeric"
-                        disabled={locked}
-                        value={meterVal}
-                        onKeyDown={blockInvalidChar}
-                        onWheel={blockWheelChange}
-                        onChange={(e) => handleMeterChange(num, e.target.value)}
-                        onBlur={() => {
-                          const v = getFieldValue(`dieselMeter${num}`, num);
-                          const err = isRentedVehicle ? null : meterViolation(num, v, editingRow === num ? draftData : undefined);
-                          if (err) {
-                            setMeterErrors((prev) => ({ ...prev, [num]: err }));
-                            // Message shows once at top beside Last Entered Meter — no toast duplicate.
-                          }
-                        }}
-                        placeholder="0"
-                        className={`${inputBase} ${hasError ? inputErr : inputOk} pr-8`}
-                        aria-label={t("ops.trip.diesel_reading")}
-                        aria-invalid={hasError}
-                      />
-                      <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400">
-                        KM
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Fuel bunk master selection; legacy free-text values remain visible. */}
-                  <td className="py-2 px-1.5 align-middle">
-                    <div className="space-y-1">
-                    <select
-                      disabled={locked || isFetching}
-                      value={bunkVal}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        handleFieldChange(`dieselBunk${num}`, num, value);
-                        handleFieldChange(`dieselOtherBunk${num}`, num, "");
-                        const bunk = fuelBunks.find((row) => row.birdType === value);
-                        handleFieldChange(
-                          `dieselBunkSource${num}`,
-                          num,
-                          value === OTHER_BUNK_VALUE ? "OTHER" : bunk ? "MASTER" : ""
-                        );
-                        handleFieldChange(`dieselFuelBunkId${num}`, num, bunk?.id ?? "");
-                        const hasBunkGps = bunk?.latitude != null && bunk.longitude != null;
-                        const gpsPatch = {
-                          [`dieselGpsLat${num}`]: hasBunkGps ? bunk.latitude : "",
-                          [`dieselGpsLon${num}`]: hasBunkGps ? bunk.longitude : "",
-                          [`dieselGpsAccuracy${num}`]: hasBunkGps ? 0 : "",
-                          [`dieselGpsCapturedAt${num}`]: hasBunkGps ? new Date().toISOString() : "",
-                        };
-                        if (isEditingThisRow) {
-                          setDraftData((prev) => ({ ...prev, ...gpsPatch }));
-                        } else {
-                          applyBatchUpdates(gpsPatch);
-                        }
-                      }}
-                      className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15 disabled:bg-slate-100 disabled:text-slate-600 truncate"
-                    ><option value="">Select bunk</option>{bunkVal && bunkVal !== OTHER_BUNK_VALUE && !fuelBunks.some((row) => row.birdType === bunkVal) ? <option value={bunkVal}>{bunkVal}</option> : null}{fuelBunks.map((bunk) => <option key={bunk.id} value={bunk.birdType}>{bunk.birdType}</option>)}<option value={OTHER_BUNK_VALUE}>{t("common.other")}</option></select>
-                    {isOtherBunk && !locked ? (
-                      <input
-                        type="text"
-                        value={otherBunkVal}
-                        maxLength={150}
-                        onChange={(e) => handleFieldChange(`dieselOtherBunk${num}`, num, e.target.value)}
-                        placeholder={t("ops.trip.other_bunk_placeholder")}
-                        className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15"
-                      />
-                    ) : null}
-                    </div>
-                  </td>
-
-                  {/* Master bunk GPS is automatic; only Other needs live capture. */}
-                  <td className="py-2 px-1.5 align-middle overflow-visible">
-                    <div className="flex items-start gap-1.5 min-w-0">
-                      <div className="min-w-0 flex-1">
-                        {gpsOk ? (
-                          <GpsAddressText
-                            lat={gpsLat}
-                            lon={gpsLon}
-                            className="block text-[12px] text-emerald-500 font-semibold leading-snug"
-                            maxLines={2}
-                          />
-                        ) : (
-                          <span className="text-[12px] text-slate-400 italic">{t("ops.trip.not_captured")}</span>
-                        )}
-                      </div>
-                      {isOtherBunk && !locked ? (
-                        <button
-                          type="button"
-                          onClick={() => handleGetOtherLocation(num)}
-                          disabled={isFetching}
-                          className="shrink-0 px-1.5 py-1 rounded-md text-[11px] font-semibold inline-flex items-center gap-0.5 border border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-60"
-                        >
-                          {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} />}
-                          GPS
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-
-                  {/* Bill — upload control only while editing (or new draft row) */}
-                  <td
-                    className="py-2 px-1 text-center align-middle overflow-visible relative z-10"
-                    onClick={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
+                  <td className="py-2.5 px-1.5 text-center font-semibold text-slate-500">{idx + 1}</td>
+                  <td className="py-2.5 px-1.5 text-center">
                     <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-                      className="hidden"
-                      ref={(el) => {
-                        fileInputRefs.current[num] = el;
+                      type="number"
+                      inputMode="decimal"
+                      disabled={locked}
+                      aria-label="Ltr"
+                      className={`${inputBase} ${inputOk}`}
+                      value={ltrVal}
+                      onChange={(e) => handleFieldChange(`dieselLtr${num}`, num, e.target.value)}
+                      onKeyDown={(e) => blockInvalidChar(e)}
+                      onWheel={blockWheelChange}
+                      onBlur={() => {
+                        const rangeError = litresRangeError(num);
+                        if (rangeError) notifyUser(rangeError, "error");
                       }}
-                      onChange={(e) => handleImageUpload(num, e)}
                     />
-                    {hasRealBill(imageVal) ? (
-                      <div className="inline-flex flex-col items-center justify-center gap-0.5 min-w-0 pointer-events-auto">
-                        <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
-                        {/* Replace / remove bill only in edit mode */}
-                        {!readOnly && (isEditingThisRow || (!isSubmitted && !locked)) && (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => openBillPicker(num)}
-                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/70 px-1.5 py-0.5 text-[11px] font-bold text-emerald-500"
-                            >
-                              <Upload size={11} strokeWidth={2.5} />
-                              <span>{t("ops.trip.upload_bill")}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (isEditingThisRow) {
-                                  setDraftField(`dieselImage${num}`, "");
-                                  setDraftField(`dieselImageName${num}`, "");
-                                } else {
-                                  applyBatchUpdates({
-                                    [`dieselImage${num}`]: "",
-                                    [`dieselImageName${num}`]: "",
-                                  });
-                                  handleChange(`dieselImage${num}`, "");
-                                  handleChange(`dieselImageName${num}`, "");
-                                }
-                              }}
-                              className="text-[11px] font-medium text-slate-400 hover:text-red-500"
-                            >
-                              {t("common.remove")}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : !readOnly && (isEditingThisRow || !isSubmitted) ? (
-                      <button
-                        type="button"
-                        onClick={() => openBillPicker(num)}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50/70 hover:bg-emerald-50/70 px-2 py-1 text-[11px] font-bold text-emerald-500 shadow-sm active:scale-[0.98] whitespace-nowrap"
-                      >
-                        <Upload size={12} strokeWidth={2.5} />
-                        <span>{t("ops.trip.upload_bill")}</span>
-                      </button>
-                    ) : (
-                      <span className="text-[12px] text-slate-400">—</span>
+                    {litresRangeError(num) && (
+                      <span className="text-red-500 text-[11px] mt-1 block">{litresRangeError(num)}</span>
                     )}
                   </td>
-
-                  {/* Status — icon only so it never overflows the column */}
-                  <td className="py-2 px-2 text-center align-middle">
-                    {readOnly || (isSubmitted && !isEditingThisRow) ? (
-                      <div className="inline-flex items-center justify-center gap-1">
-                        <span
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50/80 text-emerald-500 border border-emerald-100"
-                          aria-label={t("ops.trip.submitted")}
-                        >
-                          <CheckCircle2 size={15} strokeWidth={2.25} />
-                        </span>
-                        {!readOnly && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => startEdit(num)}
-                              className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-slate-50 text-slate-600"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => requestDelete(num, { label: t("ops.trip.deleting_diesel_row", { row: num }) })}
-                              disabled={busyRow === num}
-                              className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-rose-50/70 text-slate-500 hover:text-rose-500"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <span
-                        className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 border border-slate-200"
-                        aria-label={t("status.draft")}
+                  <td className="py-2.5 px-1.5 text-center font-semibold tabular-nums text-slate-600" aria-label="Rate (₹)">
+                    {rateDisplay}
+                  </td>
+                  <td className="py-2.5 px-1.5 text-center">
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      disabled={locked}
+                      aria-label="Amount (₹)"
+                      className={`${inputBase} ${inputOk}`}
+                      value={amountVal}
+                      onChange={(e) => handleFieldChange(`dieselAmount${num}`, num, e.target.value)}
+                      onKeyDown={(e) => blockInvalidChar(e)}
+                      onWheel={blockWheelChange}
+                    />
+                  </td>
+                  <td className="py-2.5 px-1.5 text-center">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={rowMinAllowed > 0 ? rowMinAllowed : 0}
+                      disabled={locked}
+                      className={`${inputBase} ${hasError ? inputErr : inputOk}`}
+                      value={meterVal}
+                      onChange={(e) => handleMeterChange(num, e.target.value)}
+                      onKeyDown={(e) => blockInvalidChar(e)}
+                      onWheel={blockWheelChange}
+                      aria-label="Reading (KM)"
+                      aria-invalid={hasError}
+                    />
+                  </td>
+                  <td className="py-2.5 px-2 text-left font-medium text-slate-700">
+                    <select
+                      disabled={locked}
+                      value={isOtherBunk ? OTHER_BUNK_VALUE : bunkVal}
+                      onChange={(e) => handleBunkChange(num, e.target.value)}
+                      className="w-full min-w-0 rounded-md border border-slate-200 bg-white px-1 py-1.5 text-[12px] font-semibold outline-none transition-colors focus:border-emerald-400 disabled:bg-slate-100 disabled:text-slate-600"
+                    >
+                      <option value="">{t("ops.trip.bunk_placeholder")}</option>
+                      {fuelBunks.map((bunk) => (
+                        <option key={bunk.id ?? bunk.birdType} value={bunk.birdType}>
+                          {bunk.birdType}
+                        </option>
+                      ))}
+                      <option value={OTHER_BUNK_VALUE}>{t("common.other")}</option>
+                    </select>
+                    {isOtherBunk && (
+                      <input
+                        disabled={locked}
+                        placeholder={t("ops.trip.other_bunk_placeholder")}
+                        value={otherBunkVal}
+                        onChange={(e) => handleBunkOtherChange(num, e.target.value)}
+                        className="mt-1 w-full min-w-0 rounded-md border border-slate-200 bg-white px-1.5 py-1.5 text-[12px] outline-none transition-colors focus:border-emerald-400 disabled:bg-slate-100 placeholder:text-slate-400"
+                      />
+                    )}
+                  </td>
+                  <td className="py-2.5 px-2 text-left">
+                    <div className="flex flex-col items-start gap-1">
+                      <button
+                        type="button"
+                        disabled={locked || isFetching}
+                        onClick={() => handleGetOtherLocation(num)}
+                        title="GPS"
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[12px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        <Circle size={14} strokeWidth={2} />
+                        {isFetching ? <Loader2 size={13} className="animate-spin" /> : <MapPin size={13} />}
+                        GPS
+                      </button>
+                      {gpsOk ? (
+                        <GpsAddressText
+                          lat={gpsLat}
+                          lon={gpsLon}
+                          className="block text-[12px] font-semibold text-emerald-600"
+                          maxLines={2}
+                        />
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-1.5 text-center">
+                    <div className="flex flex-col items-center gap-1">
+                      {hasRealBill(imageVal) ? (
+                        <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
+                      ) : (
+                        <span className="text-[13px] text-slate-400">—</span>
+                      )}
+                      {!locked && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openBillPicker(num)}
+                            title={t("ops.trip.upload_bill")}
+                            aria-label={t("ops.trip.upload_bill")}
+                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700"
+                          >
+                            <Upload size={12} />
+                          </button>
+                          <input
+                            ref={(el) => {
+                              fileInputRefs.current[num] = el;
+                            }}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleImageUpload(num, e)}
+                          />
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="py-2.5 px-1.5 text-center">
+                    {!readOnly && !isSubmitted && (
+                      <button
+                        type="button"
+                        onClick={() => handleRowSubmit(num)}
+                        disabled={!canSubmitRow || busyRow === num}
+                        className={`mb-1 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold shadow-sm transition-all ${canSubmitRow && busyRow !== num ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer" : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"}`}
+                      >
+                        {t("ops.trip.submit_diesel_entry")}
+                      </button>
+                    )}
+                    {isSubmitted ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
+                        <CheckCircle2 size={13} /> {t("ops.trip.submitted")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-500">
+                        <Circle size={13} /> {t("status.draft")}
                       </span>
                     )}
                   </td>
@@ -1401,45 +1223,6 @@ export default function DieselExpensesTable({
           </tbody>
         </table>
       </div>
-      {(() => {
-        const actionRow = visibleRows.find((num) => {
-          const submitted = !!sheetData[`dieselSubmitted${num}`];
-          return !readOnly && (!submitted || editingRow === num);
-        });
-        if (!actionRow) return null;
-        const isEditingActionRow = editingRow === actionRow;
-        const canSubmit = rowReady(actionRow, isEditingActionRow);
-        return (
-          <div>
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const submitted = !!sheetData[`dieselSubmitted${actionRow}`];
-                  if (isEditingActionRow) cancelEdit();
-                  if (!submitted) handleClearRow(actionRow);
-                }}
-                className="h-9 px-4 rounded-lg border border-slate-200 bg-white text-[13px] font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center justify-center shrink-0"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleRowSubmit(actionRow)}
-                disabled={!canSubmit || busyRow === actionRow}
-                className={`h-9 px-4 rounded-lg text-[13px] font-bold text-white inline-flex items-center justify-center shrink-0 ${
-                  canSubmit && busyRow !== actionRow
-                    ? "bg-emerald-500 hover:bg-emerald-600"
-                    : "bg-slate-300 cursor-not-allowed"
-                }`}
-              >
-                {busyRow === actionRow ? `${t("ops.trip.submitting")}…` : t("ops.trip.submit_diesel_entry")}
-              </button>
-            </div>
-          </div>
-        );
-      })()}
-      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 }

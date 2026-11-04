@@ -18,6 +18,10 @@ import type { FarmPaymentTotals, TripFarmPayment } from '../types/farmPayment.ty
 /** One row in PUT /api/accounts/farm-payments. */
 export interface TripFarmPaymentSaveInput {
   tripId: number;
+  /** Load-level update identity (trip_legs.id). Authoritative when present. */
+  legId?: number;
+  /** Optional display/validation aid (leg_index). */
+  load?: number;
   rate?: number;
   paidAmount?: number;
   paymentDate?: string | null;
@@ -86,11 +90,14 @@ export function mapRawFarmPayment(raw: unknown): TripFarmPayment | null {
       ? row.loads.map((value) => {
           const load = value as Record<string, unknown>;
           return {
+            legId: load.legId == null ? null : optionalNumber(load.legId),
             load: money(load.load),
             farmName: typeof load.farmName === 'string' ? load.farmName : null,
             birdType: typeof load.birdType === 'string' ? load.birdType : null,
             totalBirds: money(load.totalBirds),
             dcWeight: money(load.dcWeight),
+            rate: load.rate == null ? null : optionalNumber(load.rate),
+            amount: load.amount == null ? null : optionalNumber(load.amount),
           };
         })
       : [],
@@ -136,6 +143,142 @@ export function indexFarmPaymentsByTrip(
   rows?: readonly TripFarmPayment[] | null
 ): Map<string, TripFarmPayment> {
   return new Map((rows ?? []).map((row) => [String(row.tripId), row]));
+}
+
+/**
+ * Stable display row for the Farm Payment table/export layer.
+ *
+ * - Single-load/legacy trip → one row, id `trip:${tripId}`.
+ * - Multi-load trip (2+ submitted loads) → one row per load,
+ *   id `trip:${tripId}:leg:${legId}` (falls back to `:load:${load}` when the
+ *   leg id is absent). The displayed trip number is NEVER the React key nor
+ *   an update identity — tripId (+ legId) is.
+ */
+export interface FarmPaymentDisplayRow {
+  /** Stable row identity. Never the displayed trip number. */
+  key: string;
+  tripId: number;
+  /** trip_legs.id for multi-load rows; null for single/legacy rows. */
+  legId: number | null;
+  /** leg_index for multi-load rows; null for single/legacy rows. */
+  load: number | null;
+  /** Display-only trip number (`TRIP-L1` suffix for multi-load). */
+  displayTripNo: string;
+  /** Canonical stored trip number (for the Trip view + backend identity). */
+  tripNo: string;
+  tripDate: string;
+  farm: string;
+  vehicleNo: string;
+  isRentedVehicle: boolean;
+  birdType: string;
+  birds: number;
+  dcWeight: number;
+  rate: number;
+  amount: number;
+  status: TripFarmPayment['status'];
+}
+
+/** Display trip number: `-L{load}` suffix only for genuine multi-load trips. */
+export function displayTripNo(tripNo: string, loadCount: number, load: number): string {
+  return loadCount > 1 ? `${tripNo}-L${load}` : tripNo;
+}
+
+/** Serializable export shape for one payable display row. */
+export interface FarmPaymentExportRowData {
+  tripNo: string;
+  tripDate: string;
+  farm: string;
+  vehicle: string;
+  birdType: string;
+  birds: number;
+  dcWeight: number;
+  rate: number;
+  totalAmount: number;
+}
+
+/**
+ * Build export rows from Farm Payment display rows (already filtered).
+ * Multi-load trips export one row per load (`TRIP-L1`, `TRIP-L2`, …) with
+ * that load's own figures; the aggregate parent row is never exported, so
+ * totals sum the visible payable rows exactly once.
+ */
+export function toFarmPaymentExportRows(rows: readonly FarmPaymentDisplayRow[]): FarmPaymentExportRowData[] {
+  return rows.map((row) => ({
+    tripNo: row.displayTripNo,
+    tripDate: row.tripDate,
+    farm: row.farm,
+    vehicle: row.vehicleNo,
+    birdType: row.birdType,
+    birds: Math.round(row.birds),
+    dcWeight: row.dcWeight,
+    rate: row.rate,
+    totalAmount: row.amount,
+  }));
+}
+
+/**
+ * Flatten parent Farm Payment records into table/export display rows.
+ *
+ * Only the Farm Payment table/export layer uses this. Account Analysis and
+ * every trip-level consumer keep using the parent records (one per trip),
+ * so the farm cost is never double-counted: the parent `amount` is already
+ * the exact sum of its load amounts.
+ */
+export function flattenFarmPaymentsForTable(rows: readonly TripFarmPayment[]): FarmPaymentDisplayRow[] {
+  const out: FarmPaymentDisplayRow[] = [];
+  for (const row of rows) {
+    const loads = row.loads ?? [];
+    if (loads.length > 1) {
+      for (const load of loads) {
+        const legId = load.legId != null ? Number(load.legId) : null;
+        const rate = Number(load.rate ?? row.rate ?? 0);
+        const safeRate = Number.isFinite(rate) ? rate : 0;
+        const amount = load.amount != null && Number.isFinite(Number(load.amount))
+          ? Number(load.amount)
+          : Math.round(Number(load.dcWeight ?? 0) * safeRate * 100) / 100;
+        out.push({
+          key: Number.isFinite(legId as number) && (legId as number) > 0
+            ? `trip:${row.tripId}:leg:${legId}`
+            : `trip:${row.tripId}:load:${load.load}`,
+          tripId: row.tripId,
+          legId: Number.isFinite(legId as number) && (legId as number) > 0 ? (legId as number) : null,
+          load: load.load,
+          displayTripNo: displayTripNo(row.tripNo, loads.length, load.load),
+          tripNo: row.tripNo,
+          tripDate: row.tripDate,
+          farm: load.farmName ?? row.farmName ?? '',
+          vehicleNo: row.vehicleNo ?? '',
+          isRentedVehicle: Boolean(row.isRentedVehicle),
+          birdType: load.birdType ?? row.birdType ?? '',
+          birds: Number(load.totalBirds ?? 0),
+          dcWeight: Number(load.dcWeight ?? 0),
+          rate: safeRate,
+          amount,
+          status: row.status,
+        });
+      }
+    } else {
+      out.push({
+        key: `trip:${row.tripId}`,
+        tripId: row.tripId,
+        legId: null,
+        load: null,
+        displayTripNo: row.tripNo,
+        tripNo: row.tripNo,
+        tripDate: row.tripDate,
+        farm: row.farmName ?? '',
+        vehicleNo: row.vehicleNo ?? '',
+        isRentedVehicle: Boolean(row.isRentedVehicle),
+        birdType: row.birdType ?? '',
+        birds: Number(row.totalBirds ?? 0),
+        dcWeight: Number(row.dcWeight ?? 0),
+        rate: Number(row.rate ?? 0),
+        amount: row.amount,
+        status: row.status,
+      });
+    }
+  }
+  return out;
 }
 
 /** GET /api/accounts/farm-payments — the whole ledger, mapped and de-duplicated. */

@@ -91,7 +91,7 @@ export async function exportFarmPaymentsPdf(rows: FarmPaymentExportRow[], scope:
   ].filter(Boolean).join("   |   ");
   doc.text(filters, margin, headerBottom + 14);
   doc.text(
-    `${rows.length} trips   |   DC Birds ${Math.round(totals.birds).toLocaleString("en-IN")}   |   DC Weight ${number(totals.weight)} kg   |   Amount Rs. ${money(totals.amount)}`,
+    `${rows.length} payable rows   |   DC Birds ${Math.round(totals.birds).toLocaleString("en-IN")}   |   DC Weight ${number(totals.weight)} kg   |   Amount Rs. ${money(totals.amount)}`,
     margin, headerBottom + 20,
   );
 

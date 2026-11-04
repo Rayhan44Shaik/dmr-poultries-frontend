@@ -473,7 +473,7 @@ export default {
   'ops.trip.boxes_selected': 'boxes selected',
   'ops.trip.bunk': 'Bunk',
   'ops.trip.bunk_address': 'Bunk',
-  'ops.trip.bunk_placeholder': 'Select fuel bunk',
+  'ops.trip.bunk_placeholder': 'Select bunk',
   'ops.trip.bunk_required': 'Fuel bunk is required.',
   'ops.trip.other_bunk_placeholder': 'Enter other bunk / location',
   'ops.trip.cannot_exceed_farm_birds': 'Cannot exceed farm birds.',
@@ -974,7 +974,9 @@ export default {
   'ops.trip.upload_dc_photo': 'Upload DC Photo',
   'ops.trip.use_tab_navigate': 'Use the tabs above to navigate the steps',
   'ops.trip.valid_image': 'Valid image file.',
+  'ops.trip.select_trip_to_view': 'Select a trip to view.',
   'ops.trip.view_selected': 'View Selected',
+  'ops.trip.view_selected_trip': 'View selected trip.',
   'ops.trip.view_step1': 'Trip Details',
   'ops.trip.view_step2': 'Farm Details',
   'ops.trip.view_step2_status': 'Farm details status',
@@ -1055,6 +1057,15 @@ export default {
   'ops.mortality.tooltip.box_mode': 'Box Mode MOR',
   'ops.mortality.tooltip.weight_mode': 'Weight Mode MOR',
   'ops.mortality.tooltip.helper': 'Mortality is grouped by the delivery mode saved for each shop entry.',
+  // Multi-load breakdown: one tooltip model for every metric, mirroring the
+  // Trip List load tooltip.
+  'ops.mortality.tooltip.by_load': '{metric} by load',
+  'ops.mortality.tooltip.total': 'Trip total',
+  'ops.mortality.tooltip.weight_loss_formula': 'Farm weight − delivered weight − recognized mortality weight',
+  // Expanded Weights load tabs.
+  'ops.mortality.load.all': 'All Loads',
+  'ops.mortality.load.number': 'Load {number}',
+  'ops.mortality.detail.load_scope': 'Load scope',
 
   'ops.mortality.detail.delivered': 'Delivered',
   'ops.mortality.detail.weight_summary': 'Weights',

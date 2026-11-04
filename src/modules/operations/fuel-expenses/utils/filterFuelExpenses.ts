@@ -1,4 +1,4 @@
-import type { FuelExpense, FuelSortKey, FuelUiStatus } from "../types/fuelExpense";
+import type { FuelExpense, FuelSortKey } from "../types/fuelExpense";
 
 export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED" | "DELETED";
 
@@ -15,6 +15,10 @@ export interface FuelClientFilters {
   sourceType?: string;
   quickTab?: FuelQuickTab;
   search?: string;
+  /** Keep soft-deleted rows in the result so a downstream quick-tab filter
+   * (e.g. the Deleted register tab) can still see them. Active tabs exclude
+   * deleted rows unless this is set. */
+  includeDeleted?: boolean;
 }
 
 const dateOnly = (value: string | undefined) => (value || "").slice(0, 10);
@@ -45,8 +49,7 @@ function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
   return haystack.includes(query) || compact(haystack).includes(compact(query));
 }
 
-/**
- * Ensures unique fuel expense records (deduplicated by record id and bill number).
+/** Ensures unique fuel expense records (deduplicated by record id and bill number).
  * Allows multiple distinct fuel bills per trip (e.g. multi-fill trips).
  */
 export function uniqueFuelExpenses(expenses: readonly FuelExpense[]): FuelExpense[] {
@@ -64,9 +67,9 @@ export function uniqueFuelExpenses(expenses: readonly FuelExpense[]): FuelExpens
   });
 }
 
-/**
- * Returns only the latest approved fuel expense per vehicle (distinct on vehicle).
- * Matches the Approved tab behaviour of the Recent Maintenance Table.
+/** Returns only the latest approved fuel expense per vehicle (distinct on vehicle).
+ * Uses deterministic tie-breaking: approvedAt → updatedAt → expense date → stable ID/billNo.
+ * Matches the Approved tab behaviour consistently across UI and API.
  */
 export function getLatestApprovedFuelExpensesPerVehicle(bills: readonly FuelExpense[]): FuelExpense[] {
   const approvedBills = bills.filter((bill) => {
@@ -90,6 +93,41 @@ export function getLatestApprovedFuelExpensesPerVehicle(bills: readonly FuelExpe
   return result;
 }
 
+/** Determines the effective status for display and counting.
+ * Priority: deleted > Approved (trip, auto-approved on completion) > the
+ * bill's own workflow status. Timestamp presence must never imply approval:
+ * every row carries created/updated dates, so treating any date as
+ * "Approved" would empty the Pending tab entirely.
+ */
+export function effectiveStatus(bill: FuelExpense): "Deleted" | "Approved" | "Pending" | "Rejected" {
+  const isDeleted = bill.deleted === true || bill.status === "Deleted";
+  if (isDeleted) return "Deleted" as const;
+  if (bill.sourceType === "TRIP" || !!bill.tripNo) return "Approved" as const;
+  return bill.status as "Pending" | "Approved" | "Rejected";
+}
+
+/** Sort approved bills by: approvedAt (newest first), updatedAt (newest first),
+ * expense date (newest first), then stable billNo (numeric, newest first). */
+function compareBillsNewestFirst(left: FuelExpense, right: FuelExpense): number {
+  // Tie-breaking order: 1. approvedAt (newest first), 2. updatedAt (newest first),
+  // 3. expense date (newest first), 4. stable billNo (numeric, newest first)
+  const leftApp = left.approvedDate ?? left.updatedDate ?? left.date ?? left.id;
+  const rightApp = right.approvedDate ?? right.updatedDate ?? right.date ?? right.id;
+  const byApp = String(rightApp).localeCompare(String(leftApp), undefined, { numeric: true, sensitivity: "base" });
+  if (byApp !== 0) return byApp;
+
+  // Final tie-breaker: billNo numeric comparison (higher ID = newer)
+  const leftNum = Number(left.id);
+  const rightNum = Number(right.id);
+  if (Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum !== rightNum) {
+    return rightNum - leftNum;
+  }
+  return String(right.billNo ?? "").localeCompare(String(left.billNo ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 export function filterFuelExpenses(
   bills: readonly FuelExpense[],
   {
@@ -105,6 +143,7 @@ export function filterFuelExpenses(
     sourceType,
     quickTab = "ALL",
     search = "",
+    includeDeleted = false,
   }: FuelClientFilters
 ): FuelExpense[] {
   const from = dateOnly(fromDate);
@@ -113,7 +152,7 @@ export function filterFuelExpenses(
   const matched = bills.filter((bill) => {
     const isDeleted = bill.deleted === true || bill.status === "Deleted";
     const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
-    const effectiveStatus: FuelUiStatus = isDeleted ? "Deleted" : isTrip ? "Approved" : bill.status;
+    const effectiveStat = effectiveStatus(bill);
 
     const billDate = dateOnly(bill.date);
     if ((from && (!billDate || billDate < from)) || (to && (!billDate || billDate > to))) return false;
@@ -134,10 +173,11 @@ export function filterFuelExpenses(
     if (quickTab === "DELETED") {
       if (!isDeleted) return false;
     } else {
-      // Active tabs (ALL, PENDING, APPROVED) exclude deleted rows
-      if (isDeleted) return false;
-      if (quickTab === "PENDING" && (isTrip || effectiveStatus !== "Pending")) return false;
-      if (quickTab === "APPROVED" && effectiveStatus !== "Approved") return false;
+      // Active tabs (ALL, PENDING, APPROVED) exclude deleted rows, unless
+      // the caller keeps them for a downstream tab filter (Deleted register).
+      if (isDeleted && !includeDeleted) return false;
+      if (quickTab === "PENDING" && effectiveStat !== "Pending") return false;
+      if (quickTab === "APPROVED" && effectiveStat !== "Approved") return false;
     }
 
     // Dropdown filters (if explicit)
@@ -154,20 +194,7 @@ export function filterFuelExpenses(
   return matched;
 }
 
-function compareBillsNewestFirst(left: FuelExpense, right: FuelExpense): number {
-  const byDate = String(right.date ?? "").localeCompare(String(left.date ?? ""));
-  if (byDate !== 0) return byDate;
-  const leftNum = Number(left.id);
-  const rightNum = Number(right.id);
-  if (Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum !== rightNum) {
-    return rightNum - leftNum;
-  }
-  return String(right.billNo ?? "").localeCompare(String(left.billNo ?? ""), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
+/** Sorts fuel expenses by the given key and direction. */
 export function sortFuelExpenses(
   bills: readonly FuelExpense[],
   sortBy: FuelSortKey | null | undefined,
@@ -204,4 +231,3 @@ export function sortFuelExpenses(
     return String(left.billNo).localeCompare(String(right.billNo), undefined, { numeric: true }) * direction;
   });
 }
-

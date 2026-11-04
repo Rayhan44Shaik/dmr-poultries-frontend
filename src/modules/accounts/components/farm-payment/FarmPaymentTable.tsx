@@ -5,9 +5,8 @@
 // Day column rendered as `Fri, 11 Sep 2026` via formatTripListDay, and the
 // animated "Loading Farm Payment records…" state while rows are in flight.
 
-import React from 'react';
-import type { Trip } from '../../../operations/vehicle-trips/types/trip';
-import type { FarmPayment } from '../../types/farmPayment.types';
+import React, { useState } from 'react';
+import type { FarmPaymentDisplayRow } from '../../services/farmPaymentApiService';
 import {
   Lock,
   Eye,
@@ -28,13 +27,13 @@ import { formatVehicleNumber } from '../../../../utils/format';
 import { useI18n } from '../../../../i18n';
 
 interface FarmPaymentTableProps {
-  trips: Trip[];
-  paymentData: Record<string, Partial<FarmPayment>>;
-  onPaymentUpdate: (tripId: string, updates: Partial<FarmPayment>) => void;
+  rows: FarmPaymentDisplayRow[];
+  /** Live rate edit for one display row (marks only that row dirty). */
+  onRateChange: (row: FarmPaymentDisplayRow, rate: number) => void;
   /** Rows are loading — show the animated register loading state. */
   loading?: boolean;
-  /** Open the read-only trip view modal (full trip history) for a trip. */
-  onViewTrip: (trip: Trip) => void;
+  /** Open the read-only trip view modal for the row's parent trip. */
+  onViewTrip: (row: FarmPaymentDisplayRow) => void;
   /** Empty-state message (the page distinguishes "no data" from "no match"). */
   emptyMessage?: string;
   /** Zero-based index of the first row, so S.No survives paging like the Trip List. */
@@ -53,21 +52,60 @@ function LoadingState() {
 }
 
 const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
-  trips,
-  paymentData,
-  onPaymentUpdate,
+  rows,
+  onRateChange,
   loading = false,
   onViewTrip,
   emptyMessage,
   startIndex = 0,
 }) => {
   const { t, language } = useI18n();
+  // Per-row edit drafts: typing never writes into the page state until it is
+  // a committable rate, so an empty field is a real editing state — not a
+  // zero — and a rejected keystroke can never corrupt the live amount.
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
-  const isPaymentLocked = (tripId: string): boolean => {
-    const payment = paymentData[String(tripId)];
-    if (!payment) return false;
-    return payment.paymentStatus === 'Paid' || payment.paymentStatus === 'Partially Paid';
+  const isRowLocked = (row: FarmPaymentDisplayRow): boolean =>
+    row.status === 'Paid' || row.status === 'Partially Paid';
+
+  const commitDraft = (row: FarmPaymentDisplayRow) => {
+    const draft = drafts[row.key];
+    setFocusedKey((current) => (current === row.key ? null : current));
+    if (draft === undefined) return;
+    setDrafts((prev) => {
+      const next = { ...prev };
+      delete next[row.key];
+      return next;
+    });
+    const parsed = parseRateDraft(draft);
+    // Empty/invalid on commit → revert to the authoritative row rate; the
+    // page state was never polluted, so nothing needs undoing.
+    if (parsed == null) return;
+    if (parsed !== row.rate) onRateChange(row, parsed);
   };
+
+  const revertDraft = (rowKey: string) => {
+    setDrafts((prev) => {
+      if (!(rowKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+    setFocusedKey((current) => (current === rowKey ? null : current));
+  };
+
+  /** Partial decimal text the user may still be typing ("" = empty editing state). */
+  const isDraftText = (text: string): boolean => /^\d*\.?\d*$/.test(text);
+
+  /** Committable rate: finite, non-negative, no NaN/Infinity/exponent. Empty → null. */
+  function parseRateDraft(text: string): number | null {
+    if (text.trim() === '') return null;
+    if (!isDraftText(text)) return null;
+    const parsed = Number(text);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return parsed;
+  }
 
   // Locked (already paid/partial) rows show their saved rate read-only —
   // a light red pill so a settled rate reads as "locked" at a glance.
@@ -147,34 +185,24 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                   <LoadingState />
                 </td>
               </tr>
-            ) : trips.length === 0 ? (
+            ) : rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center text-slate-400 text-[13px] font-medium" role="status">
                   {emptyMessage ?? t('accounts.farmpay.empty_no_data')}
                 </td>
               </tr>
             ) : (
-              trips.map((trip, index) => {
-                const payment = paymentData[String(trip.id)] || {};
-
-                // The Farm Payments API is authoritative here: it reads the
-                // Step 3 pickup/DC columns directly for completed trips.
-                const totalBirdsLoaded = Number(payment.totalBirds ?? trip.totalBirds ?? 0);
-                const dcWeight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
-                const ratePerKg = payment.ratePerKg || 0;
-                // Weight-based pricing: Rate/Kg × DC weight.
-                const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
-                // Rows whose settlement is already recorded stay read-only. The
-                // page shows no paid/unpaid status: this table is about the rate
-                // and the amount, nothing else.
-                const locked = isPaymentLocked(String(trip.id));
+              rows.map((row, index) => {
+                const locked = isRowLocked(row);
                 // One background per row: locked rows keep their tint, otherwise
                 // the rows alternate — the Trip List's zebra striping.
                 const rowTone = locked ? 'bg-slate-50/60' : index % 2 === 0 ? 'bg-white' : 'bg-slate-50/20';
                 const serialNo = startIndex + index + 1;
+                const draftActive = focusedKey === row.key;
+                const inputValue = draftActive ? (drafts[row.key] ?? '') : row.rate > 0 ? String(row.rate) : '';
 
                 return (
-                  <tr key={trip.id} className={`transition-colors duration-150 hover:bg-slate-50/60 ${rowTone}`}>
+                  <tr key={row.key} className={`transition-colors duration-150 hover:bg-slate-50/60 ${rowTone}`}>
                     <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-12 tabular-nums">
                       {serialNo}
                     </td>
@@ -182,65 +210,60 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                         language: the trip number and vehicle number are codes, not
                         prose, so Telugu never transliterates them. */}
                     <td className="px-4 py-4 text-[13px] font-bold text-emerald-600 whitespace-nowrap">
-                      {trip.tripNo}
+                      {row.displayTripNo}
                     </td>
                     <td className="px-4 py-4 text-[13px] font-medium text-slate-600 whitespace-nowrap">
-                      {formatTripListDay(trip.tripDate, language)}
+                      {formatTripListDay(row.tripDate, language)}
                     </td>
                     <td className="px-4 py-4 text-[13px] font-medium text-slate-700 whitespace-nowrap">
-                      {localizeTripViewText(payment.farmName ?? trip.sourceFarm, language)}
+                      {localizeTripViewText(row.farm, language)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-slate-600 whitespace-nowrap">
-                      {formatVehicleNumber(trip.vehicleNo)}
-                      {(payment.isRentedVehicle || trip.isRentedVehicle) ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
+                      {formatVehicleNumber(row.vehicleNo)}
+                      {row.isRentedVehicle ? <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">Rental</span> : null}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-bold text-blue-600 whitespace-nowrap tabular-nums">
-                      <div>{formatCount(totalBirdsLoaded)}</div>
-                      {(payment.loads?.length ?? 0) > 1 && (
-                        <div className="mt-1 space-y-0.5 text-[10px] font-semibold text-slate-400">
-                          {payment.loads?.map((load) => (
-                            <div key={load.load}>L{load.load}: {formatCount(load.totalBirds)}</div>
-                          ))}
-                        </div>
-                      )}
+                      {formatCount(row.birds)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-medium text-slate-700 whitespace-nowrap tabular-nums">
-                      <div>{dcWeight > 0 ? dcWeight.toFixed(2) : '—'}</div>
-                      {(payment.loads?.length ?? 0) > 1 && (
-                        <div className="mt-1 space-y-0.5 text-[10px] font-semibold text-slate-400">
-                          {payment.loads?.map((load) => (
-                            <div key={load.load}>L{load.load}: {Number(load.dcWeight).toFixed(2)}</div>
-                          ))}
-                        </div>
-                      )}
+                      {row.dcWeight > 0 ? row.dcWeight.toFixed(2) : '—'}
                     </td>
                     <td className="px-4 py-4">
                       <div className="flex justify-end">
                         {locked ? (
-                          lockedRate(ratePerKg)
+                          lockedRate(row.rate)
                         ) : (
                           <input
-                            type="number"
-                            value={ratePerKg || ''}
-                            min={0}
-                            step="0.01"
+                            type="text"
                             inputMode="decimal"
-                            aria-label={t('accounts.farmpay.rate_aria', { no: trip.tripNo })}
-                            onChange={(e) => {
-                              // A rate is never negative: clamp pasted/typed
-                              // negative values to 0 so the live total can never
-                              // disagree with what Save will persist (the save
-                              // filter already ignores non-positive rates).
-                              const rate = Math.max(0, parseFloat(e.target.value) || 0);
-                              const newTotal = dcWeight * rate;
-                              onPaymentUpdate(String(trip.id), {
-                                ratePerKg: rate,
-                                ratePerBird: 0,
-                                totalAmount: newTotal,
-                                totalBirds: totalBirdsLoaded,
-                                dcWeight: dcWeight,
-                              });
+                            value={inputValue}
+                            aria-label={t('accounts.farmpay.rate_aria', { no: row.displayTripNo })}
+                            onFocus={() => {
+                              setFocusedKey(row.key);
+                              setDrafts((prev) => (row.key in prev ? prev : { ...prev, [row.key]: row.rate > 0 ? String(row.rate) : '' }));
                             }}
+                            onChange={(e) => {
+                              const text = e.target.value;
+                              // Reject anything that is not a non-negative
+                              // decimal in progress: no minus, no exponent,
+                              // no second dot — the keystroke simply lands
+                              // nowhere instead of corrupting the amount.
+                              if (!isDraftText(text)) return;
+                              setDrafts((prev) => ({ ...prev, [row.key]: text }));
+                              const parsed = parseRateDraft(text);
+                              // Empty stays an editing state: it never becomes
+                              // a zero and never marks the row dirty.
+                              if (parsed == null) return;
+                              onRateChange(row, parsed);
+                            }}
+                            onBlur={() => commitDraft(row)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                              else if (e.key === 'Escape') revertDraft(row.key);
+                            }}
+                            // A wheel over the field must never nudge the rate:
+                            // drop focus (committing the current draft) instead.
+                            onWheel={(e) => (e.target as HTMLInputElement).blur()}
                             placeholder="0.00"
                             className="hide-spinner w-20 px-2 py-1 text-sm text-right border border-slate-200 rounded focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none bg-white transition-shadow"
                           />
@@ -249,16 +272,16 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                     </td>
                     <td
                       className="px-4 py-4 text-[13px] text-right font-bold whitespace-nowrap text-slate-800 tabular-nums"
-                      title={formatINRExact(totalAmount)}
+                      title={formatINRExact(row.amount)}
                     >
-                      {formatINR(totalAmount)}
+                      {formatINR(row.amount)}
                     </td>
                     <td className="px-4 py-4 text-center">
                       <button
                         type="button"
-                        onClick={() => onViewTrip(trip)}
+                        onClick={() => onViewTrip(row)}
                         className="group inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-emerald-300 hover:text-emerald-600 hover:shadow focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                        aria-label={t('accounts.farmpay.view_trip_aria', { no: trip.tripNo })}
+                        aria-label={t('accounts.farmpay.view_trip_aria', { no: row.displayTripNo })}
                       >
                         <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
                           <Eye size={14} />

@@ -53,6 +53,9 @@ export default {
   'shop_ledger.col.closing': 'Closing',
   'shop_ledger.tx_count': '{count} transactions',
   'shop_ledger.tx_showing': 'Showing {shown} of {total} transactions',
+  'shop_ledger.cumulative.by_load': 'by load',
+  'shop_ledger.cumulative.total': 'Total',
+  'shop_ledger.cumulative.load': 'Load',
 
   // ── Table ─────────────────────────────────────────────────────────
   'shop_ledger.loading_records': 'Loading shop ledger records…',
@@ -100,6 +103,13 @@ export default {
   'shop_ledger.pdf_generating_shop': 'Generating preview for {shop}…',
   'shop_ledger.pdf_check': 'Check PDF',
   'shop_ledger.pdf_hide': 'Hide',
+
+  // ── View Shop Ledger detail modal ─────────────────────────────────
+  'shop_ledger.detail.prev_shop': 'Previous shop',
+  'shop_ledger.detail.next_shop': 'Next shop',
+  'shop_ledger.detail.download_pdf': 'Download PDF',
+  'shop_ledger.detail.downloading': 'Preparing PDF…',
+  'shop_ledger.detail.select_shop_hint': 'Select a shop to view its ledger.',
 
   // ── WhatsApp modal (UI chrome — the message body itself stays
   //    English because it is the business text delivered to shops) ──

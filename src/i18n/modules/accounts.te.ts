@@ -149,6 +149,7 @@ export default {
   'accounts.farmpay.notif_reset': 'అన్ని మార్పులు రీసెట్ అయ్యాయి',
   'accounts.farmpay.notif_filters_cleared': 'ఫిల్టర్లు తొలగించబడ్డాయి. గత పూర్తి వారం చూపిస్తున్నారు.',
   'accounts.farmpay.totals_for': 'ఫిల్టర్ అయిన మొత్తం {count} ట్రిప్పుల మొత్తాలు',
+  'accounts.farmpay.totals_for_rows': 'ఫిల్టర్ అయిన మొత్తం {count} వరుసల మొత్తాలు',
   'accounts.farmpay.total_birds': 'మొత్తం DC కోళ్లు',
   'accounts.farmpay.total_weight': 'మొత్తం DC బరువు',
   'accounts.farmpay.total_amount': 'మొత్తం సొమ్ము',

@@ -111,7 +111,8 @@ const OPTIMIZE_DEPS = [
 // Browser-facing code uses a relative /api URL (VITE_API_BASE_URL=/api); Vite
 // reaches the REAL backend (repo `backend/`, PORT=4000) — never the opt-in
 // quarter sample server (scripts/quarter-sample-data.mjs, default port 4100).
-// Shared by the dev server AND `vite preview`.
+// Shared by the dev server AND `vite preview`. The proxy target is
+// overridden by VITE_DEV_API_PROXY_TARGET in isolated runs.
 const API_PROXY: Record<string, ProxyOptions> = {
   '/api': {
     target: process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://127.0.0.1:4000',
@@ -144,6 +145,9 @@ const API_PROXY: Record<string, ProxyOptions> = {
  * browser bundle.
  */
 const DMR_INSTANCE_VIRTUAL = 'virtual:dmr-instance'
+// Optional isolated-run port override (e.g. VITE_PORT=5199); unset keeps
+// Vite's built-in default port behaviour (5173) exactly as before.
+const REQUESTED_PORT = process.env.VITE_PORT ? Number(process.env.VITE_PORT) : undefined
 const DMR_INSTANCE_RESOLVED = '\0' + DMR_INSTANCE_VIRTUAL
 
 const dmrInstanceStamp = {
@@ -237,6 +241,8 @@ export default defineConfig({
     },
     // Also covers the relative /api/mobile URLs used by mobile code.
     proxy: API_PROXY,
+    // Isolated-run port override; undefined keeps the default port behaviour.
+    port: REQUESTED_PORT,
     // Playwright traces under tmp/ (and other artefacts) are frequently
     // locked on Windows. Watching them crashes the whole Vite process with
     // EBUSY — never watch them.
@@ -265,5 +271,6 @@ export default defineConfig({
     allowedHosts: ['.e2b.app', 'localhost'],
     // Same backend contract as dev: the built bundle is testable end-to-end.
     proxy: API_PROXY,
+    port: REQUESTED_PORT,
   },
 })

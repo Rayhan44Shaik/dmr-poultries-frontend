@@ -54,8 +54,13 @@ interface Props {
   onRefresh?: () => void;
   onExportExcel?: () => void;
   hasFilters?: boolean;
+  /** Filtered rows exist — PDF/Excel export only when true. */
+  canExport?: boolean;
   refreshing?: boolean;
 }
+
+/** Right-side action order: Add Fuel Bill → Reset → Refresh → PDF → Excel. */
+export { FUEL_TOOLBAR_ORDER } from "../utils/fuelSummary";
 
 function FuelFilters({
   fromDate,
@@ -85,6 +90,7 @@ function FuelFilters({
   onRefresh,
   onExportExcel,
   hasFilters = false,
+  canExport,
   refreshing = false,
 }: Props) {
   const { t, language } = useI18n();
@@ -281,26 +287,9 @@ function FuelFilters({
         </div>
       </div>
 
-      {/* ── Action Toolbar: Order = Reset, Refresh, Add Fuel Bill, PDF, Excel ── */}
+      {/* ── Action Toolbar: Order = Add Fuel Bill, Reset, Refresh, PDF, Excel ── */}
       <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
-        {/* 1. Reset Filters */}
-        <FilterResetButton
-          count={countActiveFilters(
-            search.trim() !== "",
-            !/^all\b/i.test(vehicle.trim()) && vehicle !== "",
-            !/^all\b/i.test(driver.trim()) && driver !== "",
-            !/^all\b/i.test(bunk.trim()) && bunk !== "",
-            !/^all$/i.test(sourceType.trim()) && sourceType !== "",
-            fromDate !== "" || toDate !== "",
-            sortBy !== null,
-          )}
-          onClick={onReset}
-        />
-
-        {/* 2. Refresh */}
-        {onRefresh && <BrandRefreshButton onClick={onRefresh} loading={refreshing} />}
-
-        {/* 3. Add Fuel Bill */}
+        {/* 1. Add Fuel Bill */}
         {onAddFuelBill && (
           <button
             type="button"
@@ -315,34 +304,51 @@ function FuelFilters({
           </button>
         )}
 
-        {/* 4. PDF (Enabled only when filter applied) */}
+        {/* 2. Reset Filters */}
+        <FilterResetButton
+          count={countActiveFilters(
+            search.trim() !== "",
+            !/^all\b/i.test(vehicle.trim()) && vehicle !== "",
+            !/^all\b/i.test(driver.trim()) && driver !== "",
+            !/^all\b/i.test(bunk.trim()) && bunk !== "",
+            !/^all$/i.test(sourceType.trim()) && sourceType !== "",
+            fromDate !== "" || toDate !== "",
+            sortBy !== null,
+          )}
+          onClick={onReset}
+        />
+
+        {/* 3. Refresh */}
+        {onRefresh && <BrandRefreshButton onClick={onRefresh} loading={refreshing} />}
+
+        {/* 4. PDF (Enabled only when filtered records exist) */}
         {onExportPDF && (
           <button
             type="button"
             onClick={onExportPDF}
-            disabled={!hasFilters}
+            disabled={!(canExport ?? hasFilters)}
             className={`group relative ${opsPdfButtonClass}`}
             aria-label={t("reports.export_pdf") || "PDF"}
-            title={!hasFilters ? (language === "te" ? "PDF ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export PDF") : (language === "te" ? "PDF నివేదిక ఎగుమతి చేయండి" : "Export PDF Report")}
+            title={!(canExport ?? hasFilters) ? (language === "te" ? "ఎగుమతి చేయడానికి రికార్డులు లేవు" : "No filtered records to export") : (language === "te" ? "PDF నివేదిక ఎగుమతి చేయండి" : "Export PDF Report")}
           >
-            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
+            <span className={`inline-flex ${(canExport ?? hasFilters) ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
               <FileText size={15} />
             </span>
             <span>PDF</span>
           </button>
         )}
 
-        {/* 5. Excel (Enabled only when filter applied) */}
+        {/* 5. Excel (Enabled only when filtered records exist) */}
         {onExportExcel && (
           <button
             type="button"
             onClick={onExportExcel}
-            disabled={!hasFilters}
+            disabled={!(canExport ?? hasFilters)}
             className={`group relative ${opsExcelButtonClass}`}
             aria-label={t("reports.export_excel") || "Excel"}
-            title={!hasFilters ? (language === "te" ? "Excel ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export Excel") : (language === "te" ? "Excel నివేదిక ఎగుమతి చేయండి" : "Export Excel Report")}
+            title={!(canExport ?? hasFilters) ? (language === "te" ? "ఎగుమతి చేయడానికి రికార్డులు లేవు" : "No filtered records to export") : (language === "te" ? "Excel నివేదిక ఎగుమతి చేయండి" : "Export Excel Report")}
           >
-            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
+            <span className={`inline-flex ${(canExport ?? hasFilters) ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
               <FileSpreadsheet size={15} />
             </span>
             <span>Excel</span>

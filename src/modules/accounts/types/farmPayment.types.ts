@@ -36,11 +36,17 @@ export interface TripFarmPayment {
 }
 
 export interface FarmPaymentLoad {
+  /** trip_legs primary key. 0 / absent for legacy trips without usable legs. */
+  legId?: number | null;
   load: number;
   farmName?: string | null;
   birdType?: string | null;
   totalBirds: number;
   dcWeight: number;
+  /** Effective load rate (leg farm_rate, else parent fallback). */
+  rate?: number | null;
+  /** Load payable (leg farm_amount, else rate × weight fallback). */
+  amount?: number | null;
 }
 
 /** Money totals over a set of trip farm payments. */

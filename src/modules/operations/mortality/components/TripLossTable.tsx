@@ -38,7 +38,18 @@ import {
 } from "lucide-react";
 import type { LossSort, TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import type { SortBy } from "../services/mortalityAnalysisApi";
-import { formatNumber } from "../../../../utils/format";
+import { formatNumber, formatWeight } from "../../../../utils/format";
+import {
+  buildLoadTooltip,
+  gridNavStep,
+  hasLoadBreakdown,
+  placeTooltip,
+  tripLoads,
+  type LoadTooltip,
+  type MortalityLoadMetric,
+  type TooltipFormatters,
+} from "../utils/mortalityLoads";
+import { useDragScroll } from "../hooks/useDragScroll";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { Pagination } from "../../../../ui";
@@ -212,45 +223,126 @@ const COLUMNS: Column[] = [
 const alignClass = (align?: Align) =>
   align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
-/** Fixed, unclipped mortality breakdown — the same hover model as KPI cards. */
-function MortalityBreakdownCell({ record, t }: { record: TripLossAnalysis; t: (key: string, values?: Record<string, string | number>) => string }) {
+/** Width of the floating load-breakdown card, matching the Trip List tooltip. */
+const LOAD_TOOLTIP_WIDTH = 280;
+
+/**
+ * One driven load-breakdown cell for every multi-load metric.
+ *
+ * Single-load trips render the plain value — never a redundant Load 1 stub.
+ * Multi-load trips render the aggregate with the Trip List affordance (a
+ * dotted-underline button) that opens a floating portalled card on hover and
+ * keyboard focus: one Load row per load, a separated trip-total row,
+ * tabular numerals and Indian formatting. Escape closes the card.
+ */
+function LoadBreakdownCell({
+  record,
+  metric,
+  title,
+  helper,
+  value,
+  t,
+  weightUnit,
+  draggingRef,
+  cellClassName,
+  triggerClassName,
+}: {
+  record: TripLossAnalysis;
+  metric: MortalityLoadMetric;
+  title: string;
+  helper?: string;
+  value: React.ReactNode;
+  t: (key: string, values?: Record<string, string | number>) => string;
+  weightUnit: string;
+  draggingRef: React.RefObject<boolean>;
+  cellClassName: string;
+  triggerClassName?: string;
+}) {
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+  const showBreakdown = hasLoadBreakdown(record);
+  if (!showBreakdown) {
+    return <td className={cellClassName}>{value}</td>;
+  }
   const show = (element: HTMLElement) => {
+    // A tooltip never opens from a drag gesture — the card would chase the
+    // pointer while the table scrolls underneath it.
+    if (draggingRef.current) return;
     const rect = element.getBoundingClientRect();
-    const width = 280;
-    setPosition({ left: Math.min(window.innerWidth - width - 12, Math.max(12, rect.left + rect.width / 2 - width / 2)), top: rect.bottom + 8 });
+    setPosition(
+      placeTooltip(
+        { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width },
+        tripLoads(record).length,
+        LOAD_TOOLTIP_WIDTH,
+        { width: window.innerWidth, height: window.innerHeight }
+      )
+    );
   };
-  const weight = (value: number) => Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const hide = () => setPosition(null);
+  const fmt: TooltipFormatters = {
+    birds: (amount) => `${formatNumber(amount)} ${t("common.birds")}`,
+    weight: (amount) => formatWeight(amount, weightUnit),
+    percent: (amount) => `${Number(amount || 0).toFixed(2)}%`,
+    count: (amount) => formatNumber(amount),
+  };
+  const tooltip: LoadTooltip = buildLoadTooltip(record, metric, {
+    title,
+    helper,
+    labels: {
+      formatLoad: (load) => t("ops.mortality.load.number", { number: load }),
+      totalLabel: t("ops.mortality.tooltip.total"),
+      boxModeLabel: t("ops.mortality.tooltip.box_mode"),
+      weightModeLabel: t("ops.mortality.tooltip.weight_mode"),
+    },
+    fmt,
+  });
   return (
-    <td
-      tabIndex={0}
-      onPointerEnter={(event) => show(event.currentTarget)}
-      onPointerLeave={() => setPosition(null)}
-      onFocus={(event) => show(event.currentTarget)}
-      onBlur={() => setPosition(null)}
-      className="cursor-help whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange-300"
-    >
-      {formatNumber(record.mortalityCount)}
-      {position ? createPortal(
-        <div role="tooltip" style={position} className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl">
-          <p className="border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">{t("ops.mortality.tooltip.title")}</p>
-          <div className="mt-2 space-y-1.5">
-            {[
-              [t("ops.mortality.tooltip.box_mode"), record.boxMortalityCount, record.boxMortalityWeight],
-              [t("ops.mortality.tooltip.weight_mode"), record.weightModeMortalityCount, record.weightModeMortalityWeight],
-            ].map(([label, birds, mortalityWeight]) => (
-              <div key={String(label)} className="grid grid-cols-[1fr_auto] gap-x-3 rounded-lg px-2 py-1.5 odd:bg-slate-50">
-                <span className="font-semibold text-slate-600">{String(label)}</span>
-                <span className="font-bold tabular-nums text-orange-700">{formatNumber(Number(birds))} {t("common.birds")}</span>
-                <span className="text-slate-400">{t("common.weight")}</span>
-                <span className="font-bold tabular-nums text-slate-700">{weight(Number(mortalityWeight))}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center justify-between border-t border-slate-100 px-2 pt-2 font-bold"><span>{t("common.total")}</span><span className="tabular-nums text-orange-700">{formatNumber(record.mortalityCount)} {t("common.birds")}</span></div>
-          <p className="mt-2 text-[10px] leading-4 text-slate-400">{t("ops.mortality.tooltip.helper")}</p>
-        </div>, document.body,
-      ) : null}
+    <td className={cellClassName} onMouseLeave={hide}>
+      <button
+        type="button"
+        data-load-tooltip
+        aria-label={title}
+        onMouseEnter={(event) => show(event.currentTarget)}
+        onFocus={(event) => show(event.currentTarget)}
+        onBlur={hide}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            hide();
+            event.currentTarget.blur();
+          }
+        }}
+        className={`rounded border-b border-dotted border-current px-0.5 font-bold focus:outline-none focus:ring-2 focus:ring-blue-300 ${triggerClassName ?? ""}`}
+      >
+        {value}
+      </button>
+      {position
+        ? createPortal(
+          <div
+            role="tooltip"
+            style={{ left: position.left, top: position.top }}
+            className="pointer-events-none fixed z-[9999] w-[280px] rounded-xl border border-slate-200 bg-white p-3 text-left text-[11px] font-medium text-slate-700 shadow-2xl"
+          >
+            <p className="border-b border-slate-100 pb-2 text-xs font-bold text-slate-800">{tooltip.title}</p>
+            <div className="mt-2 space-y-1.5">
+              {tooltip.lines.map((line, lineIndex) => (
+                <div key={lineIndex} className="rounded-lg px-2 py-1.5 odd:bg-slate-50">
+                  <div className="flex items-center justify-between gap-x-3">
+                    <span className="font-semibold text-slate-600">{line.label}</span>
+                    <span className="font-bold tabular-nums text-slate-900">{line.value}</span>
+                  </div>
+                  {line.sub ? <p className="mt-0.5 text-[10px] leading-4 text-slate-400">{line.sub}</p> : null}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex items-center justify-between border-t border-slate-100 px-2 pt-2 font-bold">
+              <span>{tooltip.totalLabel}</span>
+              <span className="tabular-nums text-slate-900">{tooltip.total}</span>
+            </div>
+            {tooltip.helper ? <p className="mt-2 text-[10px] leading-4 text-slate-400">{tooltip.helper}</p> : null}
+          </div>,
+          document.body
+        )
+        : null}
     </td>
   );
 }
@@ -290,6 +382,16 @@ export default function TripLossTable({
    */
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [panelWidth, setPanelWidth] = useState(0);
+  /** Horizontal side-drag scrolling for the wide grid — clicks still win. */
+  const { scrollerRef: dragScrollerRef, dragging, draggingRef, scrollerProps } =
+    useDragScroll<HTMLDivElement>();
+  const setScrollerRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      scrollRef.current = element;
+      dragScrollerRef(element);
+    },
+    [dragScrollerRef]
+  );
 
   useEffect(() => {
     const element = scrollRef.current;
@@ -335,28 +437,19 @@ export default function TripLossTable({
   const handleRowKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
       if (event.target !== event.currentTarget) return;
-      const row = records[rowIndex];
-      if (!row) return;
-
-      if (event.key === "Enter" || event.key === " " || event.key === "Escape") {
-        // Only the row itself owns these; a focused chevron keeps its own keys.
-        if (event.target !== event.currentTarget) return;
-        if (event.key === "Escape") {
-          if (openTripId !== row.tripId) return;
-          event.preventDefault();
-          setOpenTripId(null);
-          return;
-        }
-        event.preventDefault();
-        toggle(row.tripId);
+      const action = gridNavStep(records, rowIndex, event.key, openTripId);
+      if (action.kind === "none") return;
+      event.preventDefault();
+      if (action.kind === "toggle") {
+        toggle(action.tripId);
         return;
       }
-      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-
+      if (action.kind === "close") {
+        setOpenTripId(null);
+        return;
+      }
       // ↑/↓ always step one trip, wherever the focus sits inside the row.
-      event.preventDefault();
-      const next = records[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
-      moveTo(next, openTripId !== null);
+      moveTo(records.find((row) => row.tripId === action.tripId), openTripId !== null);
     },
     [records, openTripId, toggle, moveTo]
   );
@@ -473,7 +566,12 @@ export default function TripLossTable({
         )}
       </div>
 
-      <div ref={scrollRef} className="w-full overflow-x-auto">
+      <div
+        ref={setScrollerRef}
+        className="w-full overflow-x-auto"
+        style={{ cursor: dragging ? "grabbing" : "grab" }}
+        {...scrollerProps}
+      >
         <table className="min-w-full border-collapse text-left text-[13px] font-normal" aria-busy={reloading}>
           <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
             <tr className="whitespace-nowrap">
@@ -600,12 +698,17 @@ export default function TripLossTable({
                         {formatTripListDay(r.tripDate, language)}
                       </td>
 
-                      <td
-                        className="max-w-[170px] truncate px-4 py-5 text-[13px] font-medium text-slate-700"
-                        title={r.sourceFarm || undefined}
-                      >
-                        {localizeTripViewText(r.sourceFarm, language) || "—"}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="farm"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.detail.farm") })}
+                        value={localizeTripViewText(r.sourceFarm, language) || "—"}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="max-w-[170px] truncate px-4 py-5 text-[13px] font-medium text-slate-700"
+                        triggerClassName="max-w-full truncate"
+                      />
 
                       <td
                         className="max-w-[130px] truncate px-4 py-5 text-[13px] font-normal text-slate-600"
@@ -614,48 +717,116 @@ export default function TripLossTable({
                         {localizeTripViewText(r.supervisorName, language) || "—"}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700">
-                        {formatNumber(r.farmBirds)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="farmBirds"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.farm_birds") })}
+                        value={formatNumber(r.farmBirds)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700">
-                        {tableWeight(r.farmWeight)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="farmWeight"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.farm_weight") })}
+                        value={tableWeight(r.farmWeight)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-amber-700"
+                      />
 
                       {/* Plain number — the ShoppingBag glyph already names this
                           column in the header; repeating a badge on every row
                           is what made the grid noisy. */}
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-slate-700">
-                        {formatNumber(r.deliveryShops)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="shops"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.delivery_shops") })}
+                        value={formatNumber(r.deliveryShops)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-slate-700"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700">
-                        {formatNumber(r.deliveredBirds)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="deliveredBirds"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.delivered_birds") })}
+                        value={formatNumber(r.deliveredBirds)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700">
-                        {tableWeight(r.deliveredWeight)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="deliveredWeight"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.delivery_weight") })}
+                        value={tableWeight(r.deliveredWeight)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-sky-700"
+                      />
 
-                      <MortalityBreakdownCell record={r} t={t} />
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="mortality"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.mortality_birds") })}
+                        helper={t("ops.mortality.tooltip.helper")}
+                        value={formatNumber(r.mortalityCount)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600">
-                        {tableWeight(r.mortalityWeight)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="mortalityWeight"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.mortality_weight") })}
+                        value={tableWeight(r.mortalityWeight)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-orange-600"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600">
-                        {tableWeight(r.weightLoss)}
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="weightLoss"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.weight_loss") })}
+                        helper={t("ops.mortality.tooltip.weight_loss_formula")}
+                        value={tableWeight(r.weightLoss)}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600"
+                      />
 
-                      <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600">
-                        {r.weightLossPercentage.toFixed(2)}%
-                      </td>
+                      <LoadBreakdownCell
+                        record={r}
+                        metric="lossPct"
+                        title={t("ops.mortality.tooltip.by_load", { metric: t("ops.mortality.kpi.weight_loss_pct") })}
+                        value={`${r.weightLossPercentage.toFixed(2)}%`}
+                        t={t}
+                        weightUnit={weightUnit}
+                        draggingRef={draggingRef}
+                        cellClassName="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold tabular-nums text-rose-600"
+                      />
                     </tr>
 
                     {isOpen && (
                       <tr>
                         <td colSpan={COLUMNS.length} className="p-0">
                           <div
+                            data-no-dragscroll
                             className="sticky left-0 cursor-text select-text"
                             style={panelWidth > 0 ? { width: `${panelWidth}px` } : undefined}
                             tabIndex={-1}

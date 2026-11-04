@@ -3,7 +3,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, X } from "lucide-react";
+import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, CheckCircle2, X } from "lucide-react";
+import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripListDay } from "../utils/formatTripListDay";
@@ -156,7 +158,7 @@ function TripRecentTable({
   });
 
   const tableRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+
 
   // ✅ Approver identity is stamped server-side from the authenticated
   // session (backend serverActor middleware) — the client never sends it.
@@ -286,46 +288,24 @@ function TripRecentTable({
       (selectedIsDraft || canDeleteItem(selectedCreatedRef))
     : false;
 
-  const handleRowClick = (trip: Trip) => {
-    if (trip.deleted) return;
-    if (isPending(Number(trip.id))) return;
-    setSelectedTripId(Number(trip.id) === Number(selectedTripId) ? null : Number(trip.id));
-  };
+  // Single shared selection: click toggles, arrows skip deleted/pending
+  // rows, Enter selects, Escape clears — the click-away rule below stays.
+  const selection = useTableRowSelection<Trip>({
+    rows: paginatedTrips,
+    getId: (trip) => Number(trip.id),
+    isRowSelectable: (trip) => !trip.deleted && !isPending(Number(trip.id)),
+    selectedId: selectedTripId,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (trip) => `Trip ${trip.tripNo}`,
+    onSelect: (trip) => setSelectedTripId(Number(trip.id)),
+    onDeselect: () => setSelectedTripId(null),
+    onPrimaryAction: (trip) => setSelectedTripId(Number(trip.id)),
+  });
 
-  const selectRowFromKeyboard = useCallback((trip: Trip) => {
-    if (trip.deleted || isPending(Number(trip.id))) return;
-    setSelectedTripId(Number(trip.id));
-  }, [isPending]);
 
-  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
-    const targetTag = (event.target as HTMLElement).tagName;
-    const isFormControl = targetTag === "SELECT" || targetTag === "INPUT" || targetTag === "TEXTAREA";
-    // Preserve native keyboard handling for editable/select controls inside a row.
-    if (isFormControl) return;
-    const currentTrip = paginatedTrips[rowIndex];
-    if (!currentTrip) return;
-    if (event.key === "Enter" || event.key === " ") {
-      if (event.target !== event.currentTarget) return;
-      event.preventDefault();
-      selectRowFromKeyboard(currentTrip);
-      return;
-    }
-    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
-    event.preventDefault();
-    const step = event.key === "ArrowDown" ? 1 : -1;
-    let nextIndex = rowIndex + step;
-    while (
-      nextIndex >= 0 &&
-      nextIndex < paginatedTrips.length &&
-      (paginatedTrips[nextIndex]?.deleted || isPending(Number(paginatedTrips[nextIndex]?.id)))
-    ) {
-      nextIndex += step;
-    }
-    const nextTrip = paginatedTrips[nextIndex];
-    if (!nextTrip) return;
-    selectRowFromKeyboard(nextTrip);
-    requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus({ preventScroll: true }));
-  }, [isPending, paginatedTrips, selectRowFromKeyboard]);
+
+
 
   const handleEditClick = () => {
     if (selectedTrip) onEdit(selectedTrip);
@@ -538,20 +518,11 @@ function TripRecentTable({
                   return (
                     <tr
                       key={trip.id}
-                      ref={(element) => {
-                        if (element) rowRefs.current.set(trip.id, element);
-                        else rowRefs.current.delete(trip.id);
-                      }}
-                      tabIndex={isDeleted ? -1 : 0}
-                      onClick={(event) => {
-                        handleRowClick(trip);
-                        if (!isDeleted) event.currentTarget.focus({ preventScroll: true });
-                      }}
-                      onKeyDown={(event) => handleRowKeyDown(event, index)}
-                      aria-selected={isSelected}
-                      className={`cursor-pointer border-l-4 border-l-transparent outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}
+                      {...selection.getRowProps(trip, index)}
+                      className={`cursor-pointer border-l-4 border-l-transparent outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-red-400" : isSelected ? tableSelectedRowClass : "hover:bg-slate-50/80"}`}
                     >
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
+                        {isSelected && !isDeleted ? <CheckCircle2 size={13} className="mr-1 inline text-emerald-600" aria-hidden="true" /> : null}
                         {localizeTripViewText(trip.tripNo, language)}
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>

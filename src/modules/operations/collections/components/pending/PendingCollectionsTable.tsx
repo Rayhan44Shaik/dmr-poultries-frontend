@@ -12,6 +12,9 @@ import type {
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { tableSelectedRowClass } from "../../../../../shared/ui/tableRowSelection";
+import { useTableRowSelection } from "../../../../../shared/ui/useTableRowSelection";
+import { RowSelectMark } from "../../../../../shared/ui/RowSelectMark";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -106,13 +109,18 @@ function PendingCollectionsTable({
   const shown = (value: string | null | undefined) =>
     localizeTripViewText(value ?? "", language);
 
-  const handleRowClick = (shopName: string) => {
-    if (selectedShopName === shopName) {
-      onSelectShop(null);
-    } else {
-      onSelectShop(shopName);
-    }
-  };
+  // Shared single-row selection keyed by the stable shop id; clicking the
+  // selected row again clears it, matching the previous toggle behaviour.
+  const selection = useTableRowSelection<PendingReportRow>({
+    rows: data,
+    getId: (shop) => shop.shopId,
+    selectedId: data.find((shop) => shop.shopName === selectedShopName)?.shopId ?? null,
+    toggleOnReselect: true,
+    allowEscapeClear: true,
+    getRowLabel: (shop) => `Shop ${shop.shopName}`,
+    onSelect: (shop) => onSelectShop(shop.shopName),
+    onDeselect: () => onSelectShop(null),
+  });
 
   const selectedShop = data.find((s) => s.shopName === selectedShopName);
 
@@ -273,21 +281,15 @@ function PendingCollectionsTable({
                   return (
                     <tr
                       key={shop.shopId}
-                      onClick={() => handleRowClick(shop.shopName)}
-                      aria-selected={isSelected}
-                      className={`transition-colors cursor-pointer ${
+                      {...selection.getRowProps(shop, index)}
+                      className={`transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                         isSelected
-                          ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50"
+                          ? tableSelectedRowClass
                           : "hover:bg-slate-50/80"
                       }`}
                     >
                       <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">
-                        {isSelected && (
-                          <span className="mr-1 inline-flex items-center justify-center">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          </span>
-                        )}
-                        {startIndex + index + 1}
+                        <RowSelectMark selected={isSelected} serialNo={startIndex + index + 1} label={`Selected shop ${shop.shopName}`} />
                       </td>
                       {/* One line per record: a long shop name used to wrap over
                           three lines and push the money columns out of

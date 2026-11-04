@@ -1,6 +1,7 @@
 import { apiDelete, apiGet, apiPost, apiPut, throwApiError } from "../../../../api";
-import type { FuelExpense, FuelExpenseDraft, FuelUiStatus } from "../types/fuelExpense";
+import type { FuelExpense, FuelExpenseDraft, FuelTripLoad, FuelUiStatus } from "../types/fuelExpense";
 import { resolveFuelGps } from "../utils/fuelGps";
+import { summarizeFuelBills } from "../utils/fuelSummary";
 
 const PATH = "/operations/fuel-expenses";
 
@@ -17,6 +18,7 @@ export interface FuelListSummary {
   totalAmount: number;
   pendingCount: number;
   approvedCount: number;
+  totalDistance: number | null;
   avgMileage: number | null;
   recentTripMileage: number | null;
 }
@@ -57,10 +59,12 @@ interface ApiFuel {
   driverId: number | null;
   driverName: string | null;
   supervisorId: number | null;
-  supervisorName: string | null;
-  tripId?: number | null;
-  tripNo?: string | null;
-  currentMeter: number;
+  supervisorName: string | null;    tripId?: number | null;
+    tripNo?: string | null;
+    tripFuelEntryIndex?: number | null;
+    tripLoadCount?: number | null;
+    tripLoads?: FuelTripLoad[];
+    currentMeter: number;
   fuelRate: number;
   liters: number;
   amount: number;
@@ -72,13 +76,14 @@ interface ApiFuel {
   gpsAccuracy?: number | null;
   gpsCapturedAt?: string | null;
   status: string;
+  travelDistance?: number | null;
   deleted?: boolean;
   imageData?: string | null;
   imageName?: string | null;
   createdAt?: string | null;
   createdBy?: string;
   approvedAt?: string | null;
-  approvedBy?: string | null;
+  approvedBy?: string;
   updatedAt?: string | null;
 }
 
@@ -104,6 +109,9 @@ function mapRow(row: ApiFuel): FuelExpense {
     supervisorName: row.supervisorName ?? "",
     tripId: row.tripId ?? null,
     tripNo: row.tripNo ?? null,
+    tripFuelEntryIndex: row.tripFuelEntryIndex ?? null,
+    tripLoadCount: row.tripLoadCount ?? null,
+    tripLoads: Array.isArray(row.tripLoads) ? row.tripLoads : [],
     meterReading: Number(row.currentMeter ?? 0),
     amount: Number(row.amount ?? 0),
     rate: Number(row.fuelRate ?? 0),
@@ -121,6 +129,7 @@ function mapRow(row: ApiFuel): FuelExpense {
     createdDate: row.createdAt ?? "",
     createdBy: row.createdBy ?? "",
     approvedDate: row.approvedAt ?? undefined,
+    travelDistance: row.travelDistance ?? null,
     approvedBy: isTrip ? "Trip Completion" : (row.approvedBy ?? undefined),
     updatedDate: row.updatedAt ?? undefined,
     image: row.imageData ?? undefined,
@@ -130,14 +139,11 @@ function mapRow(row: ApiFuel): FuelExpense {
 }
 
 function summarizeRows(rows: FuelExpense[]): FuelListSummary {
-  return {
-    totalLitres: rows.reduce((sum, row) => sum + row.litres, 0),
-    totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
-    pendingCount: rows.filter((row) => row.status === "Pending").length,
-    approvedCount: rows.filter((row) => row.status === "Approved").length,
-    avgMileage: null,
-    recentTripMileage: null,
-  };
+  // Canonical filtered-set totals: the saved trip distance (deduplicated per
+  // trip) and mileage as Total Distance ÷ Total Fuel Litres. Zero litres
+  // yields null mileage (renders "—"). Shared with the page footer/KPIs.
+  const summary = summarizeFuelBills(rows);
+  return { ...summary, recentTripMileage: null };
 }
 
 function mapSummary(
@@ -155,12 +161,20 @@ function mapSummary(
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   };
+  // Mileage is always re-derived from the authoritative totals when the
+  // backend summary omits it, so a zero-litres set can never show a stale
+  // or invalid figure.
+  const totalDistance = summary.totalDistance != null ? nullableFinite(summary.totalDistance) : fallback.totalDistance;
+  const totalLitres = finite(summary.totalLitres, fallback.totalLitres);
+  const derivedMileage =
+    totalDistance != null && totalLitres > 0 ? Number((totalDistance / totalLitres).toFixed(2)) : null;
   return {
-    totalLitres: finite(summary.totalLitres, fallback.totalLitres),
+    totalLitres,
     totalAmount: finite(summary.totalAmount, fallback.totalAmount),
     pendingCount: finite(summary.pendingCount, fallback.pendingCount),
     approvedCount: finite(summary.approvedCount, fallback.approvedCount),
-    avgMileage: nullableFinite(summary.avgMileage),
+    totalDistance,
+    avgMileage: summary.avgMileage != null ? nullableFinite(summary.avgMileage) : derivedMileage,
     recentTripMileage: nullableFinite(summary.recentTripMileage),
   };
 }

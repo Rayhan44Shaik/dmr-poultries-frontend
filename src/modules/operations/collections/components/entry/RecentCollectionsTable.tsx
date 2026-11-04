@@ -9,6 +9,8 @@ import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { tableSelectedRowClass } from "../../../../../shared/ui/tableRowSelection";
+import { RowSelectMark } from "../../../../../shared/ui/RowSelectMark";
 import { FilterResetButton, countActiveFilters } from "../../../../../ui";
 import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey } from "../../utils/collectionStatusLabel";
@@ -25,8 +27,10 @@ interface Props {
   collections: RecentCollection[];
   /** True while the Recent Collections feed is refreshing. */
   isLoading?: boolean;
-  statusFilter: "Pending" | "Approved" | "Deleted";
-  onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
+  statusFilter: "Pending" | "Approved" | "Deleted" | "All";
+  onStatusChange: (status: "Pending" | "Approved" | "Deleted" | "All") => void;
+  /** Rolling four-week bounds applied to the "All" toggle; when absent no window is applied. */
+  rollingWindow?: { rollingStartISO: string; rollingEndISO: string; asOfDateISO: string };
   /** Optional: roles without approve rights simply never receive it. */
   onApproveMany?: (ids: string[]) => boolean | Promise<boolean>;
   onReject?: (id: string) => void;
@@ -62,6 +66,7 @@ export default function RecentCollectionsTable({
   onRefresh,
   refreshing = false,
   onSelectionChange,
+  rollingWindow,
 }: Props) {
   const { t, language } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
@@ -148,7 +153,22 @@ export default function RecentCollectionsTable({
     const sort = (rows: RecentCollection[]) =>
       [...rows].sort((a, b) => compareCollectionRecency(b, a));
 
+    const all = sort(
+      filteredBySearch.filter(
+        (col) =>
+          (col.rawStatus === "Pending Approval" ||
+            col.rawStatus === "Approved" ||
+            col.rawStatus === "Deleted") &&
+          // Apply rolling four-week window: collectionDate must be within [rollingStart, rollingEnd]
+          (rollingWindow
+            ? col.collectionDate >= rollingWindow.rollingStartISO &&
+              col.collectionDate <= rollingWindow.rollingEndISO
+            : true),
+      ),
+    );
+
     return {
+      All: all,
       Pending: sort(pending),
       // EVERY shop that has an approved collection appears exactly once and
       // carries that shop's most recent approved collection number. Opening
@@ -156,19 +176,23 @@ export default function RecentCollectionsTable({
       Approved: approvedByShop,
       Deleted: sort(deleted),
     };
-  }, [collections, filteredBySearch]);
+  }, [collections, filteredBySearch, rollingWindow]);
 
-  const displayedData = buckets[statusFilter];
+  const displayedData = statusFilter === "All" ? buckets.All : buckets[statusFilter];
   const singleCheckedId = checkedIds.size === 1 ? [...checkedIds][0] : null;
-  const actionRowId = statusFilter === "Pending" ? singleCheckedId : selectedId;
+  // For "All" toggle, use selectedId; for other toggles, use checked ID when exactly one is selected.
+  const actionRowId = statusFilter === "All" ? selectedId : (statusFilter === "Pending" ? singleCheckedId : selectedId);
   const selectedCollection = displayedData.find((row) => row.id === actionRowId) ?? null;
   const selectedStatus = selectedCollection?.rawStatus || selectedCollection?.status;
+  // Edit is only valid for Pending Approval records, regardless of which toggle is active.
   const canEditSelected = Boolean(selectedCollection && selectedStatus === "Pending Approval" && onEdit);
+  // View is only valid for Approved records.
   const canViewSelected = Boolean(selectedCollection && selectedStatus === "Approved");
+  // Delete is allowed for Pending and Deleted records, but not Approved financial records.
   const canDeleteSelected = Boolean(
     selectedCollection &&
-    selectedStatus !== "Deleted" &&
     onDelete &&
+    selectedStatus !== "Approved" &&
     !isPending(selectedCollection.id),
   );
 
@@ -393,6 +417,8 @@ export default function RecentCollectionsTable({
 
   const getEmptyStateMessage = (): string => {
     switch (statusFilter) {
+      case "All":
+        return t("ops.collection.no_all");
       case "Pending":
         return t("empty.no_pending");
       case "Approved":
@@ -428,7 +454,7 @@ export default function RecentCollectionsTable({
           </span>
 
           <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
-            {(["Pending", "Approved", "Deleted"] as const).map((tab) => {
+            {(["All", "Pending", "Approved", "Deleted"] as const).map((tab) => {
               const isActive = statusFilter === tab;
               // Colours match the meaning of each tab and the row/badge tints.
               const activeClass =
@@ -436,7 +462,9 @@ export default function RecentCollectionsTable({
                   ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
                   : tab === "Pending"
                   ? "bg-orange-50/80 text-orange-500 shadow-sm"
-                  : "bg-rose-50/80 text-rose-500 shadow-sm";
+                  : tab === "Deleted"
+                  ? "bg-rose-50/80 text-rose-500 shadow-sm"
+                  : "bg-emerald-50/80 text-emerald-500 shadow-sm";
               // Tab and row badge share one label source, so they always agree.
               const key = `status.${tab.toLowerCase()}`;
               const label = t(key) === key ? tab : t(key);
@@ -672,14 +700,14 @@ export default function RecentCollectionsTable({
                     }}
                     onKeyDown={(event) => handleRowKeyDown(event, index, col)}
                     aria-selected={isSelected || isChecked}
-                    className={`cursor-pointer outline-none transition-[background-color,box-shadow,border-color] duration-200 ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-300 ${
+                    className={`cursor-pointer outline-none transition-[background-color,box-shadow,border-color] duration-200 ease-out motion-reduce:transition-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected || isChecked
-                        ? "bg-amber-50/70 border-l-4 border-l-amber-300 ring-1 ring-inset ring-amber-100"
+                        ? tableSelectedRowClass
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
                     <td className="px-4 py-5 text-center text-[13px] font-medium text-slate-500 tabular-nums">
-                      {startIndex + index + 1}
+                      <RowSelectMark selected={isSelected || isChecked} serialNo={startIndex + index + 1} label={`Selected collection ${col.collectionNo}`} />
                     </td>
                     <td className="px-4 py-5 text-[13px] font-bold text-emerald-600 truncate">
                       {col.collectionNo}

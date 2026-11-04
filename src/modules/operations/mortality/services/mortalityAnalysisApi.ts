@@ -2,6 +2,28 @@ import { apiGet } from "../../../../api";
 
 const BASE = "/operations/mortality-analysis";
 
+/** Per-load actuals for one submitted load, in leg_index order. */
+export interface MortalityLoad {
+  legId: number | null;
+  load: number;
+  farmName: string | null;
+  farmBirds: number;
+  farmWeight: number;
+  deliveryShops: number;
+  deliveredBirds: number;
+  deliveredWeight: number;
+  boxMortalityCount: number;
+  boxMortalityWeight: number;
+  weightModeMortalityCount: number;
+  weightModeMortalityWeight: number;
+  mortalityCount: number;
+  mortalityWeight: number;
+  weightLoss: number;
+  mortalityPercentage: number;
+  weightLossPercentage: number;
+  survivalRate: number;
+}
+
 export interface MortalityRow {
   tripId: number; tripNo: string; tripDate: string; sourceFarm: string;
   supervisorName: string; vehicleNo: string; driverName: string;
@@ -13,6 +35,9 @@ export interface MortalityRow {
   boxMortalityCount: number; boxMortalityWeight: number;
   weightModeMortalityCount: number; weightModeMortalityWeight: number;
   mortalityPercentage: number; survivalRate: number;
+  /** Per-load actuals. Exactly one entry for single-load and legacy trips;
+   *  a tooltip is shown only when there are two or more entries. */
+  loads: MortalityLoad[];
 }
 
 export interface MortalityKpis {

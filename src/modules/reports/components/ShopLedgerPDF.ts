@@ -50,6 +50,7 @@ export interface ShopLedgerPdfEntry {
 }
 
 export interface ShopLedgerCumulativeRow {
+  shopId?: number;
   shop: string;
   subShopName?: string;
   birds: number;
@@ -68,6 +69,14 @@ export interface ShopLedgerCumulativeRow {
     boxBirds: number;
     boxWeight: number;
     weightModeBirds: number;
+  }>;
+  deliveriesByLoad?: Array<{
+    load: number;
+    birds: number;
+    weight: number;
+    mortalityBirds: number;
+    mortalityWeight: number;
+    weightLoss: number;
   }>;
 }
 

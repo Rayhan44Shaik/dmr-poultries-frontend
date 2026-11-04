@@ -27,9 +27,17 @@
 // No shop-wise delivery list here: the shop COUNT already sits on the trip row,
 // and shop-level detail lives in the Delivery module where it is actionable.
 
+import { useEffect, useRef, useState } from "react";
 import { HeartPulse, Scale, Truck } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight } from "../../../../utils/format";
+import {
+  loadScopes,
+  loadTabNav,
+  selectLoadScope,
+  tripLoads,
+  type LoadScope,
+} from "../utils/mortalityLoads";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { useI18n } from "../../../../i18n";
@@ -132,6 +140,33 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
   const crew = (names?: string[]) =>
     names && names.length > 0 ? names.map((name) => view(name)).join(", ") : "—";
 
+  /**
+   * Load tabs for multi-load trips. "All Loads" is the exact aggregate main
+   * row; a load tab shows only that load's canonical values. Tab state is
+   * local — switching never refetches, and a new trip always reopens on All.
+   */
+  const scopes = loadScopes(record);
+  const [scope, setScope] = useState<LoadScope>("all");
+  useEffect(() => setScope("all"), [record.tripId]);
+  const effectiveScope = scopes.includes(scope) ? scope : "all";
+  const figures = selectLoadScope(record, effectiveScope);
+  const activeTab = Math.max(0, scopes.indexOf(effectiveScope));
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabLabel = (tab: LoadScope) =>
+    tab === "all"
+      ? t("ops.mortality.load.all")
+      : t("ops.mortality.load.number", { number: tab });
+  const onTabsKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const next = loadTabNav(activeTab, scopes.length, event.key);
+    if (next === activeTab) return;
+    event.preventDefault();
+    setScope(scopes[next]);
+    requestAnimationFrame(() => tabRefs.current[next]?.focus());
+  };
+
+  // Multi-load trips name every submitted load's farm instead of implying one.
+  const loadFarms = [...new Set(tripLoads(record).map((load) => load.farmName).filter((name): name is string => !!name?.trim()))];
+
   /** Trip facts, two pairs per row — trip no + day, vehicle + supervisor, … */
   const detailRows: Array<Array<{ label: string; value: React.ReactNode; tone?: string }>> = [
     [
@@ -144,7 +179,10 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
     ],
     [
       { label: t("common.driver"), value: view(record.driverName) || "—" },
-      { label: t("ops.mortality.field.source_farm"), value: view(record.sourceFarm) || "—" },
+      {
+        label: t("ops.mortality.field.source_farm"),
+        value: loadFarms.length > 1 ? loadFarms.map((name) => view(name)).join(" · ") : view(record.sourceFarm) || "—",
+      },
     ],
     [
       { label: t("ops.trip.field.loaders"), value: crew(record.loaders) },
@@ -152,49 +190,53 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
     ],
   ];
 
-  /** Quantities, one row per measure, with that measure's own percentage. */
+  /**
+   * Quantities, one row per measure, with that measure's own percentage — for
+   * the selected tab. All Loads is the exact aggregate main row; a load tab
+   * shows only that load.
+   */
   const weightRows: Array<{ label: string; birds: React.ReactNode; weight: string; pct: string; tone: string }> = [
     {
       label: t("ops.mortality.detail.farm"),
-      birds: formatNumber(record.farmBirds),
-      weight: formatWeight(record.farmWeight, weightUnit),
+      birds: formatNumber(figures.farmBirds),
+      weight: formatWeight(figures.farmWeight, weightUnit),
       pct: "100.00%",
       tone: "text-amber-700",
     },
     {
       label: t("ops.mortality.detail.delivered"),
-      birds: formatNumber(record.deliveredBirds),
-      weight: formatWeight(record.deliveredWeight, weightUnit),
-      pct: `${((record.deliveredWeight / Math.max(record.farmWeight, 1)) * 100).toFixed(2)}%`,
+      birds: formatNumber(figures.deliveredBirds),
+      weight: formatWeight(figures.deliveredWeight, weightUnit),
+      pct: `${((figures.deliveredWeight / Math.max(figures.farmWeight, 1)) * 100).toFixed(2)}%`,
       tone: "text-sky-700",
     },
     {
       label: t("ops.mortality.tooltip.box_mode"),
-      birds: formatNumber(record.boxMortalityCount),
-      weight: formatWeight(record.boxMortalityWeight, weightUnit),
-      pct: record.farmBirds > 0 ? `${((record.boxMortalityCount / record.farmBirds) * 100).toFixed(2)}%` : "0.00%",
+      birds: formatNumber(figures.boxMortalityCount),
+      weight: formatWeight(figures.boxMortalityWeight, weightUnit),
+      pct: figures.farmBirds > 0 ? `${((figures.boxMortalityCount / figures.farmBirds) * 100).toFixed(2)}%` : "0.00%",
       tone: "text-orange-600",
     },
     {
       label: t("ops.mortality.tooltip.weight_mode"),
-      birds: formatNumber(record.weightModeMortalityCount),
-      weight: formatWeight(record.weightModeMortalityWeight, weightUnit),
-      pct: record.farmBirds > 0 ? `${((record.weightModeMortalityCount / record.farmBirds) * 100).toFixed(2)}%` : "0.00%",
+      birds: formatNumber(figures.weightModeMortalityCount),
+      weight: formatWeight(figures.weightModeMortalityWeight, weightUnit),
+      pct: figures.farmBirds > 0 ? `${((figures.weightModeMortalityCount / figures.farmBirds) * 100).toFixed(2)}%` : "0.00%",
       tone: "text-violet-600",
     },
     {
       label: t("ops.mortality.detail.mortality"),
-      birds: formatNumber(record.mortalityCount),
-      weight: formatWeight(record.mortalityWeight, weightUnit),
-      pct: `${record.mortalityPercentage.toFixed(2)}%`,
+      birds: formatNumber(figures.mortalityCount),
+      weight: formatWeight(figures.mortalityWeight, weightUnit),
+      pct: `${figures.mortalityPercentage.toFixed(2)}%`,
       tone: "text-orange-600",
     },
     {
       label: t("ops.mortality.detail.weight_loss"),
       // Loss is a weight figure; it has no bird count of its own.
       birds: <span className="text-slate-300">—</span>,
-      weight: formatWeight(record.weightLoss, weightUnit),
-      pct: `${record.weightLossPercentage.toFixed(2)}%`,
+      weight: formatWeight(figures.weightLoss, weightUnit),
+      pct: `${figures.weightLossPercentage.toFixed(2)}%`,
       tone: "text-rose-600",
     },
   ];
@@ -246,7 +288,41 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
               tone="rose"
               title={t("ops.mortality.detail.weight_summary")}
               colSpan={4}
-              action={<span className="hidden max-w-xl text-right text-[10px] font-medium normal-case tracking-normal text-slate-400 lg:block">{t("ops.mortality.tooltip.helper")}</span>}
+              action={
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {scopes.length > 0 ? (
+                    <span
+                      role="tablist"
+                      aria-label={t("ops.mortality.detail.load_scope")}
+                      onKeyDown={onTabsKeyDown}
+                      className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm"
+                    >
+                      {scopes.map((tab, tabIndex) => {
+                        const isActive = tabIndex === activeTab;
+                        return (
+                          <button
+                            key={String(tab)}
+                            ref={(element) => {
+                              tabRefs.current[tabIndex] = element;
+                            }}
+                            type="button"
+                            role="tab"
+                            aria-selected={isActive}
+                            tabIndex={isActive ? 0 : -1}
+                            onClick={() => setScope(tab)}
+                            className={`rounded-md px-2.5 py-1 text-[10.5px] font-bold tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                              isActive ? "bg-emerald-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            {tabLabel(tab)}
+                          </button>
+                        );
+                      })}
+                    </span>
+                  ) : null}
+                  <span className="hidden max-w-xl text-right text-[10px] font-medium normal-case tracking-normal text-slate-400 lg:block">{t("ops.mortality.tooltip.helper")}</span>
+                </span>
+              }
             />
             <tr>
               <th scope="col" className="w-1/4 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
@@ -300,19 +376,19 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
                 colSpan={3}
                 className="px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
               >
-                {(record.survivalRate * 100).toFixed(2)}%
+                {(figures.survivalRate * 100).toFixed(2)}%
               </td>
             </tr>
             <tr className={uiAnalysisRowHoverClass}>
               <Pair
                 label={t("ops.mortality.field.mortality_pct")}
-                value={`${record.mortalityPercentage.toFixed(2)}%`}
+                value={`${figures.mortalityPercentage.toFixed(2)}%`}
                 tone="text-orange-600"
                 rule={false}
               />
               <Pair
                 label={t("ops.mortality.field.weight_loss_pct")}
-                value={`${record.weightLossPercentage.toFixed(2)}%`}
+                value={`${figures.weightLossPercentage.toFixed(2)}%`}
                 tone="text-rose-600"
               />
             </tr>

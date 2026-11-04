@@ -5,7 +5,9 @@ import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';
 import { listTrips, loadTripById } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
-import { loadTripFarmPayments, saveTripFarmPayments } from '../services/farmPaymentApiService'; import { farmPaymentRowDetails, isFarmPaymentTrip, mergeFarmPaymentRows, useQuietRefreshSignal } from '../utils/farmPaymentSync';
+import { flattenFarmPaymentsForTable, loadTripFarmPayments, saveTripFarmPayments, toFarmPaymentExportRows } from '../services/farmPaymentApiService';
+import type { FarmPaymentDisplayRow, TripFarmPaymentSaveInput } from '../services/farmPaymentApiService';
+import { farmPaymentRowDetails, isFarmPaymentTrip, mergeFarmPaymentRows, useQuietRefreshSignal } from '../utils/farmPaymentSync';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
 import { Save, RotateCcw, HandCoins, FileText, FileSpreadsheet, LoaderCircle } from 'lucide-react';
@@ -127,6 +129,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // from state would risk a stale closure. API rows are the sole source of
   // truth for what each trip opens with.
   const apiFarmByTripRef = useRef<Map<string, TripFarmPayment>>(new Map());
+  // Render-safe snapshot of the API ledger (mirrors apiFarmByTripRef, which
+  // event handlers read directly). Memos must read state, never a ref.
+  const [apiLedger, setApiLedger] = useState<TripFarmPayment[]>([]);
+  // Canonical parent trips by id for load-row filtering and the Trip view.
+  const tripByIdRef = useRef<Map<string, Trip>>(new Map());
 
   // Filter states
   // Opens on the last 14 days (through today); see recentTripsRange().
@@ -141,18 +148,21 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [pageSize, setPageSize] = useState(10);
 
   // Trip opened in the read-only trip view modal (per-row eye button).
-  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null); const viewRequestSeqRef = useRef(0); const handleViewTrip = (trip: Trip) => { const seq = viewRequestSeqRef.current + 1; viewRequestSeqRef.current = seq; setViewingTrip(trip); void loadTripById(trip.id).then((loaded) => { if (viewRequestSeqRef.current === seq) setViewingTrip(loaded); }).catch(() => { if (viewRequestSeqRef.current === seq) showNotification(t('ops.trip.refresh_failed_using_cached'), 'info'); }); };
+  // The displayed -L1/-L2 suffix never leaves the page: the modal always
+  // opens the canonical parent trip, highlighting the row's load when known.
+  const [viewingTrip, setViewingTrip] = useState<Trip | null>(null); const [viewingLoad, setViewingLoad] = useState<number | null>(null); const viewRequestSeqRef = useRef(0); const handleViewTrip = (row: FarmPaymentDisplayRow) => { const trip = tripByIdRef.current.get(String(row.tripId)); if (!trip) return; const seq = viewRequestSeqRef.current + 1; viewRequestSeqRef.current = seq; setViewingLoad(row.load ?? null); setViewingTrip(trip); void loadTripById(trip.id).then((loaded) => { if (viewRequestSeqRef.current === seq) setViewingTrip(loaded); }).catch(() => { if (viewRequestSeqRef.current === seq) showNotification(t('ops.trip.refresh_failed_using_cached'), 'info'); }); };
 
-  // Trip IDs whose payment the user edited since the last load/save. Only
+  // Display-row keys edited since the last load/save: `trip:${id}` for a
+  // single/legacy row, `trip:${id}:leg:${legId}` for a multi-load row. Only
   // these rows are saved by "Save Payments" — rows restored from a previous
   // save are untouched, so the toast count always matches what was just
-  // entered (editing one row after a save saves exactly one payment).
+  // entered (editing one load after a save saves exactly one load).
   const [dirtyTripIds, setDirtyTripIds] = useState<Set<string>>(() => new Set());
-  const markDirty = (tripId: string) =>
+  const markDirty = (rowKey: string) =>
     setDirtyTripIds((prev) => {
-      if (prev.has(tripId)) return prev;
-      const next = new Set(prev); dirtyTripIdsRef.current.add(tripId);
-      next.add(tripId);
+      if (prev.has(rowKey)) return prev;
+      const next = new Set(prev); dirtyTripIdsRef.current.add(rowKey);
+      next.add(rowKey);
       return next;
     });
   const clearDirty = () => { dirtyTripIdsRef.current = new Set(); setDirtyTripIds(new Set()); };
@@ -191,6 +201,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       .then(([all, farmRows]) => {
         if (cancelled) return; // superseded — drop the stale response
         apiFarmByTripRef.current = new Map(farmRows.map((row) => [String(row.tripId), row]));
+        setApiLedger(farmRows);
         setLoadError(null);
 
         const completed = all
@@ -208,7 +219,14 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           );
 
         setAllTrips(completed);
-        setPaymentData((prev) => mergeFarmPaymentRows(prev, completed, apiFarmByTripRef.current, dirtyTripIdsRef.current, formFromApiRow));
+        tripByIdRef.current = new Map(completed.map((t) => [String(t.id), t]));
+        // The merge works on trip ids; the dirty set holds display-row keys.
+        const tripDirtyForMerge = new Set<string>();
+        dirtyTripIdsRef.current.forEach((key) => {
+          const match = /^trip:(\d+)/.exec(key);
+          if (match) tripDirtyForMerge.add(match[1]);
+        });
+        setPaymentData((prev) => mergeFarmPaymentRows(prev, completed, apiFarmByTripRef.current, tripDirtyForMerge, formFromApiRow));
         // Dirty rows are preserved by the merge above — flags stay until save/reset.
 
       })
@@ -250,49 +268,129 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setCurrentPage(1);
   }
 
-  // ----- compute unique farms -----
+  // ----- parent ledger rows (one per trip) → payable display rows -----
+  // The page edits parent form state (paymentData) exactly as before; these
+  // memos project it — together with the authoritative API ledger — into one
+  // display row per payable load for the table, filters, pagination, totals
+  // and exports. Account Analysis keeps reading the parent records.
+  const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+  const tripById = useMemo(() => new Map(allTrips.map((t) => [String(t.id), t])), [allTrips]);
+
+  const parentRows = useMemo<TripFarmPayment[]>(() => {
+    const apiFarm = new Map(apiLedger.map((row) => [String(row.tripId), row]));
+    return allTrips.map((trip) => {
+      const tripKey = String(trip.id);
+      const apiRow = apiFarm.get(tripKey);
+      const form = paymentData[tripKey];
+      const formLoads = form?.loads && form.loads.length > 0 ? form.loads : null;
+      const apiLoads = apiRow?.loads && apiRow.loads.length > 0 ? apiRow.loads : null;
+      const submittedLegs = (trip.legs ?? []).filter((leg) => leg.pickupStepSubmitted);
+      const sourceLoads = formLoads ?? apiLoads ?? submittedLegs.map((leg) => ({
+        legId: leg.id ?? null,
+        load: leg.legIndex,
+        farmName: leg.sourceFarm ?? null,
+        birdType: leg.farmBirdType ?? null,
+        totalBirds: Number(leg.totalBirds ?? 0),
+        dcWeight: Number(leg.dcWeight ?? 0),
+        rate: null,
+        amount: null,
+      }));
+      const parentRate = Number(form?.ratePerKg ?? apiRow?.rate ?? 0);
+      const safeParentRate = Number.isFinite(parentRate) ? parentRate : 0;
+      const loads = sourceLoads.map((load) => {
+        const rate = Number(load.rate ?? safeParentRate ?? 0);
+        const safeRate = Number.isFinite(rate) ? rate : 0;
+        const rawAmount = load.amount == null ? NaN : Number(load.amount);
+        const amount = Number.isFinite(rawAmount)
+          ? Math.round(rawAmount * 100) / 100
+          : round2(Number(load.dcWeight ?? 0) * safeRate);
+        return {
+          legId: load.legId ?? null,
+          load: load.load,
+          farmName: load.farmName ?? null,
+          birdType: load.birdType ?? null,
+          totalBirds: Number(load.totalBirds ?? 0),
+          dcWeight: Number(load.dcWeight ?? 0),
+          rate: safeRate,
+          amount,
+        };
+      });
+      const amount = loads.length > 1
+        ? round2(loads.reduce((sum, load) => sum + load.amount, 0))
+        : Number(form?.totalAmount ?? apiRow?.amount ?? 0);
+      return {
+        id: Number(trip.id),
+        tripId: Number(trip.id),
+        tripNo: trip.tripNo,
+        tripDate: trip.tripDate,
+        farmId: apiRow?.farmId,
+        farmName: form?.farmName ?? apiRow?.farmName ?? trip.sourceFarm,
+        birdType: form?.birdType ?? apiRow?.birdType ?? trip.birdType,
+        totalBirds: loads.length > 0
+          ? loads.reduce((sum, load) => sum + load.totalBirds, 0)
+          : Number(form?.totalBirds ?? apiRow?.totalBirds ?? trip.totalBirds ?? 0),
+        dcWeight: loads.length > 0
+          ? round2(loads.reduce((sum, load) => sum + load.dcWeight, 0))
+          : Number(form?.dcWeight ?? apiRow?.dcWeight ?? trip.dcWeight ?? 0),
+        rate: safeParentRate,
+        amount,
+        paidAmount: Number(form?.amountPaid ?? apiRow?.paidAmount ?? 0),
+        balance: Number(form?.balance ?? apiRow?.balance ?? 0),
+        status: apiRow?.status ?? 'Pending',
+        paymentDate: form?.paidDate ?? apiRow?.paymentDate ?? null,
+        paymentMode: typeof (form?.paymentMode ?? apiRow?.paymentMode) === 'string'
+          ? String(form?.paymentMode ?? apiRow?.paymentMode)
+          : null,
+        referenceNo: (form?.notes ? referenceFromNotes(form.notes) : apiRow?.referenceNo) ?? null,
+        vehicleNo: trip.vehicleNo,
+        isRentedVehicle: Boolean(paymentData[tripKey]?.isRentedVehicle ?? trip.isRentedVehicle),
+        supervisorName: trip.supervisorName,
+        loads,
+      } as TripFarmPayment;
+    });
+  }, [allTrips, paymentData, apiLedger]);
+
+  const allDisplayRows = useMemo<FarmPaymentDisplayRow[]>(
+    () => flattenFarmPaymentsForTable(parentRows),
+    [parentRows]
+  );
+
+  // ----- compute unique farms (per payable load) -----
   const farms = useMemo(() => {
     const farmSet = new Set<string>();
-    allTrips.forEach((trip) => {
-      const payment = paymentData[String(trip.id)];
-      (payment?.loads?.length ? payment.loads.map((load) => load.farmName) : [payment?.farmName ?? trip.sourceFarm])
-        .filter((farm): farm is string => Boolean(farm))
-        .forEach((farm) => farmSet.add(farm));
+    allDisplayRows.forEach((row) => {
+      if (row.farm) farmSet.add(row.farm);
     });
     return ['All', ...Array.from(farmSet)];
-  }, [allTrips, paymentData]);
+  }, [allDisplayRows]);
 
-  // ----- filter trips -----
-  const filteredTrips = useMemo(() => {
-    return allTrips.filter((trip) => {
-      const payment = paymentData[String(trip.id)] ?? {};
+  // ----- filter display rows -----
+  // Farm filtering is per load: a two-load trip with two farms shows only the
+  // matching load row. Date and vehicle filters stay parent-trip based.
+  // Search matches the canonical trip number, the displayed -L1/-L2 number,
+  // farm, vehicle, driver, supervisor and bird type.
+  const filteredRows = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return allDisplayRows.filter((row) => {
+      const trip = tripById.get(String(row.tripId));
+      if (!trip) return false;
       if (dateFrom && trip.tripDate < dateFrom) return false;
       if (dateTo && trip.tripDate > dateTo) return false;
-      if (selectedFarm !== 'All' && !(
-        payment.farmName === selectedFarm ||
-        payment.loads?.some((load) => load.farmName === selectedFarm)
-      )) return false;
+      if (selectedFarm !== 'All' && row.farm !== selectedFarm) return false;
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const birds = Number(payment.totalBirds ?? trip.totalBirds ?? 0);
-        const weight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
-        const rate = Number(payment.ratePerKg ?? 0);
-        const amount = Number(payment.totalAmount ?? weight * rate);
+      if (query) {
         const match =
-          trip.tripNo.toLowerCase().includes(q) ||
-          trip.vehicleNo.toLowerCase().includes(q) ||
-          String(payment.farmName ?? trip.sourceFarm).toLowerCase().includes(q) ||
-          trip.driverName.toLowerCase().includes(q) ||
-          trip.supervisorName.toLowerCase().includes(q) ||
-          String(payment.birdType ?? trip.birdType ?? '').toLowerCase().includes(q) ||
-          (payment.loads ?? []).some((load) =>
-            [load.load, load.farmName, load.birdType, load.totalBirds, load.dcWeight]
-              .some((value) => String(value ?? '').toLowerCase().includes(q)),
-          ) ||
-          [birds, weight, rate, amount].some((value) =>
-            [String(value), value.toLocaleString('en-IN'), value.toFixed(2)].some((text) =>
-              text.toLowerCase().includes(q),
+          row.displayTripNo.toLowerCase().includes(query) ||
+          row.tripNo.toLowerCase().includes(query) ||
+          row.farm.toLowerCase().includes(query) ||
+          row.vehicleNo.toLowerCase().includes(query) ||
+          String(trip.driverName ?? '').toLowerCase().includes(query) ||
+          String(trip.supervisorName ?? '').toLowerCase().includes(query) ||
+          row.birdType.toLowerCase().includes(query) ||
+          [row.birds, row.dcWeight, row.rate, row.amount].some((value) =>
+            [String(value), value.toLocaleString('en-IN'), Number(value).toFixed(2)].some((text) =>
+              text.toLowerCase().includes(query),
             ),
           );
         if (!match) return false;
@@ -300,67 +398,94 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
       return true;
     });
-  }, [allTrips, dateFrom, dateTo, selectedFarm, searchQuery, paymentData]);
+  }, [allDisplayRows, tripById, dateFrom, dateTo, selectedFarm, searchQuery]);
 
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
 
-  const exportRows = useMemo<FarmPaymentExportRow[]>(() => filteredTrips.map((trip) => {
-    const payment = paymentData[String(trip.id)] ?? {};
-    const dcWeight = Number(payment.dcWeight ?? trip.dcWeight ?? 0);
-    const rate = Number(payment.ratePerKg ?? 0);
-    return {
-      tripNo: trip.tripNo,
-      tripDate: trip.tripDate,
-      farm: String(payment.farmName ?? trip.sourceFarm),
-      vehicle: trip.vehicleNo,
-      birdType: String(payment.birdType ?? trip.birdType ?? ''),
-      birds: Math.round(Number(payment.totalBirds ?? trip.totalBirds ?? 0)),
-      dcWeight,
-      rate,
-      totalAmount: Number(payment.totalAmount ?? dcWeight * rate),
-    };
-  }), [filteredTrips, paymentData]);
+  const exportRows = useMemo<FarmPaymentExportRow[]>(
+    () => toFarmPaymentExportRows(filteredRows),
+    [filteredRows]
+  );
 
-  // ----- compute KPI totals (based on filtered trips) -----
-  const totalBirdsKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) =>
-      sum + Number(paymentData[String(trip.id)]?.totalBirds ?? trip.totalBirds ?? 0), 0);
-  }, [filteredTrips, paymentData]);
+  // ----- compute KPI totals (based on filtered display rows) -----
+  // One single-load trip counts once; a two-load trip counts both loads — the
+  // same rows the table shows, summed exactly once.
+  const totalBirdsKPI = useMemo(() => (
+    filteredRows.reduce((sum, row) => sum + row.birds, 0)
+  ), [filteredRows]);
 
-  const totalWeightKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) =>
-      sum + Number(paymentData[String(trip.id)]?.dcWeight ?? trip.dcWeight ?? 0), 0);
-  }, [filteredTrips, paymentData]);
+  const totalWeightKPI = useMemo(() => (
+    filteredRows.reduce((sum, row) => sum + row.dcWeight, 0)
+  ), [filteredRows]);
 
-  const totalAmountKPI = useMemo(() => {
-    return filteredTrips.reduce((sum, trip) => {
-      const payment = paymentData[String(trip.id)];
-      const ratePerKg = payment?.ratePerKg || 0;
-      // Same weight-based pricing the table shows live, so the card and the
-      // column it adds up can never disagree.
-      const dcWeight = Number(payment?.dcWeight ?? trip.dcWeight ?? 0);
-      return sum + (payment?.totalAmount || dcWeight * ratePerKg);
-    }, 0);
-  }, [filteredTrips, paymentData]);
+  const totalAmountKPI = useMemo(() => (
+    filteredRows.reduce((sum, row) => sum + row.amount, 0)
+  ), [filteredRows]);
 
-  // ----- pagination -----
   // ----- pagination (global <Pagination /> handles clamping + windows) -----
-  const paginatedTrips = useMemo(
-    () => filteredTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize),
-    [filteredTrips, currentPage, pageSize]
+  // Pagination counts payable display rows: a two-load trip occupies two slots.
+  const paginatedRows = useMemo(
+    () => filteredRows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [filteredRows, currentPage, pageSize]
   );
 
   // ----- payment handlers -----
-  const handlePaymentUpdate = (tripId: string, updates: Partial<FarmPayment>) => {
-    markDirty(tripId);
+  // A rate edit touches exactly one display row: a single/legacy row writes
+  // the parent rate, a multi-load row writes only its own load — the sibling
+  // load's rate is never read, let alone overwritten. The parent totals are
+  // recomputed from the loads so the table, totals and save payload agree.
+  const handleDisplayRowUpdate = (row: FarmPaymentDisplayRow, rate: number) => {
+    markDirty(row.key);
+    const tripKey = String(row.tripId);
     setPaymentData((prev) => {
-      const existing = prev[tripId] || {};
+      const existing = prev[tripKey] || {};
+      if (row.legId == null) {
+        const dcWeight = Number(existing.dcWeight ?? row.dcWeight ?? 0);
+        return {
+          ...prev,
+          [tripKey]: {
+            ...existing,
+            ratePerKg: rate,
+            ratePerBird: 0,
+            totalAmount: round2(dcWeight * rate),
+            totalBirds: Number(existing.totalBirds ?? row.birds ?? 0),
+            dcWeight,
+            tripId: tripKey,
+            updatedAt: new Date().toISOString(),
+          },
+        };
+      }
+      const apiLoads = apiFarmByTripRef.current.get(tripKey)?.loads ?? [];
+      const baseLoads = existing.loads && existing.loads.length > 0 ? existing.loads : apiLoads;
+      const seeded = baseLoads.length > 0
+        ? baseLoads
+        : [{
+            legId: row.legId, load: row.load ?? 1, farmName: row.farm, birdType: row.birdType,
+            totalBirds: row.birds, dcWeight: row.dcWeight, rate: row.rate, amount: row.amount,
+          }];
+      const loads = seeded.map((load) => {
+        const same = (load.legId != null && load.legId === row.legId)
+          || (load.legId == null && load.load === row.load);
+        if (!same) return load;
+        return { ...load, rate, amount: round2(row.dcWeight * rate) };
+      });
+      const weightSum = loads.reduce((sum, load) => sum + Number(load.dcWeight ?? 0), 0);
+      const totalAmount = round2(loads.reduce((sum, load) => sum + Number(load.amount ?? 0), 0));
+      const rates = loads.map((load) => Number(load.rate ?? 0));
+      const parentRate = rates.length > 0 && rates.every((r) => r === rates[0])
+        ? rates[0]
+        : weightSum > 0 ? round2(totalAmount / weightSum) : (rates[0] ?? 0);
       return {
         ...prev,
-        [tripId]: {
+        [tripKey]: {
           ...existing,
-          ...updates,
-          tripId,
+          loads,
+          ratePerKg: parentRate,
+          ratePerBird: 0,
+          totalAmount,
+          totalBirds: loads.reduce((sum, load) => sum + Number(load.totalBirds ?? 0), 0),
+          dcWeight: round2(weightSum),
+          tripId: tripKey,
           updatedAt: new Date().toISOString(),
         },
       };
@@ -372,15 +497,16 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     // double-submission impossible even via keyboard/rapid re-entry.
     if (savingPayments) return;
 
-    // Save ONLY the rows edited in this session (see dirtyTripIds). A row
-    // restored from a previous save keeps its rate fields, so filtering on
-    // "has a rate" alone would re-save old payments and inflate the count.
-    const paymentsToSave = Object.entries(paymentData).filter(([tripId, payment]) => {
-      if (!dirtyTripIds.has(tripId)) return false;
-      return (payment.ratePerKg ?? 0) > 0 || (payment.totalAmount ?? 0) > 0;
-    });
+    // Save ONLY the display rows edited in this session (see dirtyTripIds).
+    // Each dirty row keeps its own identity (tripId + legId), so saving L1
+    // can never overwrite L2. A row restored from a previous save keeps its
+    // rate fields, so filtering on "has a rate" alone would re-save old
+    // payments and inflate the count.
+    const dirtyRows = allDisplayRows.filter((row) =>
+      dirtyTripIds.has(row.key) && (row.rate > 0 || row.amount > 0)
+    );
 
-    if (paymentsToSave.length === 0) {
+    if (dirtyRows.length === 0) {
       showNotification(t('accounts.farmpay.notif_no_changes'), 'info');
       return;
     }
@@ -388,24 +514,40 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setSavingPayments(true);
 
     try {
-      const payload = paymentsToSave.map(([tripId, paymentDataItem]) => ({
-        tripId: Number(tripId),
-        rate: paymentDataItem.ratePerKg || 0,
-        paidAmount: paymentDataItem.amountPaid || 0,
-        paymentDate: paymentDataItem.paidDate || toBusinessDate(new Date()),
-        paymentMode: paymentDataItem.paymentMode || 'Cash',
-        referenceNo: referenceFromNotes(paymentDataItem.notes) ?? null,
-      }));
+      // Settlement fields live on the parent trip: attach them once per trip
+      // (to the first dirty row of that trip), never once per load.
+      const settledTrips = new Set<number>();
+      const payload: TripFarmPaymentSaveInput[] = dirtyRows.map((row) => {
+        const form = paymentData[String(row.tripId)] ?? {};
+        const firstOfTrip = !settledTrips.has(row.tripId);
+        if (firstOfTrip) settledTrips.add(row.tripId);
+        const entry: TripFarmPaymentSaveInput = {
+          tripId: row.tripId,
+          rate: row.rate,
+        };
+        if (row.legId != null) {
+          entry.legId = row.legId;
+          if (row.load != null) entry.load = row.load;
+        }
+        if (firstOfTrip) {
+          entry.paidAmount = form.amountPaid || 0;
+          entry.paymentDate = form.paidDate || toBusinessDate(new Date());
+          entry.paymentMode = form.paymentMode || 'Cash';
+          entry.referenceNo = referenceFromNotes(form.notes) ?? null;
+        }
+        return entry;
+      });
 
       const updated = await saveTripFarmPayments(payload);
 
       // Reload the ledger so the form mirrors the database (API is source of truth).
       const fresh = await loadTripFarmPayments().catch(() => updated);
       apiFarmByTripRef.current = new Map(fresh.map((row) => [String(row.tripId), row]));
+      setApiLedger(fresh);
       syncPaymentData(allTrips);
       clearDirty();
 
-      const savedCount = updated.length || payload.length;
+      const savedCount = dirtyRows.length || updated.length || payload.length;
       showNotification(
         savedCount === 1
           ? t('accounts.farmpay.notif_saved_one')
@@ -465,7 +607,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     try {
       const { exportFarmPaymentsPdf } = await import('../utils/farmPaymentExport');
       await exportFarmPaymentsPdf(exportRows, exportScope);
-      showNotification(`PDF exported for ${exportRows.length} filtered trip(s).`, 'success');
+      showNotification(`PDF exported for ${exportRows.length} filtered payable row(s).`, 'success');
     } catch (error) {
       console.error('Farm payment PDF export failed:', error);
       showNotification('Unable to export Farm Payment PDF.', 'error');
@@ -482,7 +624,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       await new Promise<void>((resolve) => window.setTimeout(resolve, 40));
       const { exportFarmPaymentsExcel } = await import('../utils/farmPaymentExport');
       exportFarmPaymentsExcel(exportRows, exportScope);
-      showNotification(`Excel exported for ${exportRows.length} filtered trip(s).`, 'success');
+      showNotification(`Excel exported for ${exportRows.length} filtered payable row(s).`, 'success');
     } catch (error) {
       console.error('Farm payment Excel export failed:', error);
       showNotification('Unable to export Farm Payment Excel.', 'error');
@@ -491,15 +633,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     }
   };
 
-  // Unsaved rows = edited since the last load/save (same set Save Payments
-  // persists), so the Save/Reset buttons enable exactly when there is
-  // something new to save — never for rows restored from a previous save.
-  const modifiedCount = useMemo(() => {
-    return Object.entries(paymentData).filter(([tripId, payment]) => {
-      if (!dirtyTripIds.has(tripId)) return false;
-      return (payment.ratePerKg ?? 0) > 0 || (payment.totalAmount ?? 0) > 0;
-    }).length;
-  }, [paymentData, dirtyTripIds]);
+  // Unsaved rows = display rows edited since the last load/save (same set
+  // Save Payments persists), so the Save/Reset buttons enable exactly when
+  // there is something new to save — never for rows restored from a save.
+  const modifiedCount = useMemo(() => (
+    allDisplayRows.filter((row) => dirtyTripIds.has(row.key) && (row.rate > 0 || row.amount > 0)).length
+  ), [allDisplayRows, dirtyTripIds]);
 
   // The page opens unfiltered, so "filtered" means: a date, farm, or search
   // the user picked. Only then does the totals bar appear under the table.
@@ -555,7 +694,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               aria-live="polite"
               className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums"
             >
-              {loading ? t('accounts.farmpay.updating') : filteredTrips.length}
+              {loading ? t('accounts.farmpay.updating') : filteredRows.length}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
@@ -630,9 +769,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         ) : (
           <>
             <FarmPaymentTable
-              trips={paginatedTrips}
-              paymentData={paymentData}
-              onPaymentUpdate={handlePaymentUpdate}
+              rows={paginatedRows}
+              onRateChange={handleDisplayRowUpdate}
               loading={loading && allTrips.length === 0}
               onViewTrip={handleViewTrip}
               startIndex={(currentPage - 1) * pageSize}
@@ -647,10 +785,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
             {/* Totals bar — the last strip of the table, only once a date range
                 or filter narrows the list. */}
-            {isFilterActive && filteredTrips.length > 0 && (
+            {isFilterActive && filteredRows.length > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-slate-200/70 bg-slate-50/80 px-4 py-2">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  {t('accounts.farmpay.totals_for', { count: filteredTrips.length })}
+                  {t('accounts.farmpay.totals_for_rows', { count: filteredRows.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
                   <TotalStat label={t('accounts.farmpay.total_birds')} value={formatCount(totalBirdsKPI)} dot="bg-indigo-500" />
@@ -668,11 +806,11 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             {/* Global pagination, exactly as the Trip List renders it: the
                 shared component, shown only when there is more than one page,
                 blocked while a refresh is in flight. */}
-            {shouldShowPagination(filteredTrips.length) && (
+            {shouldShowPagination(filteredRows.length) && (
               <Pagination
                 page={currentPage}
                 pageSize={pageSize}
-                totalItems={filteredTrips.length}
+                totalItems={filteredRows.length}
                 onPageChange={setCurrentPage}
                 onPageSizeChange={(size) => {
                   setPageSize(size);
@@ -691,7 +829,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       <FarmPaymentTripViewModal
         open={Boolean(viewingTrip)}
         trip={viewingTrip}
-        onClose={() => { viewRequestSeqRef.current += 1; setViewingTrip(null); }}
+        initialLoad={viewingLoad}
+        onClose={() => { viewRequestSeqRef.current += 1; setViewingTrip(null); setViewingLoad(null); }}
       />
     </div>
   );

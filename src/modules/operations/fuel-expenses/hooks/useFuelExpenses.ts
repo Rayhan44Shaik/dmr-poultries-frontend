@@ -21,6 +21,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     totalAmount: 0,
     pendingCount: 0,
     approvedCount: 0,
+    totalDistance: null,
     avgMileage: null,
     recentTripMileage: null,
   });
@@ -130,6 +131,10 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
         setDeletedMap((prev) => new Map(prev).set(id, deletedRecord));
         setExpenses((prev) => prev.map((e) => (e.id === id ? deletedRecord : e)));
       }
+      // Refetch the canonical register so the table, KPI cards and footer
+      // totals/mileage all reflect the backend state (filters/sort/tab/page
+      // are owned by the page and therefore retained).
+      await refresh(true);
       showNotification?.(t("ops.fuel.deleted_success"), "success");
       return true;
     } catch (err) {

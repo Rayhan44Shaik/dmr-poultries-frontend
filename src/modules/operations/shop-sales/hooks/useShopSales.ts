@@ -9,6 +9,7 @@ import {
   paginateSales,
 } from "../utils/shopSaleCalculation";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/paginationStyles";
+import { notifyShopDataChanged } from "../../../../shared/events/shopDataEvents";
 
 const DEFAULT_FILTER: ShopSaleFilter = {
   fromDate: "",
@@ -118,6 +119,24 @@ function useShopSales() {
       try {
         const saved = await updateShopSale(original.numericId, patch);
         setSales((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+        // A Shop Sales mutation changes the ledger's financial row and/or
+        // delivery quantities. Notify both sides of a reassignment so every
+        // open Shop Ledger (including another tab) immediately re-reads the
+        // server-authoritative statement.
+        notifyShopDataChanged({
+          shopId: original.numericShopId ?? null,
+          shopName: original.shopName,
+          reason: "updated",
+          source: "shop-sales",
+        });
+        if (saved.numericShopId !== original.numericShopId) {
+          notifyShopDataChanged({
+            shopId: saved.numericShopId ?? null,
+            shopName: saved.shopName,
+            reason: "updated",
+            source: "shop-sales",
+          });
+        }
         return saved;
       } catch (error) {
         // Don't leave the optimistic/invalid value displayed — reload the
@@ -134,6 +153,12 @@ function useShopSales() {
   const addSale = useCallback(async (input: CreateShopSaleInput) => {
     const saved = await createShopSale(input);
     setSales((prev) => [...prev, saved]);
+    notifyShopDataChanged({
+      shopId: saved.numericShopId ?? input.shopId,
+      shopName: saved.shopName ?? input.shopName,
+      reason: "created",
+      source: "shop-sales",
+    });
     return saved;
   }, []);
 
@@ -143,6 +168,14 @@ function useShopSales() {
       const retained = previous.filter((sale) => sale.numericTripId !== tripId);
       return [...retained, ...saved];
     });
+    for (const sale of saved) {
+      notifyShopDataChanged({
+        shopId: sale.numericShopId ?? null,
+        shopName: sale.shopName,
+        reason: "updated",
+        source: "shop-sales",
+      });
+    }
     return saved;
   }, []);
 

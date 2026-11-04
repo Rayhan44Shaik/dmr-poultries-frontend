@@ -958,7 +958,9 @@ export default {
   'ops.trip.upload_dc_photo': 'డీసీ ఫోటో అప్‌లోడ్',
   'ops.trip.use_tab_navigate': 'దశలను నావిగేట్ చేయడానికి పై ట్యాబ్‌లు ఉపయోగించండి',
   'ops.trip.valid_image': 'చెల్లుబాటు అయ్యే ఇమేజ్ ఫైల్.',
+  'ops.trip.select_trip_to_view': 'చూడటానికి ఒక ట్రిప్‌ను ఎంచుకోండి.',
   'ops.trip.view_selected': 'ఎంచుకున్నది చూడండి',
+  'ops.trip.view_selected_trip': 'ఎంచుకున్న ట్రిప్‌ను చూడండి.',
   'ops.trip.view_step1': 'ట్రిప్ వివరాలు',
   'ops.trip.view_step2': 'ఫారం వివరాలు',
   'ops.trip.view_step2_status': 'ఫారం వివరాల స్థితి',
@@ -1101,6 +1103,15 @@ export default {
   'ops.mortality.tooltip.box_mode': 'బాక్స్ మోడ్ మరణాలు',
   'ops.mortality.tooltip.weight_mode': 'బరువు మోడ్ మరణాలు',
   'ops.mortality.tooltip.helper': 'ప్రతి షాప్ ఎంట్రీలో సేవ్ చేసిన డెలివరీ మోడ్ ఆధారంగా మరణాలు చూపబడతాయి.',
+  // Multi-load breakdown: one tooltip model for every metric, mirroring the
+  // Trip List load tooltip.
+  'ops.mortality.tooltip.by_load': '{metric} లోడ్‌ల వారీగా',
+  'ops.mortality.tooltip.total': 'ట్రిప్ మొత్తం',
+  'ops.mortality.tooltip.weight_loss_formula': 'ఫారం బరువు − డెలివరీ బరువు − గుర్తించిన మరణాల బరువు',
+  // Expanded Weights load tabs.
+  'ops.mortality.load.all': 'అన్ని లోడ్లు',
+  'ops.mortality.load.number': 'లోడ్ {number}',
+  'ops.mortality.detail.load_scope': 'లోడ్ పరిధి',
 
   'ops.mortality.detail.delivered': 'డెలివరీ',
   'ops.mortality.detail.weight_summary': 'బరువులు',

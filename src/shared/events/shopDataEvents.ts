@@ -17,7 +17,7 @@ export interface ShopDataChangedDetail {
   shopName?: string | null;
   reason: ShopDataChangeReason;
   /** Which screen performed the write — useful for logs and future gating. */
-  source: "collection-entry" | "pending-collections" | "shop-master";
+  source: "collection-entry" | "pending-collections" | "shop-master" | "shop-sales";
 }
 
 /** Lazily-created channel; absent in non-browser (test/SSR) environments. */
