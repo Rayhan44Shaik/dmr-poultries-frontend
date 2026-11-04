@@ -538,7 +538,9 @@ export async function generateShopPDFBlob(
 
     return doc.output("blob");
   } catch (error: any) {
-    throw new Error(error?.message || "Failed to generate PDF receipt.");
+    const failure = new Error(error?.message || "Failed to generate PDF receipt.");
+    (failure as { cause?: unknown }).cause = error;
+    throw failure;
   }
 }
 

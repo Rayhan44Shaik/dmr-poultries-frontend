@@ -183,9 +183,10 @@ export default function EnterRateModal({
   }, [trip]);
 
   // 2 days: yesterday, today - today highlighted, as per request only 2 days
+  const tripDate = trip?.tripDate;
   const marketThreeDays = useMemo(() => {
-    if (!trip?.tripDate || !marketMaster) return [];
-    const today = trip.tripDate;
+    if (!tripDate || !marketMaster) return [];
+    const today = tripDate;
     const yesterday = addCalendarDays(today, -1);
     return [yesterday, today].map((date) => {
       const comp = marketMaster.companyRates.find((r) => r.date === date);
@@ -193,7 +194,7 @@ export default function EnterRateModal({
       const size = marketMaster.sizeCategoryBreakdown.find((r) => r.date === date);
       return { date, comp, add, size, isToday: date === today };
     });
-  }, [trip?.tripDate, marketMaster]);
+  }, [tripDate, marketMaster]);
 
   const sizeKeys = useMemo(() => sizeCategoryHeaders(marketMaster).slice(0, 5), [marketMaster]);
 

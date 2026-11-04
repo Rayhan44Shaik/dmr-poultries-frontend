@@ -5,6 +5,20 @@ import { Lock, UtensilsCrossed, Package, Coffee, Wrench, Landmark, Users, MoreHo
 import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import { useI18n } from "../../../../../i18n";
 
+/** Coloured icon chip for expense category labels. Declared at module scope so
+ *  React keeps one component identity across renders. */
+const CatIcon = ({
+  icon: Icon,
+  tone,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  tone: string;
+}) => (
+  <span className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
+    <Icon size={13} />
+  </span>
+);
+
 interface GeneralExpensesTableProps {
   sheetData: any;
   handleChange: (field: string, value: any) => void;
@@ -131,18 +145,6 @@ export default function GeneralExpensesTable({
     computedDistance > 0 && totalDieselLiters > 0
       ? (computedDistance / totalDieselLiters).toFixed(2)
       : null;
-  /** Coloured icon chip for expense category labels. */
-  const CatIcon = ({
-    icon: Icon,
-    tone,
-  }: {
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    tone: string;
-  }) => (
-    <span className={`h-6 w-6 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
-      <Icon size={13} />
-    </span>
-  );
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-xs bg-white">

@@ -561,6 +561,12 @@ export default function StepPickup({
     );
   };
 
+  const isLastRowComplete = useMemo(() => {
+    if (rows.length === 0) return true;
+    const lastRow = rows[rows.length - 1];
+    return lastRow.birds > 0 && lastRow.weight > 0;
+  }, [rows]);
+
   const blockScrollAndArrows = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
   };
@@ -813,12 +819,6 @@ export default function StepPickup({
     importEditOriginalRef.current = null;
     setEditingImportIndex(null);
   };
-
-  const isLastRowComplete = useMemo(() => {
-    if (rows.length === 0) return true;
-    const lastRow = rows[rows.length - 1];
-    return lastRow.birds > 0 && lastRow.weight > 0;
-  }, [rows]);
 
   // ─── Image upload handlers ──────────────────────────────────────────
   const photoFields = (): Partial<Trip> & { syncPickupPhotos: boolean } => ({

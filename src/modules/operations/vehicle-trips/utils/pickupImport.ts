@@ -60,7 +60,7 @@ function extractMetadata(rows: unknown[][]): PickupImportMetadata {
       if (!cell) continue;
       for (const [key, label] of definitions) {
         if (metadata[key] || !label.test(cell)) continue;
-        const inline = cell.match(/[:\-]\s*(.+)$/)?.[1]?.trim();
+        const inline = cell.match(/[:-]\s*(.+)$/)?.[1]?.trim();
         const adjacent = text(row[col + 1]);
         const value = inline || adjacent;
         if (value && !label.test(value)) metadata[key] = value;
