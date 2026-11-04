@@ -11,7 +11,7 @@ import type {
   PendingShopSortDir,
   PendingShopSortKey,
 } from "../types/collection";
-import { useToast } from "../../../../components/common/ToastProvider";
+import { useToast } from "../../../../components/common/useToast";
 import { ShopCollectionDetailModal } from "../components/pending/ShopCollectionDetailModal";
 import PendingCollectionsFilters from "../components/pending/PendingCollectionsFilters";
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";

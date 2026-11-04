@@ -41,15 +41,10 @@ import {
 import {
   format,
   isValid,
-  parse,
   startOfWeek,
-  endOfWeek,
   startOfMonth,
   endOfMonth,
   startOfDay,
-  endOfDay,
-  isBefore,
-  isAfter,
   isSameDay,
   addMonths,
   subMonths,
@@ -59,6 +54,16 @@ import {
   getMonth,
   differenceInCalendarDays,
 } from "date-fns";
+import {
+  WEEK_STARTS_ON,
+  MONTH_LABELS,
+  parseISODateLocal,
+  parseDisplayDate,
+  formatDisplay,
+  formatValue,
+  isDateDisabled,
+  clampToBounds,
+} from "./datePickerCore";
 import { DayPicker } from "react-day-picker";
 import { te as teluguLocale } from "date-fns/locale";
 import "react-day-picker/style.css";
@@ -67,39 +72,8 @@ import "react-day-picker/style.css";
  * Constants
  * ============================================================================= */
 
-const DISPLAY_FORMAT = "dd/MM/yyyy";
-const VALUE_FORMAT = "yyyy-MM-dd";
-const WEEK_STARTS_ON = 1 as const; // Monday — Indian ERP convention
-
-const MONTH_LABELS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-] as const;
-
-const MONTH_SHORT = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-] as const;
+// Formats, month labels and the date helpers live in ./datePickerCore so this
+// module exports components only; they are imported at the top of this file.
 
 // Opt-in localization; existing callers keep their English calendar unchanged.
 const CALENDAR_COPY = {
@@ -179,90 +153,9 @@ export interface CalendarDropdownProps {
 }
 
 /* =============================================================================
- * Date helpers (local calendar — no UTC shift)
+ * Date helpers (local calendar — no UTC shift) live in ./datePickerCore,
+ * shared with the public helpers in ./datePickerUtils.
  * ============================================================================= */
-
-function toLocalISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function parseISODateLocal(iso: string | undefined | null): Date | undefined {
-  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) return undefined;
-  const [y, m, d] = iso.trim().split("-").map(Number);
-  const date = new Date(y, m - 1, d);
-  if (!isValid(date)) return undefined;
-  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) {
-    return undefined;
-  }
-  return date;
-}
-
-function parseDisplayDate(text: string): Date | undefined {
-  const trimmed = text.trim();
-  if (!trimmed) return undefined;
-
-  // Strict DD/MM/YYYY
-  const strict = parse(trimmed, DISPLAY_FORMAT, new Date());
-  if (isValid(strict) && format(strict, DISPLAY_FORMAT) === trimmed) {
-    return strict;
-  }
-
-  // Tolerant: D/M/YYYY or DD-MM-YYYY or DD.MM.YYYY
-  const normalized = trimmed.replace(/[-.]/g, "/");
-  const parts = normalized.split("/");
-  if (parts.length === 3) {
-    const [dd, mm, yyyy] = parts.map((p) => p.trim());
-    if (dd && mm && yyyy && yyyy.length === 4) {
-      const candidate = parse(
-        `${dd.padStart(2, "0")}/${mm.padStart(2, "0")}/${yyyy}`,
-        DISPLAY_FORMAT,
-        new Date()
-      );
-      if (isValid(candidate)) return candidate;
-    }
-  }
-
-  // Also accept YYYY-MM-DD typed manually
-  const iso = parseISODateLocal(trimmed);
-  if (iso) return iso;
-
-  return undefined;
-}
-
-function formatDisplay(date: Date | undefined): string {
-  if (!date || !isValid(date)) return "";
-  return format(date, DISPLAY_FORMAT);
-}
-
-function formatValue(date: Date | undefined): string {
-  if (!date || !isValid(date)) return "";
-  return toLocalISODate(date);
-}
-
-function isDateDisabled(
-  date: Date,
-  minDate?: Date,
-  maxDate?: Date
-): boolean {
-  const day = startOfDay(date);
-  if (minDate && isBefore(day, startOfDay(minDate))) return true;
-  if (maxDate && isAfter(day, startOfDay(maxDate))) return true;
-  return false;
-}
-
-function clampToBounds(date: Date, minDate?: Date, maxDate?: Date): Date {
-  let result = date;
-  if (minDate && isBefore(startOfDay(result), startOfDay(minDate))) {
-    result = minDate;
-  }
-  if (maxDate && isAfter(startOfDay(result), startOfDay(maxDate))) {
-    result = maxDate;
-  }
-  return result;
-}
 
 /* =============================================================================
  * CalendarDropdown — month / year select used inside DayPicker caption
@@ -952,64 +845,4 @@ export function UncontrolledDatePicker({
   );
 }
 
-/* =============================================================================
- * Re-exports / utilities for consumers
- * ============================================================================= */
-
-export const DatePickerUtils = {
-  DISPLAY_FORMAT,
-  VALUE_FORMAT,
-  WEEK_STARTS_ON,
-  MONTH_LABELS,
-  MONTH_SHORT,
-  toLocalISODate,
-  parseISODateLocal,
-  parseDisplayDate,
-  formatDisplay,
-  formatValue,
-  isDateDisabled,
-  clampToBounds,
-  startOfWeekMonday: (d: Date) => startOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }),
-  endOfWeekSunday: (d: Date) => endOfWeek(d, { weekStartsOn: WEEK_STARTS_ON }),
-  startOfDay,
-  endOfDay,
-};
-
 export default DatePicker;
-
-/* =============================================================================
- * Optional: dual-bound helper used by forms that store Date objects
- * ============================================================================= */
-
-export function dateToPickerValue(date: Date | null | undefined): string {
-  if (!date || !isValid(date)) return "";
-  return toLocalISODate(date);
-}
-
-export function pickerValueToDate(value: string | null | undefined): Date | null {
-  const parsed = parseISODateLocal(value ?? "");
-  return parsed ?? null;
-}
-
-/** True when `value` is a non-empty valid YYYY-MM-DD. */
-export function isPickerValue(value: unknown): value is string {
-  return typeof value === "string" && Boolean(parseISODateLocal(value));
-}
-
-/**
- * Build a short human label for chips / filter pills.
- * Examples: "Today", "12 Aug 2026", "Invalid date"
- */
-export function describePickerValue(value: string, locale: string = "en-IN"): string {
-  const d = parseISODateLocal(value);
-  if (!d) return value ? "Invalid date" : "No date";
-  if (isSameDay(d, startOfDay(new Date()))) return "Today";
-  const yesterday = startOfDay(new Date());
-  yesterday.setDate(yesterday.getDate() - 1);
-  if (isSameDay(d, yesterday)) return "Yesterday";
-  return d.toLocaleDateString(locale, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}

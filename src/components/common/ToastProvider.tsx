@@ -22,7 +22,8 @@
  */
 
 import type { ReactNode } from "react";
-import { createContext, useCallback, useContext, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { ToastContext, type ToastContextType } from "./useToast";
 // `useMemo` is used by the provider below to keep the context value stable.
 import {
   push,
@@ -30,12 +31,6 @@ import {
 } from "../../ui/notifications/notificationStore";
 
 export type ToastType = NotificationTone;
-
-interface ToastContextType {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
-}
-
-const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const showToast = useCallback(
@@ -49,32 +44,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const value = useMemo<ToastContextType>(() => ({ showToast }), [showToast]);
 
   return <ToastContext.Provider value={value}>{children}</ToastContext.Provider>;
-}
-
-export interface ToastApi {
-  success: (message: string, duration?: number) => void;
-  error: (message: string, duration?: number) => void;
-  warning: (message: string, duration?: number) => void;
-  info: (message: string, duration?: number) => void;
-  /** Raw form, matching the previous `showToast(message, type, duration)`. */
-  show: (message: string, type?: ToastType, duration?: number) => void;
-}
-
-export function useToast(): ToastApi {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error("useToast must be used within a ToastProvider");
-  }
-
-  const { showToast } = context;
-
-  // Mirrors the previous shape exactly (a fresh api object per render), so
-  // existing destructuring call sites behave identically.
-  return {
-    success: (message, duration) => showToast(message, "success", duration),
-    error: (message, duration) => showToast(message, "error", duration),
-    warning: (message, duration) => showToast(message, "warning", duration),
-    info: (message, duration) => showToast(message, "info", duration),
-    show: (message, type, duration) => showToast(message, type, duration),
-  };
 }

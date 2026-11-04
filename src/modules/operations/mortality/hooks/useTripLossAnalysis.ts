@@ -54,7 +54,7 @@
 // the screen — when there is nothing to keep — shows the skeleton.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DatePickerUtils } from "../../../../components/common/DatePicker";
+import { DatePickerUtils } from "../../../../components/common/datePickerUtils";
 import {
   fetchMortalityAnalysis,
   type MortalityFilterOptions,

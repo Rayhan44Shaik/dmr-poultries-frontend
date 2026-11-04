@@ -52,7 +52,7 @@ import {
   type OrdersWhatsAppResult,
   type SupervisorDirectory,
 } from "../services/ordersService";
-import { useToast } from "../../../components/common/ToastProvider";
+import { useToast } from "../../../components/common/useToast";
 import {
   buildShopBreakdown,
   localToday,
