@@ -22,15 +22,12 @@ import { Clock3 } from "lucide-react";
 import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 import { activityPing } from "./authApi";
-import { GENUINE_ACTIVITY_EVENTS, IDLE_TIMEOUT_MS, isGenuineActivityEvent } from "./idleActivity";
+import { GENUINE_ACTIVITY_EVENTS, IDLE_TIMEOUT_MS } from "./idleActivity";
 import {
   publishAuthEvent,
   readSharedActivity,
   subscribeAuthEvents,
 } from "./authEvents";
-
-export { isGenuineActivityEvent };
-export { ACTIVITY_KEY as ACTIVITY_BROADCAST_KEY } from "./authEvents";
 
 /** How long before the deadline the warning banner appears. */
 const WARNING_BEFORE_MS = 60 * 1000;
@@ -38,9 +35,6 @@ const WARNING_BEFORE_MS = 60 * 1000;
 const RESET_THROTTLE_MS = 1000;
 /** Genuine-activity pings to the server are throttled to this interval. */
 const SERVER_PING_THROTTLE_MS = 60 * 1000;
-
-/** sessionStorage flag the LoginPage reads to explain the signed-out state. */
-export const IDLE_SIGNOUT_KEY = "dmr:signout-reason";
 
 export default function IdleSessionGuard() {
   const { isAuthenticated, logout } = useAuth();

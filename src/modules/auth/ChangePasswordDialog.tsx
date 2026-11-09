@@ -5,7 +5,7 @@ import { changePasswordRequest } from "./authApi";
 import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
 import Modal from "../../ui/Modal";
-import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
+import { IDLE_SIGNOUT_KEY } from "./idleSessionMeta";
 import { beginSignOut } from "./signOutGate";
 import { storeToken } from "./tokenStore";
 

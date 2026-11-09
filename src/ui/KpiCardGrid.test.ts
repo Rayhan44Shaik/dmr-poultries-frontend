@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compactKpiValue } from "./KpiCardGrid";
+import { compactKpiValue } from "./kpiCardValue";
 
 test("KPI values switch to Lakhs only at 1,00,000 and retain their exact tooltip value", () => {
   assert.deepEqual(compactKpiValue(99_999, 2), {

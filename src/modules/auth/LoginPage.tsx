@@ -15,7 +15,7 @@ import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
 import { currentUserRequest, loginRequest, mfaVerifyRequest } from "./authApi";
 import { landingPathForRole } from "./permissions";
-import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
+import { IDLE_SIGNOUT_KEY } from "./idleSessionMeta";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
 import { loginErrorMessage, validateLoginForm } from "./loginValidation";
 import { notify } from "../../ui/notifications/notificationStore";

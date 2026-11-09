@@ -82,11 +82,13 @@ export { Tabs, type TabItem, type TabsProps } from "./Tabs";
 export {
   KpiCardGrid,
   KpiMetricValue,
+} from "./KpiCardGrid";
+export {
   compactKpiValue,
   type CompactKpiValue,
   type KpiCardItem,
   type KpiTone,
-} from "./KpiCardGrid";
+} from "./kpiCardValue";
 export { Pagination, type PaginationProps } from "./Pagination";
 export { StatusBadge, type StatusBadgeProps } from "./StatusBadge";
 export { EmptyState, type EmptyStateProps, type EmptyVariant } from "./EmptyState";

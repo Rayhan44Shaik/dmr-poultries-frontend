@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { currentUserShared, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
 import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
-import { IDLE_SIGNOUT_KEY } from '../modules/auth/IdleSessionGuard';
+import { IDLE_SIGNOUT_KEY } from '../modules/auth/idleSessionMeta';
 import { beginSignOut, endSignOut, isSigningOut } from '../modules/auth/signOutGate';
 import { publishAuthEvent, subscribeAuthEvents } from '../modules/auth/authEvents';
 import { AuthContext } from './authContext';
