@@ -110,7 +110,7 @@ describe('Fleet Operations active scope', () => {
   });
 
   it('does not register deferred dashboard/reports/expenses routes as active', () => {
-    const routesSource = read('routes.tsx');
+    const routesSource = read('fleetRouteConfig.tsx');
     assert.match(routesSource, /DEFERRED/);
     assert.equal(/^\s*path:\s*'fleet\/dashboard'/m.test(routesSource), false);
     assert.equal(/^\s*path:\s*'fleet\/reports'/m.test(routesSource), false);
@@ -203,7 +203,7 @@ describe('Fleet Operations active scope', () => {
     assert.doesNotMatch(live, /useEffect/);
     const tabLoadersSource = read('pages/fleetTabs.ts');
     assert.match(tabLoadersSource, /fastag: \(\) => import\("\.\/FastagDashboardPage"\)/);
-    const routesSource = read('routes.tsx');
+    const routesSource = read('fleetRouteConfig.tsx');
     assert.match(routesSource, /fleet\/fastag/);
     assert.equal(fs.existsSync(path.join(here, 'hooks/useFastagData.ts')), true);
     assert.equal(fs.existsSync(path.join(here, 'services/storage.ts')), true);

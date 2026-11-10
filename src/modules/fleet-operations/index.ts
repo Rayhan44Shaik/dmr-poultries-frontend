@@ -22,7 +22,7 @@ export { default as VehicleReportsPage } from './pages/VehicleReportsPage';
 export { default as VehicleExpenseReportPage } from './pages/VehicleExpenseReportPage';
 
 // Export routes
-export { fleetRoutes } from './routes';
+export { fleetRoutes } from './fleetRouteConfig';
 
 // Export types
 export * from './types';
