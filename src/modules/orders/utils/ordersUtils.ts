@@ -157,15 +157,31 @@ export function isEligibleVehicleTrip(trip: Trip): boolean {
   );
 }
 
+const ORDER_TAG_PREFIX_LENGTH = "order:".length;
+
+/**
+ * True for one pipe-separated remarks tag shaped exactly as `order:<ref>`.
+ * The prefix is exact but case-insensitive so both the legacy lowercase
+ * `order:<tripNo>` and the normalized uppercase `ORDER:<tripNo>` match.
+ * Embedded text (`my order:...`), malformed prefixes (`order :`, `orders:`,
+ * `order-...`) and a bare prefix with no reference are rejected.
+ */
+function isOrderTagText(tag: string): boolean {
+  const text = tag.trim();
+  if (!/^order:/i.test(text)) return false;
+  return text.slice(ORDER_TAG_PREFIX_LENGTH).trim().length > 0;
+}
+
 /**
  * True when Finish Assignment tagged the trip remarks with `order:<tripNo>`.
  * Survives a lost `[ORDER]` plan-row list so the trip still appears in
  * Delivery Tracking (with `assignmentIncomplete`) instead of vanishing.
+ * Accepts the legacy lowercase tag and the normalized uppercase form.
  */
 export function hasOrderTag(trip: Trip): boolean {
   return String(trip.remarks ?? "")
     .split("|")
-    .some((tag) => tag.trim().startsWith("order:"));
+    .some(isOrderTagText);
 }
 
 /**
@@ -1238,8 +1254,8 @@ export function orderRefsOnTrip(trip: Trip): string[] {
   const fromTrip = String(trip.remarks ?? "")
     .split("|")
     .map((tag) => tag.trim())
-    .filter((tag) => tag.startsWith("order:"))
-    .map((tag) => tag.slice("order:".length).trim())
+    .filter((tag) => /^order:/i.test(tag))
+    .map((tag) => tag.slice(ORDER_TAG_PREFIX_LENGTH).trim())
     .filter(Boolean);
   return Array.from(new Set([...fromRows, ...fromTrip]));
 }
