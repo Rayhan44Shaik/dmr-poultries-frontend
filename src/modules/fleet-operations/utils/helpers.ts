@@ -20,7 +20,7 @@ export const safeJsonParse = <T>(json: string | null, fallback: T): T => {
 /**
  * Debounce function - fixed without NodeJS namespace
  */
-export const debounce = <T extends (...args: any[]) => void>(
+export const debounce = <T extends (...args: never[]) => void>(
   fn: T,
   delay: number = 300
 ): ((...args: Parameters<T>) => void) => {

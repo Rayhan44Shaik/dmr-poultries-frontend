@@ -14,7 +14,7 @@ interface PartsTableProps {
 
 const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) => {
   const { t } = useI18n();
-  const updatePart = (index: number, field: keyof PartItem, value: any) => {
+  const updatePart = <K extends keyof PartItem>(index: number, field: K, value: PartItem[K]) => {
     const newParts = [...parts];
     newParts[index] = { ...newParts[index], [field]: value };
     

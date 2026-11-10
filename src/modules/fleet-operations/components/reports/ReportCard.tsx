@@ -5,7 +5,7 @@ interface ReportCardProps {
   id: string;
   title: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   onExport: (id: string, format: 'pdf' | 'excel') => void;
 }
 

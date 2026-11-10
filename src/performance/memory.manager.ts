@@ -1,10 +1,18 @@
 // src/performance/memory.manager.ts
 
+interface PerformanceMemoryReading {
+  readonly usedJSHeapSize: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  readonly memory?: PerformanceMemoryReading;
+}
+
 export class MemoryManager {
   private maxMemory = 50 * 1024 * 1024; // 50 MB
 
   isLowMemory(): boolean {
-    const perf = performance as any; // ✅ Type assertion to any
+    const perf = performance as PerformanceWithMemory;
     if (perf.memory) {
       return perf.memory.usedJSHeapSize > this.maxMemory * 0.8;
     }

@@ -1,5 +1,13 @@
 // src/performance/performance.monitor.ts
 
+interface PerformanceMemoryReading {
+  readonly usedJSHeapSize: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  readonly memory?: PerformanceMemoryReading;
+}
+
 export class PerformanceMonitor {
   private startTime: number = 0;
 
@@ -21,7 +29,7 @@ export class PerformanceMonitor {
   }
 
   static memory(): string {
-    const perf = performance as any; // ✅ Type assertion to any
+    const perf = performance as PerformanceWithMemory;
     if (perf.memory) {
       return `${(perf.memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB`;
     }

@@ -28,6 +28,12 @@ const TRIPS_PATH = "/trips";
 /** Raw trip shape returned by GET/PUT/POST /api/trips */
 type ApiTripRecord = Record<string, unknown>;
 
+interface ApiPhoto {
+  key?: unknown;
+  mime?: unknown;
+  data?: unknown;
+}
+
 export type LastClosingMeter = {
   closingMeter: number;
   /** Display label: trip number, or "Fuel …" / "Maintenance …". */
@@ -307,7 +313,7 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     dcPhotoMime2: raw.dcPhotoMime2 != null ? str(raw.dcPhotoMime2) : defaults.dcPhotoMime2,
     dcPhotoData2: raw.dcPhotoData2 != null ? str(raw.dcPhotoData2) : defaults.dcPhotoData2,
     pickupPhotos: Array.isArray(raw.pickupPhotos)
-      ? raw.pickupPhotos.map((photo: any) => ({ key: str(photo.key), mime: str(photo.mime, "image/jpeg"), data: str(photo.data) }))
+      ? (raw.pickupPhotos as ApiPhoto[]).map((photo) => ({ key: str(photo.key), mime: str(photo.mime, "image/jpeg"), data: str(photo.data) }))
       : defaults.pickupPhotos,
     vehicleBoxCapacity:
       numOrNull(raw.vehicleBoxCapacity ?? raw.vehicle_box_capacity) ?? defaults.vehicleBoxCapacity,
