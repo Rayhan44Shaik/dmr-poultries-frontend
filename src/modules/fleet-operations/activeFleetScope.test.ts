@@ -240,9 +240,19 @@ describe('Fleet Operations active scope', () => {
 
   it('uses the same content width and page gutters as Operations', () => {
     const fleet = read('pages/FleetPages.tsx');
-    assert.match(fleet, /px-4 pb-8 pt-6 sm:px-5 lg:px-6/);
-    assert.match(fleet, /max-w-\[1600px\]/);
-    assert.doesNotMatch(fleet, /max-w-\[1480px\]/);
+    const ops = read('../operations/pages/OperationsPages.tsx');
+    // Shared Fleet/Operations shell convention: full-width content with outer
+    // gutters, no constraining max-width, no centering. Both shells are
+    // asserted so future drift on either side fails loudly (FleetPages is the
+    // reference; Operations is the comparison).
+    for (const cls of ['px-4 pb-8 pt-6 sm:px-5 lg:px-6', 'w-full min-w-0']) {
+      assert.ok(fleet.includes(cls), `fleet: ${cls}`);
+      assert.ok(ops.includes(cls), `operations: ${cls}`);
+    }
+    for (const token of ['max-w-[1600px]', 'max-w-[1480px]', 'mx-auto']) {
+      assert.equal(fleet.includes(token), false, `fleet: ${token}`);
+      assert.equal(ops.includes(token), false, `operations: ${token}`);
+    }
   });
 
   it('Maintenance Entry does not load Operations fuel-expenses until a vehicle is selected', () => {
