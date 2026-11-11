@@ -103,3 +103,76 @@ test("two partial lots add up and close the shop", () => {
   assert.equal(row.status, "delivered");
   assert.equal(shopRemainingBoxes(row), 0);
 });
+
+// DELIVERY-REOPEN-1: backend serial normalization can place the captured
+// [ORDER] row before the uncaptured plan row after a reload. The uncaptured
+// plan row stays the assignment basis; captures count only toward delivered.
+function reopenBreakdown(rows: ShopDelivery[]) {
+  return buildShopBreakdown(
+    rows,
+    new Set([101]),
+    (shopId) => `Village ${shopId}`,
+    new Map([[101, { boxes: 20, birds: 200, weight: 300 }]])
+  )[0];
+}
+
+function reopenPlan(over: Partial<ShopDelivery> = {}): ShopDelivery {
+  return { ...planRow(101, 20, 200), id: 4, serialNo: 2, ...over };
+}
+
+function reopenCaptured(boxes: number, over: Partial<ShopDelivery> = {}): ShopDelivery {
+  return {
+    ...planRow(101, boxes, boxes * 10),
+    id: 5,
+    serialNo: 1,
+    autoCaptureTime: "2026-11-10T12:21:39.618Z",
+    ...over,
+  };
+}
+
+test("captured-first ordering keeps Assigned=20, Delivered=10, Pending=10 (partial)", () => {
+  const row = reopenBreakdown([reopenCaptured(10), reopenPlan()]);
+  assert.equal(row.assignedBoxes, 20, "plan is the uncaptured 20-box row");
+  assert.equal(row.tripBoxes, 20);
+  assert.equal(row.deliveredBoxes, 10, "captured row counts only as delivered");
+  assert.equal(row.pendingBoxes, 10, "delivery input stays open with max=10");
+  assert.equal(row.status, "part_delivered");
+  assert.equal(shopRemainingBoxes(row), 10);
+});
+
+test("plan-first ordering agrees with captured-first ordering (partial 10/20)", () => {
+  const capturedFirst = reopenBreakdown([reopenCaptured(10), reopenPlan()]);
+  const planFirst = reopenBreakdown([reopenPlan(), { ...reopenCaptured(10), id: 5, serialNo: 3 }]);
+  assert.deepEqual(
+    {
+      assigned: planFirst.assignedBoxes,
+      delivered: planFirst.deliveredBoxes,
+      pending: planFirst.pendingBoxes,
+      status: planFirst.status,
+    },
+    {
+      assigned: capturedFirst.assignedBoxes,
+      delivered: capturedFirst.deliveredBoxes,
+      pending: capturedFirst.pendingBoxes,
+      status: capturedFirst.status,
+    },
+    "row order must not change the derivation"
+  );
+  assert.equal(planFirst.pendingBoxes, 10);
+});
+
+test("captured-first fully delivered shows Pending=0 and no further input", () => {
+  const row = reopenBreakdown([reopenCaptured(20), reopenPlan()]);
+  assert.equal(row.assignedBoxes, 20);
+  assert.equal(row.deliveredBoxes, 20);
+  assert.equal(row.pendingBoxes, 0, "nothing left to capture");
+  assert.equal(row.status, "delivered");
+  assert.equal(shopRemainingBoxes(row), 0);
+});
+
+test("shop without an uncaptured plan row keeps the captured row as plan", () => {
+  const only = reopenBreakdown([reopenCaptured(10)]);
+  assert.equal(only.assignedBoxes, 10, "fallback preserves prior behavior");
+  assert.equal(only.deliveredBoxes, 10);
+  assert.equal(only.pendingBoxes, 0);
+});
