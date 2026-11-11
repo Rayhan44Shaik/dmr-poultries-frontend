@@ -1,0 +1,9 @@
+7:const MaintenanceEntryPage = lazy(retryableImport(() => import('./pages/MaintenanceEntryPage')));
+8:const MaintenanceHistoryPage = lazy(retryableImport(() => import('./pages/MaintenanceHistoryPage')));
+9:const DocumentsExpiryPage = lazy(retryableImport(() => import('./pages/DocumentsExpiryPage')));
+10:const FastagDashboardPage = lazy(retryableImport(() => import('./pages/FastagDashboardPage')));
+11:const EmiLoansPage = lazy(retryableImport(() => import('./pages/EmiLoansPage')));
+12:const VehicleAnalyticsPage = lazy(retryableImport(() => import('./pages/VehicleAnalyticsPage')));
+15:// const FleetDashboardPage = lazy(retryableImport(() => import('./pages/FleetDashboardPage')));
+16:// const VehicleReportsPage = lazy(retryableImport(() => import('./pages/VehicleReportsPage')));
+17:// const VehicleExpenseReportPage = lazy(retryableImport(() => import('./pages/VehicleExpenseReportPage')));

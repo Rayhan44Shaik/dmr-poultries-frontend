@@ -15,6 +15,7 @@ import {
   opsInputClass,
   opsExcelButtonClass,
   opsPdfButtonClass,
+  opsPrimaryButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../../ui";
@@ -42,6 +43,7 @@ interface Props {
   setRecoveryThreshold: (value: number) => void;
   setSearchQuery: (value: string) => void;
   onReset: () => void;
+  onSearch: () => void;
   onRefresh: () => void;
   onExportPdf?: () => void;
   onExportExcel?: () => void;
@@ -81,6 +83,7 @@ function PendingCollectionsFilters({
   setRecoveryThreshold,
   setSearchQuery,
   onReset,
+  onSearch,
   onRefresh,
   onExportPdf,
   onExportExcel,
@@ -257,6 +260,7 @@ function PendingCollectionsFilters({
         </div>
 
         <div className="lg:col-span-4 flex flex-wrap items-center justify-end gap-2">
+          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}><Search size={15} />{t("common.search")}</button>
           <button type="button" onClick={onExportPdf} disabled={!exportEnabled} className={`${opsPdfButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} title={exportEnabled ? "Export filtered pending collections as PDF" : "No filtered data to export"}><FileDown size={15} />PDF</button>
           <button type="button" onClick={onExportExcel} disabled={!exportEnabled} className={`${opsExcelButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} title={exportEnabled ? "Export filtered pending collections as Excel" : "No filtered data to export"}><FileSpreadsheet size={15} />Excel</button>
           <FilterResetButton

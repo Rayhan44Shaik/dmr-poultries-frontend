@@ -1,0 +1,394 @@
+diff --git a/src/modules/operations/collections/components/entry/CollectionAmount.test.ts b/src/modules/operations/collections/components/entry/CollectionAmount.test.ts
+index 716da70d..e5ec0754 100644
+--- a/src/modules/operations/collections/components/entry/CollectionAmount.test.ts
++++ b/src/modules/operations/collections/components/entry/CollectionAmount.test.ts
+@@ -1,6 +1,6 @@
+ import assert from "node:assert/strict";
+ import test from "node:test";
+-import { formatCollectionAmountInput } from "./CollectionAmount";
++import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
+ 
+ test("collection amount applies Indian grouping immediately while typing", () => {
+   assert.deepEqual(formatCollectionAmountInput("700"), { display: "700", amount: 700 });
+diff --git a/src/modules/operations/collections/components/entry/CollectionAmount.tsx b/src/modules/operations/collections/components/entry/CollectionAmount.tsx
+index 9039286b..c82a2a6a 100644
+--- a/src/modules/operations/collections/components/entry/CollectionAmount.tsx
++++ b/src/modules/operations/collections/components/entry/CollectionAmount.tsx
+@@ -2,6 +2,7 @@ import { Calculator, AlertTriangle, CheckCircle, Clock, X, Save, Loader2 } from
+ import { useState, useEffect, useRef, type ReactNode } from "react";
+ import { useI18n } from "../../../../../i18n";
+ import { amountInWords } from "../../utils/amountInWords";
++import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
+ 
+ /**
+  * One line of the collection preview: the period it belongs to (Before
+@@ -76,21 +77,6 @@ const formatWithCommas = (num: number): string => {
+   return formattedInteger + "." + decimalPart;
+ };
+ 
+-export function formatCollectionAmountInput(value: string): { display: string; amount: number } {
+-  let raw = value.replace(/,/g, "").replace(/[^0-9.]/g, "");
+-  const parts = raw.split(".");
+-  if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
+-  const [integer = "", decimal] = raw.split(".");
+-  const normalizedInteger = integer.replace(/^0+(?=\d)/, "");
+-  const grouped = normalizedInteger
+-    ? Number(normalizedInteger).toLocaleString("en-IN", { maximumFractionDigits: 0 })
+-    : "";
+-  return {
+-    display: decimal !== undefined ? `${grouped}.${decimal.slice(0, 2)}` : grouped,
+-    amount: Number.isFinite(Number(raw)) ? Number(raw) : 0,
+-  };
+-}
+-
+ export default function CollectionAmount({
+   amount,
+   remarks,
+diff --git a/src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx b/src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
+index 6b2fb7eb..6f931289 100644
+--- a/src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
++++ b/src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
+@@ -1,8 +1,9 @@
+ // src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
+ 
+ import React, { useRef, useState, useEffect, useCallback } from "react";
+-import { AlertTriangle, Plus, Gauge, CheckCircle2, Circle, Upload, MapPin, Loader2 } from "lucide-react";
++import { AlertTriangle, Plus, Gauge, CheckCircle2, Circle, Upload, MapPin, Loader2, Pencil, X, Save, Trash2 } from "lucide-react";
+ import {
++  deleteTripDiesel,
+   submitTripDiesel,
+   updateTripDiesel,
+   handleApiError,
+@@ -17,6 +18,7 @@ import {
+ } from "../../utils/meterValidation";
+ import { GpsAddressText } from "../GpsAddressText";
+ import { BillPreviewLink } from "./BillPreviewLink";
++import { mergeVisibleDieselRows } from "./mergeVisibleDieselRows";
+ 
+ import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
+ import { compressImageFile } from "../../../../../utils/compressImage";
+@@ -31,6 +33,7 @@ interface DieselExpensesTableProps {
+   sheetData: any;
+   handleChange: (field: string, value: any) => void;
+   applyBatchUpdates: (updates: Record<string, any>) => void;
++  onRowsDeleted?: (nextSheet: Record<string, unknown>) => Promise<void>;
+   dieselAmounts: number[];
+   totalDieselAmount: number;
+   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
+@@ -94,21 +97,6 @@ function dieselSlotActive(data: Record<string, unknown>, i: number): boolean {
+   );
+ }
+ 
+-/** Visible diesel rows: submitted/active sheet slots, plus empty rows the user
+- *  explicitly opened with + Add Diesel Entry. Never keep a phantom slot 1 after
+- *  a remount when bills already live on 2, 3, 4 (delete-then-re-add). */
+-export function mergeVisibleDieselRows(
+-  prev: number[],
+-  activeFromSheet: number[],
+-  keepEmpty: ReadonlySet<number>
+-): number[] {
+-  const draftOnly = prev.filter(
+-    (n) => n >= 1 && !activeFromSheet.includes(n) && keepEmpty.has(n)
+-  );
+-  const next = Array.from(new Set([...activeFromSheet, ...draftOnly])).sort((a, b) => a - b);
+-  return next.length > 0 ? next : [1];
+-}
+-
+ function dieselRowsFromSheet(data: Record<string, unknown>): number[] {
+   const slots = collectDieselSlotIndices(data).filter((i) => dieselSlotActive(data, i));
+   return slots.length > 0 ? slots : [1];
+@@ -119,6 +107,7 @@ export default function DieselExpensesTable({
+   sheetData,
+   handleChange,
+   applyBatchUpdates,
++  onRowsDeleted,
+   dieselAmounts: _dieselAmounts,
+   destMeter,
+   showNotification,
+@@ -186,24 +175,31 @@ export default function DieselExpensesTable({
+     if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+   };
+ 
+-  /** Validate that a single diesel bill litres is in valid range (0, 100].
++  /** Validate that a single diesel bill litres is in valid range (0, 200].
+    * Returns { valid, message } for the caller to display inline.
+    */
+   const validateLitresRange = (value: number): { valid: boolean; message: string | null } => {
+     if (value <= 0 || !Number.isFinite(value)) return { valid: false, message: t("ops.trip.diesel_ltr_must_be_positive") };
+-    if (value > 100) return { valid: false, message: t("ops.trip.diesel_exceeds_100_litres") };
++    if (value > 200) return { valid: false, message: t("ops.trip.diesel_ltr_max_200") };
+     return { valid: true, message: null };
+   };
+ 
+   /** Inline validation message for litres range. Displayed below the litres field. */
+   const litresRangeError = (num: number): string | null => {
+-    const data = sheetData;
+-    const ltr = data[`dieselLtr${num}`];
++    const ltr = getFieldValue(`dieselLtr${num}`, num);
++    if (ltr === "" || ltr == null) return null;
+     const litresNum = Number(ltr);
+     const range = validateLitresRange(litresNum);
+     return range.message ?? null;
+   };
+ 
++  const rateRangeError = (num: number): string | null => {
++    const litres = Number(getFieldValue(`dieselLtr${num}`, num));
++    const amount = Number(getFieldValue(`dieselAmount${num}`, num));
++    if (!Number.isFinite(litres) || litres <= 0 || !Number.isFinite(amount) || amount <= 0) return null;
++    return amount / litres > 200 ? t("ops.trip.diesel_rate_max_200") : null;
++  };
++
+   /** Blur on wheel so focused number fields don't nudge values while scrolling.
+    *  Do not call preventDefault — React registers wheel as passive.
+    */
+@@ -230,6 +226,73 @@ export default function DieselExpensesTable({
+     }
+   };
+ 
++  const startEditingRow = (num: number) => {
++    if (readOnly || busyRow !== null) return;
++    const draft = { ...sheetData };
++    // API rows store the resolved custom bunk name. Convert it back to the
++    // editable "Other" shape so the select and text field retain that name.
++    if (draft[`dieselBunkSource${num}`] === "OTHER") {
++      draft[`dieselOtherBunk${num}`] = draft[`dieselBunk${num}`] || "";
++      draft[`dieselBunk${num}`] = OTHER_BUNK_VALUE;
++    }
++    setDraftData(draft);
++    setEditingRow(num);
++    setIsEditingSubmitted(true);
++  };
++
++  const cancelEditingRow = () => {
++    setEditingRow(null);
++    setDraftData({});
++    setIsEditingSubmitted(false);
++    setMeterErrors(scanMeterChainErrors());
++  };
++
++  const clearDieselRowPatch = (num: number): Record<string, unknown> => {
++    const patch: Record<string, unknown> = {};
++    for (const key of Object.keys(sheetData)) {
++      const match = key.match(/^diesel(?:Ltr|Rate|Amount|Meter|Bunk|BunkSource|FuelBunkId|OtherBunk|Image|ImageName|Submitted|SubmittedAt|Id|ClientKey|GpsLat|GpsLon|GpsAccuracy|GpsCapturedAt)(\d+)$/);
++      if (match && Number(match[1]) === num) patch[key] = "";
++    }
++    patch[`dieselSubmitted${num}`] = false;
++    patch[`dieselId${num}`] = "";
++    patch[`dieselClientKey${num}`] = "";
++    return patch;
++  };
++
++  const handleDeleteRow = async (num: number) => {
++    if (readOnly || busyRow !== null) return;
++    if (!window.confirm(t("ops.trip.confirm_delete_diesel"))) return;
++
++    setBusyRow(num);
++    try {
++      const entryId = Number(sheetData[`dieselId${num}`]);
++      const updates = entryId > 0
++        ? flattenDieselEntries(await deleteTripDiesel(tripId, entryId))
++        : clearDieselRowPatch(num);
++      const nextSheet = { ...sheetData, ...updates };
++
++      keepEmptySlotsRef.current.delete(num);
++      setRowIndices((prev) => {
++        const remaining = prev.filter((row) => row !== num);
++        return remaining.length > 0 ? remaining : [1];
++      });
++      if (editingRow === num) {
++        setEditingRow(null);
++        setDraftData({});
++        setIsEditingSubmitted(false);
++      }
++      applyBatchUpdates(updates);
++      // Replace durable storage immediately. This also drops any older queued
++      // autosave, preventing a deleted row from returning after refresh.
++      await onRowsDeleted?.(nextSheet);
++      notifyUser(t("ops.trip.diesel_deleted"), "success");
++    } catch (err) {
++      notifyUser(handleApiError(err) || t("ops.trip.failed_delete_diesel"), "error");
++    } finally {
++      setBusyRow(null);
++    }
++  };
++
+   const handleAddRow = () => {
+     const lastRow = rowIndices[rowIndices.length - 1] ?? 0;
+     // Require the current last entry to be submitted before opening a new slot.
+@@ -777,6 +840,7 @@ export default function DieselExpensesTable({
+     const laterBlock = !isRentedVehicle && laterBillsBlocking(num, useDraft).length > 0;
+     const litresNum = Number(ltr);
+     const litresRange = validateLitresRange(litresNum);
++    const rate = litresNum > 0 ? Number(amount) / litresNum : 0;
+ 
+     return (
+       isPositive(ltr) &&
+@@ -787,6 +851,7 @@ export default function DieselExpensesTable({
+       isValidGps(lat, lon) &&
+       !meterErr &&
+       litresRange.valid &&
++      rate <= 200 &&
+       !laterBlock
+     );
+   };
+@@ -840,6 +905,8 @@ export default function DieselExpensesTable({
+     // Add litres range validation
+     const litresError = litresRangeError(num);
+     if (litresError && !reasons.includes(litresError)) reasons.push(litresError);
++    const rateError = rateRangeError(num);
++    if (rateError && !reasons.includes(rateError)) reasons.push(rateError);
+     const unique = Array.from(new Set(reasons));
+     return unique.length ? unique.map((reason) => `• ${reason}`).join("\n") : null;
+   };
+@@ -966,11 +1033,11 @@ export default function DieselExpensesTable({
+               type="button"
+               onClick={handleAddRow}
+               disabled={!canAddDieselRow}
+-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-lg shadow-sm transition-all shrink-0 ${`
++              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
+                 canAddDieselRow
+                   ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer"
+                   : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+-              `}`}
++              }`}
+             >
+               <Plus size={14} />
+               <span>{t("ops.trip.add_diesel_entry")}</span>
+@@ -986,7 +1053,7 @@ export default function DieselExpensesTable({
+             <col style={{ width: "28px" }} />
+             <col style={{ width: "7%" }} />
+             <col style={{ width: "8%" }} />
+-            <col style={{ width: "10%" }} />
++            <col style={{ width: "13%" }} />
+             <col style={{ width: "11%" }} />
+             <col style={{ width: "12%" }} />
+             <col style={{ width: "24%" }} />
+@@ -1069,9 +1136,12 @@ export default function DieselExpensesTable({
+                     <input
+                       type="number"
+                       inputMode="decimal"
++                      min="0.01"
++                      max="200"
++                      step="0.01"
+                       disabled={locked}
+                       aria-label="Ltr"
+-                      className={`${inputBase} ${inputOk}`}
++                      className={`${inputBase} ${litresRangeError(num) ? inputErr : inputOk}`}
+                       value={ltrVal}
+                       onChange={(e) => handleFieldChange(`dieselLtr${num}`, num, e.target.value)}
+                       onKeyDown={(e) => blockInvalidChar(e)}
+@@ -1087,14 +1157,19 @@ export default function DieselExpensesTable({
+                   </td>
+                   <td className="py-2.5 px-1.5 text-center font-semibold tabular-nums text-slate-600" aria-label="Rate (₹)">
+                     {rateDisplay}
++                    {rateRangeError(num) && (
++                      <span className="mt-1 block text-[11px] font-medium leading-tight text-red-500">{rateRangeError(num)}</span>
++                    )}
+                   </td>
+                   <td className="py-2.5 px-1.5 text-center">
+                     <input
+                       type="number"
+                       inputMode="decimal"
++                      min="0.01"
++                      step="0.01"
+                       disabled={locked}
+                       aria-label="Amount (₹)"
+-                      className={`${inputBase} ${inputOk}`}
++                      className={`${inputBase} ${rateRangeError(num) ? inputErr : inputOk}`}
+                       value={amountVal}
+                       onChange={(e) => handleFieldChange(`dieselAmount${num}`, num, e.target.value)}
+                       onKeyDown={(e) => blockInvalidChar(e)}
+@@ -1197,25 +1272,73 @@ export default function DieselExpensesTable({
+                     </div>
+                   </td>
+                   <td className="py-2.5 px-1.5 text-center">
+-                    {!readOnly && !isSubmitted && (
++                    <div className="flex min-h-8 items-center justify-center gap-2">
++                    {!readOnly && (!isSubmitted || isEditingThisRow) && (
+                       <button
+                         type="button"
+                         onClick={() => handleRowSubmit(num)}
+                         disabled={!canSubmitRow || busyRow === num}
+-                        className={`mb-1 inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-bold shadow-sm transition-all ${canSubmitRow && busyRow !== num ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer" : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"}`}
++                        title={isEditingThisRow && isSubmitted ? t("ops.trip.save_diesel_changes") : t("ops.trip.submit_diesel_entry")}
++                        aria-label={isEditingThisRow && isSubmitted ? t("ops.trip.save_diesel_changes") : t("ops.trip.submit_diesel_entry")}
++                        className={`group inline-flex h-8 w-8 items-center justify-center rounded-full shadow-sm transition-all duration-200 ease-out ${canSubmitRow && busyRow !== num ? "bg-emerald-500 text-white hover:-translate-y-0.5 hover:scale-105 hover:bg-emerald-600 hover:shadow-md hover:shadow-emerald-200/70 active:translate-y-0 active:scale-95" : "cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400"}`}
++                      >
++                        {busyRow === num ? <Loader2 size={14} className="animate-spin" /> : isEditingThisRow && isSubmitted ? <Save size={14} className="transition-transform duration-200 group-hover:scale-110" /> : <CheckCircle2 size={14} className="transition-transform duration-200 group-hover:scale-110" />}
++                      </button>
++                    )}
++                    {!readOnly && isSubmitted && !isEditingThisRow && (
++                      <button
++                        type="button"
++                        onClick={() => startEditingRow(num)}
++                        disabled={busyRow !== null || editingRow !== null}
++                        title={t("ops.trip.edit_diesel_entry")}
++                        aria-label={t("ops.trip.edit_diesel_entry")}
++                        className="group inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105 hover:border-emerald-300 hover:bg-emerald-100 hover:shadow-md hover:shadow-emerald-100 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:scale-100"
+                       >
+-                        {t("ops.trip.submit_diesel_entry")}
++                        <Pencil size={14} className="transition-transform duration-200 group-hover:-rotate-6 group-hover:scale-110" />
+                       </button>
+                     )}
+-                    {isSubmitted ? (
+-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700">
+-                        <CheckCircle2 size={13} /> {t("ops.trip.submitted")}
++                    {!readOnly && isEditingThisRow && isSubmitted && (
++                      <button
++                        type="button"
++                        onClick={cancelEditingRow}
++                        disabled={busyRow === num}
++                        title={t("common.cancel")}
++                        aria-label={t("common.cancel")}
++                        className="group inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 hover:shadow-md hover:shadow-rose-100 active:translate-y-0 active:scale-95 disabled:opacity-50"
++                      >
++                        <X size={14} className="transition-transform duration-200 group-hover:rotate-90" />
++                      </button>
++                    )}
++                    {!readOnly && (
++                      <button
++                        type="button"
++                        onClick={() => void handleDeleteRow(num)}
++                        disabled={busyRow !== null}
++                        title={t("ops.trip.delete_diesel_entry")}
++                        aria-label={t("ops.trip.delete_diesel_entry")}
++                        className="group inline-flex h-8 w-8 items-center justify-center rounded-full border border-rose-200 bg-rose-50 text-rose-600 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105 hover:border-rose-300 hover:bg-rose-100 hover:shadow-md hover:shadow-rose-100 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:scale-100"
++                      >
++                        {busyRow === num ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} className="transition-transform duration-200 group-hover:scale-110" />}
++                      </button>
++                    )}
++                    {isSubmitted && !isEditingThisRow ? (
++                      <span
++                        title={t("ops.trip.submitted")}
++                        aria-label={t("ops.trip.submitted")}
++                        className="group inline-flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105 hover:bg-emerald-100 hover:shadow-md hover:shadow-emerald-100"
++                      >
++                        <CheckCircle2 size={15} className="transition-transform duration-200 group-hover:scale-110" />
+                       </span>
+                     ) : (
+-                      <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-bold text-slate-500">
+-                        <Circle size={13} /> {t("status.draft")}
++                      <span
++                        title={t("status.draft")}
++                        aria-label={t("status.draft")}
++                        className="group inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:scale-105 hover:bg-slate-100 hover:shadow-md"
++                      >
++                        <Circle size={15} className="transition-transform duration-200 group-hover:scale-110" />
+                       </span>
+                     )}
++                    </div>
+                   </td>
+                 </tr>
+               );
+diff --git a/src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts b/src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts
+index 5ce6e262..e5a17b59 100644
+--- a/src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts
++++ b/src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts
+@@ -1,6 +1,6 @@
+ import assert from "node:assert/strict";
+ import { describe, it } from "node:test";
+-import { mergeVisibleDieselRows } from "./DieselExpensesTable";
++import { mergeVisibleDieselRows } from "./mergeVisibleDieselRows";
+ 
+ describe("mergeVisibleDieselRows", () => {
+   it("does not reopen empty slot 1 when bills already live on 2/3/4 (step remount)", () => {

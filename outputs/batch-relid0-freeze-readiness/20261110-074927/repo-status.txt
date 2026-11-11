@@ -1,0 +1,424 @@
+######## .. ########
+ M .gitignore
+ M backend/package.json
+ M backend/sql/033_collection_entry.sql
+ M backend/src/config/env.ts
+ M backend/src/index.ts
+ M backend/src/middleware/auth.ts
+ M backend/src/middleware/errorHandler.ts
+ M backend/src/middleware/mastersBoundary.ts
+ M backend/src/middleware/staffBoundary.ts
+ M backend/src/middleware/tripAuthorization.ts
+ M backend/src/routes/accounts.ts
+ M backend/src/routes/auth.ts
+ M backend/src/routes/farmPayments.ts
+ M backend/src/routes/fleet.ts
+ M backend/src/routes/index.ts
+ M backend/src/routes/masters.ts
+ M backend/src/routes/operations.ts
+ M backend/src/routes/payments.ts
+ M backend/src/routes/trips.ts
+ M backend/src/scripts/createAppUser.ts
+ M backend/src/scripts/reconcileTripFuel.ts
+ M backend/src/scripts/setupE2eDatabase.ts
+ M backend/src/services/__tests__/collectionsDashboardConsistency.test.ts
+ M backend/src/services/__tests__/rateEntryService.test.ts
+ M backend/src/services/__tests__/shopRatesService.test.ts
+ M backend/src/services/__tests__/shopSalesConcurrencyAndSync.test.ts
+ M backend/src/services/__tests__/shopSalesEditWindow.test.ts
+ M backend/src/services/__tests__/shopSalesQuantityValidation.test.ts
+ M backend/src/services/__tests__/shopSalesRateEditing.test.ts
+ M backend/src/services/__tests__/shopSalesService.test.ts
+ M backend/src/services/authService.ts
+ M backend/src/services/collectionEntryService.ts
+ M backend/src/services/dashboardService.ts
+ M backend/src/services/farmPaymentsService.ts
+ M backend/src/services/fleetMaintenanceService.ts
+ M backend/src/services/fuelExpensesService.ts
+ M backend/src/services/masterListService.ts
+ M backend/src/services/mastersBulkService.ts
+ M backend/src/services/mastersService.ts
+ M backend/src/services/mortalityAnalysisService.ts
+ M backend/src/services/paymentsService.ts
+ M backend/src/services/rateEntryService.ts
+ M backend/src/services/shopLedgerService.ts
+ M backend/src/services/shopRatesService.ts
+ M backend/src/services/shopSalesService.ts
+ M backend/src/services/staffPerformanceService.ts
+ M backend/src/services/staffService.ts
+ M backend/src/services/tripsService.ts
+ M backend/src/services/vehicleEmiService.ts
+ M backend/src/types/models.ts
+ M backend/src/types/operations.ts
+ M backend/src/utils/coerce.ts
+ M backend/src/utils/fleetMaintenanceLock.ts
+ M backend/src/utils/localCredentials.ts
+ M backend/src/utils/masterValidation.ts
+ M backend/src/utils/pgErrors.ts
+ M backend/src/utils/rateLock.ts
+ M backend/src/utils/shopLedger.ts
+ M backend/src/utils/tripCalculations.ts
+ M backend/src/utils/tripDeliverySync.ts
+ M backend/src/utils/tripFuelSync.ts
+ M backend/src/utils/tripLegs.ts
+ M backend/src/utils/vehicleMeterLedger.ts
+ M backend/src/validation/collectionEntry.ts
+ M backend/src/validation/fleet.ts
+ M backend/src/validation/leave.ts
+ M backend/src/validation/masters.ts
+ M backend/src/validation/mastersBulk.ts
+ M backend/src/validation/operations.ts
+ M backend/src/validation/trips.ts
+ M backend/tests/bulkImport.test.ts
+ M backend/tests/collectionEntry.test.ts
+ M backend/tests/deletedTripMeterExclusion.test.ts
+ M backend/tests/dutyPlannerWeekly.test.ts
+ M backend/tests/farmPayments.test.ts
+ M backend/tests/fuelMeterProduction.test.ts
+ M backend/tests/helpers/app.ts
+ M backend/tests/mastersConcurrency.test.ts
+ M backend/tests/rateEntryShopSales.test.ts
+ M backend/tests/shopLedger.test.ts
+ M backend/tests/shopSalesFlow.test.ts
+ M backend/tests/staffAuthorization.test.ts
+ M backend/tests/step4DeliveryPersistence.test.ts
+ M backend/tests/tripAuthorization.test.ts
+ M backend/tests/tripDeliveryCapacity.test.ts
+ M backend/tests/tripMultiLoad.test.ts
+ M backend/tests/tripValidation.test.ts
+ M backend/tests/vehicleOperationsValidation.test.ts
+ M docs/LOGIN_PAGE_CHECKS.html
+ M frontend/dmr-poultries-web
+ M tmp/fleet-live.spec.ts
+ M tmp/fleet-ui-seed.json
+?? .agents/
+?? .claude/skills/
+?? .cloud-attachments/
+?? .commandcode/
+?? .grok/
+?? .roo/
+?? .zcode/
+?? BATCH-C1-REPORT.md
+?? BATCH-C2-REPORT.md
+?? BATCH-C3-REPORT.md
+?? DELIVERY_REPORT_SUMMARY.md
+?? DELIVERY_STATUS.md
+?? DMR-ERP-FINAL-REPORT.md
+?? DMR-ERP-IMPLEMENTATION-REPORT.md
+?? DMR-ERP-IMPLEMENTATION-STATUS.md
+?? DMR_ERP_Production_Security_Testing_Implementation_Master_Prompt.pdf
+?? DMR_FINAL_PRODUCTION_REPORT.md
+?? DMR_FINAL_PRODUCTION_VERIFICATION_MATRIX.md
+?? DMR_MFA_STEPUP_DESIGN.md
+?? DMR_SECURITY_PRODUCTION_FINAL_REPORT.md
+?? DMR_SECURITY_TEST_MATRIX.md
+?? DMR_VERIFICATION_PLAN.md
+?? IMPLEMENTATION_SUMMARY.md
+?? agent-skills/
+?? architecture.md
+?? assistants/
+?? atomic-core/
+?? atomic-prism/
+?? backend/sql/060_trip_other_expense_names.sql
+?? backend/sql/061_shop_association_paper_rate_defaults.sql
+?? backend/sql/062_session_idle_hardening.sql
+?? backend/sql/063_password_reset_idempotency.sql
+?? backend/sql/064_mfa_totp.sql
+?? backend/sql/065_production_rbac.sql
+?? backend/sql/066_access_audit_history.sql
+?? backend/sql/067_user_preferences.sql
+?? backend/sql/068_employee_name_usernames.sql
+?? backend/sql/069_user_preferences_alphabet_size.sql
+?? backend/sql/070_reveal_password.sql
+?? backend/sql/071_employee_secondary_department.sql
+?? backend/sql/072_user_preferences_font_scale.sql
+?? backend/sql/073_rented_vehicles.sql
+?? backend/sql/074_trip_delivery_serial_sequence.sql
+?? backend/sql/075_repair_abandoned_delivery_drafts.sql
+?? backend/sql/076_canonical_shop_numbers.sql
+?? backend/sql/077_trip_delivery_sub_shop_nullable.sql
+?? backend/sql/078_trip_delivery_shop_master_guard.sql
+?? backend/sql/079_trip_delivery_active_shop_guard.sql
+?? backend/sql/080_trip_delivery_physical_identity.sql
+?? backend/sql/081_dummy_trip_staff.sql
+?? backend/sql/082_expand_dummy_trip_staff.sql
+?? backend/sql/083_trip_diesel_amount.sql
+?? backend/sql/084_trip_pickup_import_fingerprints.sql
+?? backend/sql/085_trip_vehicle_maintenance_sync.sql
+?? backend/sql/086_trip_delivery_amount_sync.sql
+?? backend/sql/087_preserve_collection_history_on_master_delete.sql
+?? backend/sql/088_uppercase_collection_number_prefix.sql
+?? backend/sql/089_collection_entry_import.sql
+?? backend/sql/090_collection_reference_uniqueness.sql
+?? backend/sql/091_shop_sale_edit_window_from_insert.sql
+?? backend/sql/092_shop_sale_edit_window_from_entry.sql
+?? backend/sql/093_manual_expenses_personal_vehicles.sql
+?? backend/sql/094_manual_expense_approval.sql
+?? backend/sql/095_fuel_expense_deleted_register.sql
+?? backend/sql/096_reconcile_collection_sequence.sql
+?? backend/sql/097_shop_ledger_current_source_only.sql
+?? backend/sql/098_enforce_shop_sale_rate_window.sql
+?? backend/sql/099_pgadmin_shop_sale_rate_override.sql
+?? backend/sql/100_dedupe_current_shop_sale_ledger.sql
+?? backend/sql/101_preserve_rate_locked_delivery_delete_guard.sql
+?? backend/src/config/disposableDbGuard.ts
+?? backend/src/middleware/businessBoundary.ts
+?? backend/src/middleware/idempotency.ts
+?? backend/src/middleware/roleBoundary.ts
+?? backend/src/middleware/serverActor.ts
+?? backend/src/routes/accessManagement.ts
+?? backend/src/routes/operations_pending_delete.ts
+?? backend/src/routes/settings.ts
+?? backend/src/security/
+?? backend/src/services/collectionEntryService.pendingDelete.ts
+?? backend/src/services/manualExpensesService.ts
+?? backend/src/services/tripExpensesService.ts
+?? backend/src/utils/__tests__/
+?? backend/src/utils/collectionDeleteWindow.test.ts
+?? backend/src/utils/collectionDeleteWindow.ts
+?? backend/src/utils/shopSaleEditWindow.ts
+?? backend/tests/batchC2Journeys.test.ts
+?? backend/tests/batchC3RbacMatrix.test.ts
+?? backend/tests/batchC3RealPgConcurrency.test.ts
+?? backend/tests/batchC3Remediation.test.ts
+?? backend/tests/coerce.test.ts
+?? backend/tests/corsConfiguration.test.ts
+?? backend/tests/dashboard.test.ts
+?? backend/tests/disposableDbGuard.test.ts
+?? backend/tests/e2eHarness.ts
+?? backend/tests/farmPaymentMultiLoad.test.ts
+?? backend/tests/fleetAnalytics.test.ts
+?? backend/tests/fleetMaintenance.test.ts
+?? backend/tests/fleetPermits.test.ts
+?? backend/tests/fuelExpensesList.test.ts
+?? backend/tests/marketRates.test.ts
+?? backend/tests/mastersCrudRoles.test.ts
+?? backend/tests/mfa.test.ts
+?? backend/tests/mfaTotp.test.ts
+?? backend/tests/migration086HistoricalAmounts.test.ts
+?? backend/tests/mortality.test.ts
+?? backend/tests/mortalityMultiLoad.test.ts
+?? backend/tests/operationsBoundary.test.ts
+?? backend/tests/passwordHash.test.ts
+?? backend/tests/passwordReset.test.ts
+?? backend/tests/payments.test.ts
+?? backend/tests/rateEntryWeightModeSync.test.ts
+?? backend/tests/routeProtection.test.ts
+?? backend/tests/sessionIdle.test.ts
+?? backend/tests/sessionLogic.test.ts
+?? backend/tests/settingsPreferences.test.ts
+?? backend/tests/shopLedgerCumulativeLoads.test.ts
+?? backend/tests/shopLedgerIsolation.test.ts
+?? backend/tests/tripCompletedFarmPaymentSync.test.ts
+?? backend/tests/tripExpenses.test.ts
+?? backend/tests/tripListCompleted.test.ts
+?? backend/tests/tripPickupAtomicImport.test.ts
+?? backend/tests/tripPickupImport.test.ts
+?? backend/tests/vehicleEmi.test.ts
+?? backend/tmp-probe-svc.mjs
+?? current-status.md
+?? db/
+?? decisions.md
+?? diffusion/
+?? docs/AGENTS.md
+?? docs/CODEX-HANDOFF.md
+?? docs/PROJECT_SYNC_SECURITY_AUDIT_2026-10-06.md
+?? docs/README.md
+?? docs/api-inventory.md
+?? docs/api-security-matrix.md
+?? docs/architecture.md
+?? docs/current-status.md
+?? docs/database/
+?? docs/decisions.md
+?? docs/delivery-summary.md
+?? docs/documentation-audit.md
+?? docs/documentation-traceability.md
+?? docs/final-documentation-gaps.md
+?? docs/modules/
+?? docs/page-inventory.md
+?? docs/pages/
+?? docs/security/
+?? docs/test-evidence.md
+?? extensions/
+?? extract_pdf.py
+?? foundry-local/
+?? get-npm-path.mjs
+?? llamacpp/
+?? output/
+?? outputs/
+?? replace_cumulative.js
+?? skills-lock.json
+?? src/
+?? tmp/add_box_no_both.mjs
+?? tmp/add_total_weight_dc75.mjs
+?? tmp/audit_progress.md
+?? tmp/batch_a1_audit_map.py
+?? tmp/batch_a1_capture_hashes.py
+?? tmp/batch_a1_compare_hashes.py
+?? tmp/batch_a1_finalize.py
+?? tmp/batch_a1_fix_runtime_json.py
+?? tmp/batch_a1_run_cmd.py
+?? tmp/batch_a_audit_summary.py
+?? tmp/batch_a_capture_identity.py
+?? tmp/batch_a_finalize.py
+?? tmp/batch_a_run_cmd.py
+?? tmp/batch_a_schema_select.mjs
+?? tmp/batch_a_schema_select.py
+?? tmp/batch_b_finalize.py
+?? tmp/batch_b_run_cmd.py
+?? tmp/batch_b_setup.py
+?? tmp/batch_c1_register_fix.py
+?? tmp/batch_c1_run_cmd.py
+?? tmp/batch_c1_update_register.py
+?? tmp/batch_c2_finalize_register.py
+?? tmp/batch_c2_register_corrections.py
+?? tmp/batch_c2_run_cmd.py
+?? tmp/batch_c3_final_identity.py
+?? tmp/batch_c3_run_cmd.py
+?? tmp/batch_c3_update_register.py
+?? tmp/batch_c4_identity_after.py
+?? tmp/batch_c4_identity_before.py
+?? tmp/batch_c4_run_cmd.py
+?? tmp/batch_c4_update_register.py
+?? tmp/batch_c5_identity_after.py
+?? tmp/batch_c5_identity_before.py
+?? tmp/batch_c5_run_cmd.py
+?? tmp/batch_c5_update_register.py
+?? tmp/batch_c6a1_clusters.py
+?? tmp/batch_c6a1_identity.py
+?? tmp/batch_c6a1_identity_after.py
+?? tmp/batch_c6a1_run.py
+?? tmp/batch_c6a1_secret_scan.py
+?? tmp/batch_c6a_compare.py
+?? tmp/batch_c6a_identity.py
+?? tmp/batch_c6a_inventory.py
+?? tmp/batch_c6a_update_register.py
+?? tmp/be_pkg.json
+?? tmp/build_box_weights.mjs
+?? tmp/build_dc103050_from_image.mjs
+?? tmp/build_dc3270_output.mjs
+?? tmp/build_dc64369_box_weights.mjs
+?? tmp/build_dc6787_output.mjs
+?? tmp/build_dc6788_output.mjs
+?? tmp/build_dc75_from_image.mjs
+?? tmp/c3_restart_harness.sh
+?? tmp/c3_ts.txt
+?? tmp/c4_ts.txt
+?? tmp/c5_ts.txt
+?? tmp/c6b1_phase0.py
+?? tmp/c6b1_refmap.py
+?? tmp/c6b1_stability_final.py
+?? tmp/c6b2_backup_root.txt
+?? tmp/c6b2_delta_and_refmap.py
+?? tmp/c6b2_evidence_dir.txt
+?? tmp/c6b2_phase0.py
+?? tmp/c6b2_phase1.py
+?? tmp/c6b2_phase2.py
+?? tmp/c6b2_phase3_backup.py
+?? tmp/c6b2_signoff.py
+?? tmp/c6b2_staging.txt
+?? tmp/c6b2_verify.py
+?? tmp/c6b2_verify_drift.py
+?? tmp/c6b3v_audit.py
+?? tmp/c6b3v_lint_delta.py
+?? tmp/c6b3v_lint_parse.py
+?? tmp/c6b3v_m087.sql
+?? tmp/c6b3v_m088.sql
+?? tmp/c6b3v_phase0.py
+?? tmp/c6b3v_phase5.py
+?? tmp/c6b3v_run.py
+?? tmp/c6b3v_watch.py
+?? tmp/checklist_extract.txt
+?? tmp/compaction.txt
+?? tmp/dc64369_left.png
+?? tmp/dc64369_right.png
+?? tmp/dc64369_rows49_60.png
+?? tmp/dc64369_totals.png
+?? tmp/dc_crop_1_32.png
+?? tmp/dc_crop_33_64.png
+?? tmp/dc_crop_65_75.png
+?? tmp/edit_dc3270_totals.mjs
+?? tmp/extract.py
+?? tmp/fe_pkg.json
+?? tmp/fix_capacity_calls.py
+?? tmp/inspect_dc3270.mjs
+?? tmp/inspect_dc6787.mjs
+?? tmp/inspect_dc6788.mjs
+?? tmp/master_prompt_extract.txt
+?? tmp/msg9_extract.txt
+?? tmp/pdfs/
+?? tmp/phase1_build_register.py
+?? tmp/phase1_inventory.py
+?? tmp/phase1_pdf_extract/
+?? tmp/premium-shell-preview.png
+?? tmp/project-audit-be-dependencies.json
+?? tmp/project-audit-fe-dependencies.json
+?? tmp/reconstruct_msg9.py
+?? tmp/rental-audit.txt
+?? tmp/scan_paths_msg9.py
+?? tmp/separate_dc75_totals.mjs
+?? tmp/verify_c5.py
+?? tmp/verify_c6a.py
+?? tmp/verify_c6a1.py
+?? tmp/verify_c6b1.py
+?? tmp/weights_left_crop.png
+?? tmp/weights_right_crop.png
+######## . ########
+ M src/i18n/modules/operations.en.ts
+ M src/i18n/modules/operations.te.ts
+ M src/i18n/modules/reports.en.ts
+ M src/i18n/modules/reports.te.ts
+ M src/modules/fleet-operations/activeFleetScope.test.ts
+ M src/modules/fleet-operations/components/maintenance/PartsTable.tsx
+ M src/modules/fleet-operations/components/reports/ReportCard.tsx
+ M src/modules/fleet-operations/index.ts
+ M src/modules/fleet-operations/routes.tsx
+ M src/modules/fleet-operations/utils/helpers.ts
+ M src/modules/masters/components/MasterDropdown.tsx
+ M src/modules/operations/collections/components/entry/CollectionAmount.test.ts
+ M src/modules/operations/collections/components/entry/CollectionAmount.tsx
+ M src/modules/operations/collections/components/pending/PendingCollectionsTable.tsx
+ M src/modules/operations/collections/components/pending/ShopCollectionDetailModal.tsx
+ M src/modules/operations/collections/pages/PendingCollectionsPage.tsx
+ M src/modules/operations/collections/services/collectionService.contract.test.ts
+ M src/modules/operations/collections/services/collectionService.ts
+ M src/modules/operations/fuel-expenses/components/FuelBillTable.tsx
+ M src/modules/operations/fuel-expenses/utils/filterFuelExpenses.test.ts
+ M src/modules/operations/fuel-expenses/utils/filterFuelExpenses.ts
+ M src/modules/operations/shop-sales/components/CompletedTripsTable.tsx
+ M src/modules/operations/shop-sales/pages/RatesEntryPage.tsx
+ M src/modules/operations/trip-expenses/pages/TripExpensesPage.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts
+ M src/modules/operations/vehicle-trips/components/TripListHeader.tsx
+ M src/modules/operations/vehicle-trips/components/TripMasterTable.tsx
+ M src/modules/operations/vehicle-trips/hooks/useStep5DurableDraft.ts
+ M src/modules/operations/vehicle-trips/pages/TripListPage.tsx
+ M src/modules/operations/vehicle-trips/services/tripHeaderApiService.ts
+ M src/modules/operations/vehicle-trips/utils/pickupImport.ts
+ M src/modules/reports/components/CumulativeQuantityCell.tsx
+ M src/modules/reports/components/PdfBlobPreview.tsx
+ M src/modules/reports/components/ShopLedgerDetailModal.test.tsx
+ M src/modules/reports/components/ShopLedgerDetailModal.tsx
+ M src/modules/reports/components/shopLedgerDetailData.ts
+ M src/modules/reports/pages/ShopLedgerPage.tsx
+ M src/modules/reports/utils/cumulativeLoadBreakdown.test.ts
+ M src/modules/reports/utils/cumulativeLoadBreakdown.ts
+ M src/performance/memory.manager.ts
+ M src/performance/performance.monitor.ts
+ M src/utils/validation.ts
+?? outputs/
+?? src/modules/fleet-operations/fleetLazyPages.tsx
+?? src/modules/fleet-operations/fleetRouteConfig.tsx
+?? src/modules/operations/collections/components/entry/formatCollectionAmountInput.ts
+?? src/modules/operations/vehicle-trips/components/Step_5/mergeVisibleDieselRows.ts
+######## ../../backend ########
+ M src/routes/operations.ts
+ M src/services/collectionEntryService.ts
+ M src/services/dashboardService.ts
+ M src/services/shopLedgerService.ts
+ M src/services/tripsService.ts
+ M src/types/operations.ts
+ M tests/dashboard.test.ts
+ M tests/shopLedger.test.ts

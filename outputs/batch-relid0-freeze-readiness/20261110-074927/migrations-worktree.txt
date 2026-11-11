@@ -1,0 +1,8 @@
+../../backend/sql/094_manual_expense_approval.sql
+../../backend/sql/095_fuel_expense_deleted_register.sql
+../../backend/sql/096_reconcile_collection_sequence.sql
+../../backend/sql/097_shop_ledger_current_source_only.sql
+../../backend/sql/098_enforce_shop_sale_rate_window.sql
+../../backend/sql/099_pgadmin_shop_sale_rate_override.sql
+../../backend/sql/100_dedupe_current_shop_sale_ledger.sql
+../../backend/sql/101_preserve_rate_locked_delivery_delete_guard.sql

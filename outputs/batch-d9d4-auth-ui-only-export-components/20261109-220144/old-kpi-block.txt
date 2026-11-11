@@ -1,0 +1,43 @@
+export type KpiTone = "blue" | "amber" | "emerald" | "violet" | "rose" | "cyan";
+
+export interface KpiCardItem {
+  id: string;
+  label: string;
+  value: ReactNode;
+  /** Full, unshortened metric displayed when the operator hovers the card. */
+  tooltip?: string;
+  /** Rich breakdown shown in the same fixed, unclipped style as table KPIs. */
+  tooltipContent?: ReactNode;
+  Icon: LucideIcon;
+  tone: KpiTone;
+  /** Light tinted fill in the same tone — brighter than the default white card. */
+  filled?: boolean;
+}
+
+export type CompactKpiValue = {
+  /** Visible, compact Indian-number figure (for example `2.18`). */
+  compact: string;
+  /** `L` at one lakh and `Cr` at one crore; blank below one lakh. */
+  suffix: "" | "L" | "Cr";
+  /** Exact Indian-formatted value for the card tooltip. */
+  exact: string;
+};
+
+/**
+ * Formats an operational KPI in Indian units. The full figure remains
+ * available as `exact`, while values from 1,00,000 upward stay compact:
+ * `2,18,000` → `2.18 L`, `2,19,00,000` → `2.19 Cr`.
+ */
+export function compactKpiValue(value: number, fractionDigits = 0): CompactKpiValue {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const exact = new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(safeValue);
+  const absolute = Math.abs(safeValue);
+  if (absolute >= 10_000_000) {
+    return { compact: (safeValue / 10_000_000).toFixed(2), suffix: "Cr", exact };
+  }
+  if (absolute >= 100_000) {
+    return { compact: (safeValue / 100_000).toFixed(2), suffix: "L", exact };
+  }

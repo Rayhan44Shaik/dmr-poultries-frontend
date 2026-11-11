@@ -57,3 +57,29 @@ test("pending tab follows the workflow status, not mere timestamp presence", () 
   assert.deepEqual(filterFuelExpenses(base, { quickTab: "PENDING" }).map((b) => b.id), ["act-1"]);
   assert.deepEqual(filterFuelExpenses(base, { quickTab: "APPROVED" }).map((b) => b.id), ["ap-1"]);
 });
+
+test("vehicle filter matches master formatting with saved fuel registrations", () => {
+  const formatted = bill({ vehicleNo: "AP 39 TQ 1234" });
+  const compactVehicle = bill({ id: "b2", billNo: "FUEL-2", vehicleNo: "AP39TQ1234" });
+  const other = bill({ id: "b3", billNo: "FUEL-3", vehicleNo: "AP39ZZ9999" });
+
+  assert.deepEqual(
+    filterFuelExpenses([formatted, compactVehicle, other], { vehicleNo: "AP-39-TQ-1234" }).map((row) => row.id),
+    ["b1", "b2"]
+  );
+});
+
+test("date filter accepts picker display dates and API timestamps across status tabs", () => {
+  const pending = bill({ date: "2026-10-04T00:00:00.000Z" });
+  const approved = bill({ id: "b2", billNo: "FUEL-2", date: "2026-10-04", status: "Approved" });
+  const outside = bill({ id: "b3", billNo: "FUEL-3", date: "2026-10-05" });
+  const base = filterFuelExpenses([pending, approved, outside], {
+    fromDate: "04/10/2026",
+    toDate: "04-10-2026",
+    includeDeleted: true,
+  });
+
+  assert.deepEqual(base.map((row) => row.id), ["b1", "b2"]);
+  assert.deepEqual(filterFuelExpenses(base, { quickTab: "PENDING" }).map((row) => row.id), ["b1"]);
+  assert.deepEqual(filterFuelExpenses(base, { quickTab: "APPROVED" }).map((row) => row.id), ["b2"]);
+});

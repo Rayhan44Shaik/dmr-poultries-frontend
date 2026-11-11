@@ -1,0 +1,2 @@
+files=959 errors=484 warnings=48 problems=532
+[["@typescript-eslint/no-explicit-any",379],["react-hooks/set-state-in-effect",61],["react-hooks/exhaustive-deps",48],["@typescript-eslint/no-unused-vars",17],["react-hooks/refs",11],["no-useless-assignment",7],["react-refresh/only-export-components",6],["no-useless-escape",2],["react-hooks/immutability",1]]

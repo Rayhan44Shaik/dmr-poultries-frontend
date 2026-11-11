@@ -1,0 +1,9 @@
+src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx:21:import { mergeVisibleDieselRows } from "./mergeVisibleDieselRows";
+src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx:164:      const final = mergeVisibleDieselRows(prev, activeFromSheet, keepEmptySlotsRef.current);
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:3:import { mergeVisibleDieselRows } from "./mergeVisibleDieselRows";
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:5:describe("mergeVisibleDieselRows", () => {
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:7:    assert.deepEqual(mergeVisibleDieselRows([1], [2, 3, 4], new Set()), [2, 3, 4]);
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:11:    assert.deepEqual(mergeVisibleDieselRows([1], [], new Set()), [1]);
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:15:    assert.deepEqual(mergeVisibleDieselRows([2, 3, 4, 5], [2, 3, 4], new Set([5])), [2, 3, 4, 5]);
+src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts:19:    assert.deepEqual(mergeVisibleDieselRows([2, 3, 4, 5], [2, 3, 4], new Set()), [2, 3, 4]);
+src/modules/operations/vehicle-trips/components/Step_5/mergeVisibleDieselRows.ts:4:export function mergeVisibleDieselRows(

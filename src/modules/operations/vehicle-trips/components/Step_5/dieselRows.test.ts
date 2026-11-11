@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mergeVisibleDieselRows } from "./DieselExpensesTable";
+import { mergeVisibleDieselRows } from "./mergeVisibleDieselRows";
 
 describe("mergeVisibleDieselRows", () => {
   it("does not reopen empty slot 1 when bills already live on 2/3/4 (step remount)", () => {

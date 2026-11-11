@@ -1,0 +1,5 @@
+stash@{0}: On main: SAFE-BACKUP-BEFORE-FRONTEND-SYNC-2026-08-30
+stash@{1}: On main: Shop Master changes before syncing remote main
+stash@{2}: On main: protect-StepPickup-before-main-fast-forward
+stash@{3}: On main: backup-before-fleet-only-main-sync
+stash@{4}: On main: safety-before-fleet-only-sync-2026-08-17

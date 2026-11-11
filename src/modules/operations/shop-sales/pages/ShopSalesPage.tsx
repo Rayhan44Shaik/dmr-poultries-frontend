@@ -25,6 +25,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchInput, setSearchInput] = useState("");
+  const [draftFromDate, setDraftFromDate] = useState("");
+  const [draftToDate, setDraftToDate] = useState("");
+  const [draftShopName, setDraftShopName] = useState("");
+  const [draftTripNo, setDraftTripNo] = useState("");
+  const [draftSortBy, setDraftSortBy] = useState("latest");
 
   const {
     sales,
@@ -73,18 +78,20 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     ])
   ).filter(Boolean);
 
-  // The global Search field filters as the operator types; no separate Search
-  // button is needed. The hook's request-sequence guard keeps only the latest
-  // backend response when input changes quickly.
+  // Every filter control is a draft. Search commits the complete filter set,
+  // so changing a date/dropdown never changes the table prematurely.
   const handleSearchInputChange = useCallback((value: string) => {
     setSearchInput(value);
-    setFilter((prev) => ({ ...prev, search: value.trim() }));
-    setCurrentPage(1);
-  }, [setFilter, setCurrentPage]);
+  }, []);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
     setSearchInput("");
+    setDraftFromDate("");
+    setDraftToDate("");
+    setDraftShopName("");
+    setDraftTripNo("");
+    setDraftSortBy("latest");
     showNotification(t("ops.shop_sales.filters_reset"), "info");
   }, [resetFilters, showNotification, t]);
 
@@ -123,30 +130,33 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const content = (
     <div className="w-full space-y-5 animate-in fade-in duration-500">
       <ShopSalesFilters
-        fromDate={filter.fromDate}
-        toDate={filter.toDate}
-        shopName={filter.shopName}
-        tripNo={filter.tripNo}
-        sortBy={filter.sortBy}
+        fromDate={draftFromDate}
+        toDate={draftToDate}
+        shopName={draftShopName}
+        tripNo={draftTripNo}
+        sortBy={draftSortBy}
         shopNames={shopNames}
         tripNumbers={tripNumbers}
         searchQuery={searchInput}
         setSearchQuery={handleSearchInputChange}
-        setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
-        setToDate={(v) => setFilter({ ...filter, toDate: v })}
-        setShopName={(v) => {
-          setFilter({ ...filter, shopName: v });
-          setCurrentPage(1);
-        }}
-        setTripNo={(v) => {
-          setFilter({ ...filter, tripNo: v });
-          setCurrentPage(1);
-        }}
-        setSortBy={(v) => {
-          setFilter({ ...filter, sortBy: v });
-          setCurrentPage(1);
-        }}
+        setFromDate={setDraftFromDate}
+        setToDate={setDraftToDate}
+        setShopName={setDraftShopName}
+        setTripNo={setDraftTripNo}
+        setSortBy={setDraftSortBy}
         onReset={handleResetFilters}
+        onSearch={() => {
+          setFilter((current) => ({
+            ...current,
+            fromDate: draftFromDate,
+            toDate: draftToDate,
+            shopName: draftShopName,
+            tripNo: draftTripNo,
+            sortBy: draftSortBy,
+            search: searchInput.trim(),
+          }));
+          setCurrentPage(1);
+        }}
         onRefresh={() => void handleRefresh()}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
@@ -174,6 +184,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           sortBy={filter.sortBy}
           onSortChange={(sortBy) => {
             setFilter((current) => ({ ...current, sortBy }));
+            setDraftSortBy(sortBy);
             setCurrentPage(1);
           }}
           onSaveLoad={handleSaveLoad}

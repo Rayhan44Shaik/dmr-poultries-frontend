@@ -1,0 +1,2 @@
+86792d5ad382ad686e4163b11496fa1cc554d031
+86792d5a Extract auth and KPI helpers from React components

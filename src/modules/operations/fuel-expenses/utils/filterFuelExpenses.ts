@@ -21,8 +21,26 @@ export interface FuelClientFilters {
   includeDeleted?: boolean;
 }
 
-const dateOnly = (value: string | undefined) => (value || "").slice(0, 10);
-const compact = (value: string) => value.toLocaleLowerCase().replace(/[\s-]/g, "");
+/** Normalize both API dates (YYYY-MM-DD / ISO timestamp) and values a user may
+ * type into the shared date picker (DD/MM/YYYY or DD-MM-YYYY). Comparing an
+ * un-normalized display date with an ISO bill date makes every row disappear. */
+const dateOnly = (value: string | undefined) => {
+  const raw = String(value || "").trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/.exec(raw);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const display = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(raw);
+  if (display) {
+    return `${display[3]}-${display[2].padStart(2, "0")}-${display[1].padStart(2, "0")}`;
+  }
+  return raw.slice(0, 10);
+};
+
+/** Vehicle numbers are presentation-formatted in masters (for example
+ * `AP 39 TQ 1234`) while older fuel rows can contain `AP39TQ1234` or hyphens.
+ * Treat those as the same registration. */
+const compact = (value: string) => value.toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+const sameText = (left: unknown, right: unknown) =>
+  String(left ?? "").trim().localeCompare(String(right ?? "").trim(), undefined, { sensitivity: "accent" }) === 0;
 
 function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
   const query = search.trim().toLocaleLowerCase();
@@ -158,16 +176,16 @@ export function filterFuelExpenses(
     if ((from && (!billDate || billDate < from)) || (to && (!billDate || billDate > to))) return false;
 
     if (vehicleId != null && Number(bill.vehicleId) !== vehicleId) return false;
-    if (vehicleNo && vehicleNo !== "All Vehicles" && bill.vehicleNo !== vehicleNo) return false;
+    if (vehicleNo && vehicleNo !== "All Vehicles" && compact(String(bill.vehicleNo ?? "")) !== compact(vehicleNo)) return false;
 
     if (driverId != null && Number(bill.driverId) !== driverId) return false;
-    if (driverName && driverName !== "All Drivers" && bill.driverName !== driverName) return false;
+    if (driverName && driverName !== "All Drivers" && !sameText(bill.driverName, driverName)) return false;
     const masterNames = new Set(masterBunkNames.map((name) => name.trim().toLocaleLowerCase()));
     const bunkName = String(bill.petrolBunk || "").trim().toLocaleLowerCase();
     if (!includeMasterBunks && masterNames.has(bunkName)) return false;
     if (petrolBunk === "__OTHER__") {
       if (masterNames.has(bunkName)) return false;
-    } else if (petrolBunk && petrolBunk !== "All Bunks" && bill.petrolBunk !== petrolBunk) return false;
+    } else if (petrolBunk && petrolBunk !== "All Bunks" && !sameText(bill.petrolBunk, petrolBunk)) return false;
 
     // Quick tab filtering:
     if (quickTab === "DELETED") {

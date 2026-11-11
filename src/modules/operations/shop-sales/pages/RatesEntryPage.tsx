@@ -150,11 +150,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
           refreshing={isLoading}
           pendingTrips={filteredTrips.length}
           hasFilters={hasFilters}
-          onRateEntry={() => {
-            const trip = filteredTrips.find((row) => row.id === selectedRowId);
-            if (trip) openRateEntry(trip);
-          }}
-          rateEntryEnabled={selectedRowId !== null}
         />
       </div>
 
@@ -191,6 +186,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               trips={paginatedTrips}
               onEnterRate={openRateEntry}
               onModifyRate={openModifyRate}
+              onOpen={openRateEntry}
               startIndex={startIndex}
               selectedRowId={selectedRowId}
               onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}

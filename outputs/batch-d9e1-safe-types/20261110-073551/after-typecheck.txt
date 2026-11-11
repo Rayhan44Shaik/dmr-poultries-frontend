@@ -1,0 +1,5 @@
+
+> dmr-poultries-web@0.0.0 typecheck
+> tsc -b && tsc -p tsconfig.app.json --noEmit
+
+TYPECHECK_EXIT:0

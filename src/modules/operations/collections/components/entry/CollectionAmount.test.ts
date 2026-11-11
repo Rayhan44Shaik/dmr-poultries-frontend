@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatCollectionAmountInput } from "./CollectionAmount";
+import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
 
 test("collection amount applies Indian grouping immediately while typing", () => {
   assert.deepEqual(formatCollectionAmountInput("700"), { display: "700", amount: 700 });

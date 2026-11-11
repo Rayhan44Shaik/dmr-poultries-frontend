@@ -1,0 +1,164 @@
+warning: in the working copy of 'src/modules/auth/IdleSessionGuard.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/modules/auth/LoginPage.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/providers/AuthProvider.tsx', LF will be replaced by CRLF the next time Git touches it
+diff --git a/src/modules/auth/ChangePasswordDialog.tsx b/src/modules/auth/ChangePasswordDialog.tsx
+index 657535fd..3b65759c 100644
+--- a/src/modules/auth/ChangePasswordDialog.tsx
++++ b/src/modules/auth/ChangePasswordDialog.tsx
+@@ -5,7 +5,7 @@ import { changePasswordRequest } from "./authApi";
+ import { useI18n } from "../../i18n";
+ import { useAuth } from "../../providers/authContext";
+ import Modal from "../../ui/Modal";
+-import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
++import { IDLE_SIGNOUT_KEY } from "./idleSessionMeta";
+ import { beginSignOut } from "./signOutGate";
+ import { storeToken } from "./tokenStore";
+ 
+diff --git a/src/modules/auth/IdleSessionGuard.tsx b/src/modules/auth/IdleSessionGuard.tsx
+index 1c596b03..acef4df6 100644
+--- a/src/modules/auth/IdleSessionGuard.tsx
++++ b/src/modules/auth/IdleSessionGuard.tsx
+@@ -22,16 +22,13 @@ import { Clock3 } from "lucide-react";
+ import { useAuth } from "../../providers/authContext";
+ import { useI18n } from "../../i18n";
+ import { activityPing } from "./authApi";
+-import { GENUINE_ACTIVITY_EVENTS, IDLE_TIMEOUT_MS, isGenuineActivityEvent } from "./idleActivity";
++import { GENUINE_ACTIVITY_EVENTS, IDLE_TIMEOUT_MS } from "./idleActivity";
+ import {
+   publishAuthEvent,
+   readSharedActivity,
+   subscribeAuthEvents,
+ } from "./authEvents";
+ 
+-export { isGenuineActivityEvent };
+-export { ACTIVITY_KEY as ACTIVITY_BROADCAST_KEY } from "./authEvents";
+-
+ /** How long before the deadline the warning banner appears. */
+ const WARNING_BEFORE_MS = 60 * 1000;
+ /** UI/warning clears are coalesced; the activity timestamp itself is not. */
+@@ -39,9 +36,6 @@ const RESET_THROTTLE_MS = 1000;
+ /** Genuine-activity pings to the server are throttled to this interval. */
+ const SERVER_PING_THROTTLE_MS = 60 * 1000;
+ 
+-/** sessionStorage flag the LoginPage reads to explain the signed-out state. */
+-export const IDLE_SIGNOUT_KEY = "dmr:signout-reason";
+-
+ export default function IdleSessionGuard() {
+   const { isAuthenticated, logout } = useAuth();
+   const { t } = useI18n();
+diff --git a/src/modules/auth/LoginPage.tsx b/src/modules/auth/LoginPage.tsx
+index f6c62a9f..5ee3be00 100644
+--- a/src/modules/auth/LoginPage.tsx
++++ b/src/modules/auth/LoginPage.tsx
+@@ -15,7 +15,7 @@ import { useI18n } from "../../i18n";
+ import { useAuth } from "../../providers/authContext";
+ import { currentUserRequest, loginRequest, mfaVerifyRequest } from "./authApi";
+ import { landingPathForRole } from "./permissions";
+-import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
++import { IDLE_SIGNOUT_KEY } from "./idleSessionMeta";
+ import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
+ import { loginErrorMessage, validateLoginForm } from "./loginValidation";
+ import { notify } from "../../ui/notifications/notificationStore";
+diff --git a/src/providers/AuthProvider.tsx b/src/providers/AuthProvider.tsx
+index 07630387..29c7268b 100644
+--- a/src/providers/AuthProvider.tsx
++++ b/src/providers/AuthProvider.tsx
+@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
+ import { currentUserShared, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
+ import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
+ import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
+-import { IDLE_SIGNOUT_KEY } from '../modules/auth/IdleSessionGuard';
++import { IDLE_SIGNOUT_KEY } from '../modules/auth/idleSessionMeta';
+ import { beginSignOut, endSignOut, isSigningOut } from '../modules/auth/signOutGate';
+ import { publishAuthEvent, subscribeAuthEvents } from '../modules/auth/authEvents';
+ import { AuthContext } from './authContext';
+diff --git a/src/ui/KpiCardGrid.test.ts b/src/ui/KpiCardGrid.test.ts
+index 9695d530..65a07c27 100644
+--- a/src/ui/KpiCardGrid.test.ts
++++ b/src/ui/KpiCardGrid.test.ts
+@@ -1,6 +1,6 @@
+ import assert from "node:assert/strict";
+ import test from "node:test";
+-import { compactKpiValue } from "./KpiCardGrid";
++import { compactKpiValue } from "./kpiCardValue";
+ 
+ test("KPI values switch to Lakhs only at 1,00,000 and retain their exact tooltip value", () => {
+   assert.deepEqual(compactKpiValue(99_999, 2), {
+diff --git a/src/ui/KpiCardGrid.tsx b/src/ui/KpiCardGrid.tsx
+index bfe73e51..db0cfb21 100644
+--- a/src/ui/KpiCardGrid.tsx
++++ b/src/ui/KpiCardGrid.tsx
+@@ -1,52 +1,6 @@
+-import React, { useState, type FocusEvent, type ReactNode } from "react";
++import React, { useState, type FocusEvent } from "react";
+ import { createPortal } from "react-dom";
+-import type { LucideIcon } from "lucide-react";
+-
+-export type KpiTone = "blue" | "amber" | "emerald" | "violet" | "rose" | "cyan";
+-
+-export interface KpiCardItem {
+-  id: string;
+-  label: string;
+-  value: ReactNode;
+-  /** Full, unshortened metric displayed when the operator hovers the card. */
+-  tooltip?: string;
+-  /** Rich breakdown shown in the same fixed, unclipped style as table KPIs. */
+-  tooltipContent?: ReactNode;
+-  Icon: LucideIcon;
+-  tone: KpiTone;
+-  /** Light tinted fill in the same tone — brighter than the default white card. */
+-  filled?: boolean;
+-}
+-
+-export type CompactKpiValue = {
+-  /** Visible, compact Indian-number figure (for example `2.18`). */
+-  compact: string;
+-  /** `L` at one lakh and `Cr` at one crore; blank below one lakh. */
+-  suffix: "" | "L" | "Cr";
+-  /** Exact Indian-formatted value for the card tooltip. */
+-  exact: string;
+-};
+-
+-/**
+- * Formats an operational KPI in Indian units. The full figure remains
+- * available as `exact`, while values from 1,00,000 upward stay compact:
+- * `2,18,000` → `2.18 L`, `2,19,00,000` → `2.19 Cr`.
+- */
+-export function compactKpiValue(value: number, fractionDigits = 0): CompactKpiValue {
+-  const safeValue = Number.isFinite(value) ? value : 0;
+-  const exact = new Intl.NumberFormat("en-IN", {
+-    minimumFractionDigits: fractionDigits,
+-    maximumFractionDigits: fractionDigits,
+-  }).format(safeValue);
+-  const absolute = Math.abs(safeValue);
+-  if (absolute >= 10_000_000) {
+-    return { compact: (safeValue / 10_000_000).toFixed(2), suffix: "Cr", exact };
+-  }
+-  if (absolute >= 100_000) {
+-    return { compact: (safeValue / 100_000).toFixed(2), suffix: "L", exact };
+-  }
+-  return { compact: exact, suffix: "", exact };
+-}
++import type { CompactKpiValue, KpiCardItem, KpiTone } from "./kpiCardValue";
+ 
+ /** Renders a compact KPI value while keeping its unit visually secondary. */
+ export function KpiMetricValue({
+diff --git a/src/ui/index.ts b/src/ui/index.ts
+index d239bf52..820b123b 100644
+--- a/src/ui/index.ts
++++ b/src/ui/index.ts
+@@ -82,11 +82,13 @@ export { Tabs, type TabItem, type TabsProps } from "./Tabs";
+ export {
+   KpiCardGrid,
+   KpiMetricValue,
++} from "./KpiCardGrid";
++export {
+   compactKpiValue,
+   type CompactKpiValue,
+   type KpiCardItem,
+   type KpiTone,
+-} from "./KpiCardGrid";
++} from "./kpiCardValue";
+ export { Pagination, type PaginationProps } from "./Pagination";
+ export { StatusBadge, type StatusBadgeProps } from "./StatusBadge";
+ export { EmptyState, type EmptyStateProps, type EmptyVariant } from "./EmptyState";

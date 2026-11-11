@@ -4,7 +4,6 @@ import {
   Calendar,
   CheckCircle2,
   Ellipsis,
-  Eye,
   FileDown,
   Fuel,
   Hash,
@@ -33,7 +32,7 @@ import { AppShellModal, BrandRefreshButton, FilterResetButton, Pagination, count
 import { PAGINATION_DEFAULT_PAGE_SIZE, uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import {
   opsFilterCardClass, opsFilterLabelClass, opsInputClass, opsPdfButtonClass, opsPrimaryButtonClass, opsTableCardClass,
-  opsTableDivideClass, opsTableHeadRowClass, opsTableRowClass, opsViewButtonClass,
+  opsTableDivideClass, opsTableHeadRowClass, opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
 import { tableSelectedRowClass } from "../../../../shared/ui/tableRowSelection";
 import { useTableRowSelection } from "../../../../shared/ui/useTableRowSelection";
@@ -641,7 +640,6 @@ export default function TripExpensesPage() {
       }
     },
   });
-  const canView = Boolean(selectedId);
 
   return <div className="w-full space-y-5">
     <div className={opsFilterCardClass}>
@@ -672,10 +670,6 @@ export default function TripExpensesPage() {
           <span>{manualOpen ? "Hide form" : "Add Expense"}</span>
         </button>
         <button type="button" onClick={() => void exportPdf()} disabled={!canExportPdf || !total || exporting} title={canExportPdf ? "Export the filtered expenses as PDF" : "Choose a date, vehicle or supervisor to export PDF"} className={`${opsPdfButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} aria-label="Export Operation Expenses PDF"><FileDown size={15}/>PDF</button>
-        <button type="button" onClick={() => openTrip(selectedId)} disabled={!canView} className={`group ${opsViewButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} aria-label="View expenses sheet">
-          <span className={`inline-flex ${canView ? uiActionIconMotionClass.view : ""}`}><Eye size={14} /></span>
-          View
-        </button>
         <FilterResetButton count={activeFilterCount} onClick={reset}/><BrandRefreshButton onClick={handleRefresh} loading={loading || refreshing} size="md"/>
       </div>
     </div>
@@ -714,7 +708,6 @@ export default function TripExpensesPage() {
         <div className="flex flex-wrap items-center justify-end gap-2">
           <DieselBunkToggle includeMasterBunks={includeMasterBunks} onChange={setBunkMode} />
           {(selectedManual || selectedTrip) && <div className="flex items-center gap-2">
-            <button type="button" onClick={() => selectedManual ? setViewingManual(selectedManual) : openTrip(selectedTrip?.id ?? null)} className="group inline-flex h-9 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-xs font-semibold text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 active:scale-95"><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14}/></span>View</button>
             {selectedManual?.status === "Pending" && <button type="button" onClick={() => void approveManual(selectedManual)} className="group inline-flex h-9 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95"><span className={`inline-flex ${uiActionIconMotionClass.approve}`}><CheckCircle2 size={14}/></span>Approve</button>}
             {selectedManual && <button type="button" disabled={!manualEditable(selectedManual)} onClick={() => requestManualDelete(selectedManual.id, { label: `Deleting expense ${selectedManual.expenseNo}` })} className="group inline-flex h-9 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:bg-rose-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"><span className={`inline-flex ${uiActionIconMotionClass.delete}`}><Trash2 size={14}/></span>Delete</button>}
             {selectedManual && <button type="button" disabled={!manualEditable(selectedManual)} onClick={() => { setEditingManual(selectedManual); setManualOpen(true); }} className="group inline-flex h-9 items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-200 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"><span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={14}/></span>Edit</button>}
@@ -786,7 +779,7 @@ export default function TripExpensesPage() {
               >
                 <td className={`${tdClass} text-slate-500`}><RowSelectMark selected={selected} serialNo={manualRows.length + (page - 1) * pageSize + index + 1} label={`Selected trip ${row.tripNo}`} /></td>
                 <td className="px-2 py-4 text-center align-middle">
-                  <span className="inline-block max-w-full truncate whitespace-nowrap text-[13px] font-bold text-emerald-600" title={row.tripNo}>{row.tripNo}</span>
+                  <button type="button" onClick={(event) => { event.stopPropagation(); openTrip(row.id); }} className="inline-block max-w-full truncate whitespace-nowrap rounded px-0.5 text-[13px] font-bold text-emerald-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" title={row.tripNo} aria-label={`View trip expense ${row.tripNo}`}>{row.tripNo}</button>
                 </td>
                 <td className={tdClass}>{formatTripListDay(row.tripDate)}</td>
                 <td className={`${tdClass} text-slate-700`}>{formatVehicleNumber(row.vehicleNo)}</td>

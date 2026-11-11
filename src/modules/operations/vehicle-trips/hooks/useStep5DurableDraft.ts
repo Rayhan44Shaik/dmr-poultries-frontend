@@ -187,6 +187,24 @@ export function useStep5DurableDraft({
     [active, tripId, tripNo]
   );
 
+  /** Immediately replace the durable snapshot and discard any older queued
+   * save. Used by destructive row actions so a refresh can never restore the
+   * deleted data while the normal debounce is still waiting. */
+  const replaceDraft = useCallback(
+    async (fields: Step5DraftFields) => {
+      if (!active) return;
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      latestFieldsRef.current = fields;
+      await clearStep5Draft(tripId);
+      await writeStep5Draft(tripId, tripNo, fields, serverRevRef.current);
+      setHasPendingSync(true);
+    },
+    [active, tripId, tripNo]
+  );
+
   /**
    * Save Progress. Online: perform the real call, reconcile, clear dirty on
    * confirmed success. Offline / retryable failure: persist a durable queued
@@ -251,5 +269,5 @@ export function useStep5DurableDraft({
     setHasPendingSync(false);
   }, [tripId]);
 
-  return { restoredFields, saveProgress, recordEdit, discardDraft, isOffline, hasPendingSync };
+  return { restoredFields, saveProgress, recordEdit, replaceDraft, discardDraft, isOffline, hasPendingSync };
 }

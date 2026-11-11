@@ -1,0 +1,9 @@
+src/modules/fleet-operations/fleetLazyPages.tsx:11:export const MaintenanceEntryPage = lazy(retryableImport(() => import('./pages/MaintenanceEntryPage')));
+src/modules/fleet-operations/fleetLazyPages.tsx:12:export const MaintenanceHistoryPage = lazy(retryableImport(() => import('./pages/MaintenanceHistoryPage')));
+src/modules/fleet-operations/fleetLazyPages.tsx:13:export const DocumentsExpiryPage = lazy(retryableImport(() => import('./pages/DocumentsExpiryPage')));
+src/modules/fleet-operations/fleetLazyPages.tsx:14:export const FastagDashboardPage = lazy(retryableImport(() => import('./pages/FastagDashboardPage')));
+src/modules/fleet-operations/fleetLazyPages.tsx:15:export const EmiLoansPage = lazy(retryableImport(() => import('./pages/EmiLoansPage')));
+src/modules/fleet-operations/fleetLazyPages.tsx:16:export const VehicleAnalyticsPage = lazy(retryableImport(() => import('./pages/VehicleAnalyticsPage')));
+src/modules/fleet-operations/fleetRouteConfig.tsx:16:// const FleetDashboardPage = lazy(retryableImport(() => import('./pages/FleetDashboardPage')));
+src/modules/fleet-operations/fleetRouteConfig.tsx:17:// const VehicleReportsPage = lazy(retryableImport(() => import('./pages/VehicleReportsPage')));
+src/modules/fleet-operations/fleetRouteConfig.tsx:18:// const VehicleExpenseReportPage = lazy(retryableImport(() => import('./pages/VehicleExpenseReportPage')));

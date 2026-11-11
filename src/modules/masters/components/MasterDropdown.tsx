@@ -31,6 +31,11 @@ interface MasterDropdownProps {
   value: string;
   options: readonly (string | MasterDropdownOption)[];
   onChange: (value: string) => void;
+  /** Optional checkbox-style selection. Existing single-select call sites are
+   * unchanged; multi-select consumers provide values/onValuesChange. */
+  multiple?: boolean;
+  values?: readonly string[];
+  onValuesChange?: (values: string[]) => void;
   placeholder?: string;
   searchable?: boolean;
   /** Match search terms only at the beginning of an option. */
@@ -83,6 +88,9 @@ export default function MasterDropdown({
   value,
   options,
   onChange,
+  multiple = false,
+  values = [],
+  onValuesChange,
   placeholder = label,
   searchable = false,
   searchFromStart = false,
@@ -157,6 +165,7 @@ export default function MasterDropdown({
     (option) => !(allowClear && option.value === ""),
   );
   const selected = items.find((option) => option.value === value);
+  const selectedValues = useMemo(() => new Set(values), [values]);
   const activeId =
     active >= 0 && filtered[active] ? `${id}-option-${active}` : undefined;
 
@@ -188,6 +197,17 @@ export default function MasterDropdown({
   };
   const pick = (option: MasterDropdownOption) => {
     if (disabled || option.disabled) return;
+    if (multiple) {
+      if (allowClear && option.value === "") {
+        onValuesChange?.([]);
+        return;
+      }
+      const next = selectedValues.has(option.value)
+        ? values.filter((entry) => entry !== option.value)
+        : [...values, option.value];
+      onValuesChange?.(next);
+      return;
+    }
     onChange(option.value);
     close(true);
   };
@@ -448,7 +468,9 @@ export default function MasterDropdown({
         style={{ maxHeight: 180 }}
       >
         {filtered.map((option, index) => {
-          const isSelected = kind === "select" && option.value === value;
+          const isSelected = kind === "select" && (multiple
+            ? selectedValues.has(option.value)
+            : option.value === value);
           const isActive = index === active;
           return (
             <button
@@ -547,11 +569,17 @@ export default function MasterDropdown({
         } ${triggerClassName}`}
       >
         <span
-          className={`truncate ${kind === "select" && !value ? "text-slate-400" : "text-slate-700"}`}
+          className={`truncate ${kind === "select" && !(multiple ? values.length : value) ? "text-slate-400" : "text-slate-700"}`}
         >
           {kind === "action"
             ? placeholder
-            : selected?.label || value || placeholder}
+            : multiple
+              ? values.length === 0
+                ? placeholder
+                : values.length === 1
+                  ? items.find((option) => option.value === values[0])?.label || values[0]
+                  : `${values.length} selected`
+              : selected?.label || value || placeholder}
         </span>
         <ChevronDown
           size={14}

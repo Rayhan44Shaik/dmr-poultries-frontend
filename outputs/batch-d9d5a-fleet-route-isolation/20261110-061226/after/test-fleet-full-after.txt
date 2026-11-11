@@ -1,0 +1,201 @@
+
+> dmr-poultries-web@0.0.0 test:fleet
+> tsx --test src/modules/fleet-operations/activeFleetScope.test.ts src/modules/fleet-operations/services/fleetSessionCache.test.ts
+
+▶ Fleet Operations active scope
+  ✔ exposes five production tabs plus a FASTAG placeholder (4.0965ms)
+  ✔ does not expose Dashboard, Reports, or Expenses in sidebar navigation (0.8661ms)
+  ✔ preserves deferred page, hook, and component files (1.0272ms)
+  ✔ does not mount or import deferred modules from the active Fleet page (1.68ms)
+  ✔ does not register deferred dashboard/reports/expenses routes as active (1.2416ms)
+  ✔ does not initialize deferred APIs from active Fleet fetch/cache/refresh paths (1.9846ms)
+  ✔ Analytics fetches only via filter-key cache, refresh nonce, and shared GET — no polling (1.0643ms)
+  ✔ EMI Retry is a single controlled list GET with in-flight protection (0.8817ms)
+  ✔ EMI data hook is read-only — no schedule or payment path (0.6698ms)
+  ✔ Maintenance Entry does not load History list or meter-summary (1.5952ms)
+  ✔ Permit fetches are a single controlled list with session-cache sharing (0.9309ms)
+  ✔ FASTAG is a static Under Construction screen with no data path (1.7102ms)
+  ✔ FASTAG does not participate in Fleet cache or refresh of other tabs (1.6239ms)
+  ✔ does not create cache keys for deferred modules in the session cache helper (0.6813ms)
+  ✔ resolves the default tab without a second navigate when ?tab= is already valid (0.5749ms)
+  ✖ uses the same content width and page gutters as Operations (3.8454ms)
+  ✔ Maintenance Entry does not load Operations fuel-expenses until a vehicle is selected (1.4333ms)
+  ✔ AppRoutes lazy-loads FleetPages so other modules do not evaluate Fleet tabs (0.5939ms)
+  ✔ active Fleet data paths never touch sample infrastructure or browser storage (12.796ms)
+✖ Fleet Operations active scope (43.8374ms)
+▶ fleetSessionCache
+  ✔ stores and returns a value until invalidated (3.2917ms)
+  ✔ deduplicates concurrent loaders for the same key (0.7181ms)
+✔ fleetSessionCache (6.779ms)
+ℹ tests 21
+ℹ suites 2
+ℹ pass 20
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1182.1917
+
+✖ failing tests:
+
+test at src\modules\fleet-operations\activeFleetScope.test.ts:241:3
+✖ uses the same content width and page gutters as Operations (3.8454ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /max-w-\[1600px\]/. Input:
+  
+  '// src/modules/fleet-operations/pages/FleetPages.tsx\r\n' +
+    '\r\n' +
+    'import React, { lazy, Suspense, useEffect, useRef, useState } from "react";\r\n' +
+    'import { retryableImport } from "../../../routes/lazyWithRetry";\r\n' +
+    'import { useLocation, useNavigate } from "react-router-dom";\r\n' +
+    '\r\n' +
+    'import {\r\n' +
+    '  DEFAULT_FLEET_TAB,\r\n' +
+    '  isVisibleFleetTab,\r\n' +
+    '  type VisibleFleetTab,\r\n' +
+    '} from "../activeFleetScope";\r\n' +
+    'import FleetTabSkeleton from "../components/common/FleetTabSkeleton";\r\n' +
+    'import {\r\n' +
+    '  cancelIdle,\r\n' +
+    '  onIdle,\r\n' +
+    '  preloadFleetTab,\r\n' +
+    '  tabLoaders,\r\n' +
+    '  type FleetTabComponent,\r\n' +
+    '} from "./fleetTabs";\r\n' +
+    '\r\n' +
+    '/*\r\n' +
+    ' * Tabs are lazy so opening /fleet?tab=entry does not evaluate Analytics (Recharts),\r\n' +
+    ' * EMI, History, or Permits before the first paint.\r\n' +
+    ' *\r\n' +
+    ' * DEFERRED / FUTURE — not imported:\r\n' +
+    ' *   dashboard  → ./FleetDashboardPage\r\n' +
+    ' *   reports    → ./VehicleReportsPage\r\n' +
+    ' *   expenses   → ./VehicleExpenseReportPage\r\n' +
+    ' */\r\n' +
+    '\r\n' +
+    'const tabComponents: Record<\r\n' +
+    '  VisibleFleetTab,\r\n' +
+    '  React.LazyExoticComponent<FleetTabComponent>\r\n' +
+    '> = Object.fromEntries(\r\n' +
+    '  Object.entries(tabLoaders).map(([tab, loader]) => [\r\n' +
+    '    tab,\r\n' +
+    '    lazy(retryableImport(loader)),\r\n' +
+    '  ])\r\n' +
+    ') as Record<VisibleFleetTab, React.LazyExoticComponent<FleetTabComponent>>;\r\n' +
+    '\r\n' +
+    '/** Mounts only after the lazy chunk has resolved (it sits inside Suspense). */\r\n' +
+    'function LoadSignaller({ onLoaded }: { onLoaded: () => void }) {\r\n' +
+    '  useEffect(() => {\r\n' +
+    '    onLoaded();\r\n' +
+    '  }, [onLoaded]);\r\n' +
+    '  return null;\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    '/**\r\n' +
+    ' * One tab pane. The entrance pop is applied only once the real page chunk has\r\n' +
+    ' * loaded, so navigating to a heavy tab (Maintenance) pops the page itself\r\n' +
+    ' * instead of animating the skeleton while the chunk is still downloading.\r\n' +
+    ' */\r\n' +
+    'function FleetTabPane({ tab, active }: { tab: VisibleFleetTab; active: boolean }) {\r\n' +
+    '  const [loaded, setLoaded] = useState(false);\r\n' +
+    '  const handleLoaded = React.useCallback(() => setLoaded(true), []);\r\n' +
+    '  const Component = tabComponents[tab];\r\n' +
+    '  const ref = useRef<HTMLDivElement>(null);\r\n' +
+    '\r\n' +
+    '  // Re-add the pop class each time the pane becomes active (re-adding\r\n' +
+    '  // restarts the CSS animation); class only exists once content is loaded.\r\n' +
+    '  useEffect(() => {\r\n' +
+    '    if (active && loaded) {\r\n' +
+    '      const el = ref.current;\r\n' +
+    '      if (!el) return;\r\n' +
+    '      el.classList.remove("animate-page-pop");\r\n' +
+    '      void el.offsetWidth;\r\n' +
+    '      el.classList.add("animate-page-pop");\r\n' +
+    '    }\r\n' +
+    '  }, [active, loaded]);\r\n' +
+    '\r\n' +
+    '  return (\r\n' +
+    '    <div\r\n' +
+    '      ref={ref}\r\n' +
+    '      hidden={!active}\r\n' +
+    '      aria-hidden={!active}\r\n' +
+    '      className={active && loaded ? "animate-page-pop" : undefined}\r\n' +
+    '    >\r\n' +
+    '      <Suspense fallback={<FleetTabSkeleton />}>\r\n' +
+    '        <LoadSignaller onLoaded={handleLoaded} />\r\n' +
+    '        <Component embedded={true} active={active} />\r\n' +
+    '      </Suspense>\r\n' +
+    '    </div>\r\n' +
+    '  );\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'function FleetPages() {\r\n' +
+    '  const location = useLocation();\r\n' +
+    '  const navigate = useNavigate();\r\n' +
+    '\r\n' +
+    '  const searchParams = React.useMemo(\r\n' +
+    '    () => new URLSearchParams(location.search),\r\n' +
+    '    [location.search]\r\n' +
+    '  );\r\n' +
+    '  const requestedTab = searchParams.get("tab");\r\n' +
+    '  const activeTab: VisibleFleetTab = isVisibleFleetTab(requestedTab)\r\n' +
+    '    ? requestedTab\r\n' +
+    '    : DEFAULT_FLEET_TAB;\r\n' +
+    '\r\n' +
+    '  useEffect(() => {\r\n' +
+    '    if (isVisibleFleetTab(requestedTab)) return;\r\n' +
+    '    navigate(`/fleet?tab=${DEFAULT_FLEET_TAB}`, { replace: true });\r\n' +
+    '  }, [requestedTab, navigate]);\r\n' +
+    '\r\n' +
+    '  const [visitedTabs, setVisitedTabs] = useState<Set<VisibleFleetTab>>(\r\n' +
+    '    () => new Set([activeTab])\r\n' +
+    '  );\r\n' +
+    '\r\n' +
+    '  useEffect(() => {\r\n' +
+    '    setVisitedTabs((prev) => {\r\n' +
+    '      if (prev.has(activeTab)) return prev;\r\n' +
+    '      const next = new Set(prev);\r\n' +
+    '      next.add(activeTab);\r\n' +
+    '      return next;\r\n' +
+    '    });\r\n' +
+    '  }, [activeTab]);\r\n' +
+    '\r\n' +
+    '  // Warm the active tab immediately (covers deep links such as\r\n' +
+    '  // /fleet?tab=entry) and the remaining tabs on idle, so later switches and\r\n' +
+    '  // dashboard-tile clicks are instant.\r\n' +
+    '  useEffect(() => {\r\n' +
+    '    preloadFleetTab(activeTab);\r\n' +
+    '    const others = (Object.keys(tabLoaders) as VisibleFleetTab[]).filter(\r\n' +
+    '      (t) => t !== activeTab\r\n' +
+    '    );\r\n' +
+    '    const handles = others.map((t) => onIdle(() => preloadFleetTab(t)));\r\n' +
+    '    return () => handles.forEach(cancelIdle);\r\n' +
+    '  }, [activeTab]);\r\n' +
+    '\r\n' +
+    '  return (\r\n' +
+    '    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">\n' +
+    '      <div className="w-full min-w-0">\r\n' +
+    '        {(Object.keys(tabComponents) as VisibleFleetTab[]).map((tab) => {\r\n' +
+    '          if (!visitedTabs.has(tab) && tab !== activeTab) return null;\r\n' +
+    '          return <FleetTabPane key={tab} tab={tab} active={tab === activeTab} />;\r\n' +
+    '        })}\r\n' +
+    '      </div>\r\n' +
+    '    </div>\r\n' +
+    '  );\r\n' +
+    '}\r\n' +
+    '\r\n' +
+    'export default React.memo(FleetPages);\r\n'
+  
+      at TestContext.<anonymous> (D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\fleet-operations\activeFleetScope.test.ts:244:12)
+      at Test.runInAsyncScope (node:async_hooks:226:14)
+      at Test.run (node:internal/test_runner/test:1397:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:969:18)
+      at Test.postRun (node:internal/test_runner/test:1537:19)
+      at Test.run (node:internal/test_runner/test:1462:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:969:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '// src/modules/fleet-operations/pages/FleetPages.tsx\r\n\r\nimport React, { lazy, Suspense, useEffect, useRef, useState } from "react";\r\nimport { retryableImport } from "../../../routes/lazyWithRetry";\r\nimport { useLocation, useNavigate } from "react-router-dom";\r\n\r\nimport {\r\n  DEFAULT_FLEET_TAB,\r\n  isVisibleFleetTab,\r\n  type VisibleFleetTab,\r\n} from "../activeFleetScope";\r\nimport FleetTabSkeleton from "../components/common/FleetTabSkeleton";\r\nimport {\r\n  cancelIdle,\r\n  onIdle,\r\n  preloadFleetTab,\r\n  tabLoaders,\r\n  type FleetTabComponent,\r\n} from "./fleetTabs";\r\n\r\n/*\r\n * Tabs are lazy so opening /fleet?tab=entry does not evaluate Analytics (Recharts),\r\n * EMI, History, or Permits before the first paint.\r\n *\r\n * DEFERRED / FUTURE — not imported:\r\n *   dashboard  → ./FleetDashboardPage\r\n *   reports    → ./VehicleReportsPage\r\n *   expenses   → ./VehicleExpenseReportPage\r\n */\r\n\r\nconst tabComponents: Record<\r\n  VisibleFleetTab,\r\n  React.LazyExoticComponent<FleetTabComponent>\r\n> = Object.fromEntries(\r\n  Object.entries(tabLoaders).map(([tab, loader]) => [\r\n    tab,\r\n    lazy(retryableImport(loader)),\r\n  ])\r\n) as Record<VisibleFleetTab, React.LazyExoticComponent<FleetTabComponent>>;\r\n\r\n/** Mounts only after the lazy chunk has resolved (it sits inside Suspense). */\r\nfunction LoadSignaller({ onLoaded }: { onLoaded: () => void }) {\r\n  useEffect(() => {\r\n    onLoaded();\r\n  }, [onLoaded]);\r\n  return null;\r\n}\r\n\r\n/**\r\n * One tab pane. The entrance pop is applied only once the real page chunk has\r\n * loaded, so navigating to a heavy tab (Maintenance) pops the page itself\r\n * instead of animating the skeleton while the chunk is still downloading.\r\n */\r\nfunction FleetTabPane({ tab, active }: { tab: VisibleFleetTab; active: boolean }) {\r\n  const [loaded, setLoaded] = useState(false);\r\n  const handleLoaded = React.useCallback(() => setLoaded(true), []);\r\n  const Component = tabComponents[tab];\r\n  const ref = useRef<HTMLDivElement>(null);\r\n\r\n  // Re-add the pop class each time the pane becomes active (re-adding\r\n  // restarts the CSS animation); class only exists once content is loaded.\r\n  useEffect(() => {\r\n    if (active && loaded) {\r\n      const el = ref.current;\r\n      if (!el) return;\r\n      el.classList.remove("animate-page-pop");\r\n      void el.offsetWidth;\r\n      el.classList.add("animate-page-pop");\r\n    }\r\n  }, [active, loaded]);\r\n\r\n  return (\r\n    <div\r\n      ref={ref}\r\n      hidden={!active}\r\n      aria-hidden={!active}\r\n      className={active && loaded ? "animate-page-pop" : undefined}\r\n    >\r\n      <Suspense fallback={<FleetTabSkeleton />}>\r\n        <LoadSignaller onLoaded={handleLoaded} />\r\n        <Component embedded={true} active={active} />\r\n      </Suspense>\r\n    </div>\r\n  );\r\n}\r\n\r\nfunction FleetPages() {\r\n  const location = useLocation();\r\n  const navigate = useNavigate();\r\n\r\n  const searchParams = React.useMemo(\r\n    () => new URLSearchParams(location.search),\r\n    [location.search]\r\n  );\r\n  const requestedTab = searchParams.get("tab");\r\n  const activeTab: VisibleFleetTab = isVisibleFleetTab(requestedTab)\r\n    ? requestedTab\r\n    : DEFAULT_FLEET_TAB;\r\n\r\n  useEffect(() => {\r\n    if (isVisibleFleetTab(requestedTab)) return;\r\n    navigate(`/fleet?tab=${DEFAULT_FLEET_TAB}`, { replace: true });\r\n  }, [requestedTab, navigate]);\r\n\r\n  const [visitedTabs, setVisitedTabs] = useState<Set<VisibleFleetTab>>(\r\n    () => new Set([activeTab])\r\n  );\r\n\r\n  useEffect(() => {\r\n    setVisitedTabs((prev) => {\r\n      if (prev.has(activeTab)) return prev;\r\n      const next = new Set(prev);\r\n      next.add(activeTab);\r\n      return next;\r\n    });\r\n  }, [activeTab]);\r\n\r\n  // Warm the active tab immediately (covers deep links such as\r\n  // /fleet?tab=entry) and the remaining tabs on idle, so later switches and\r\n  // dashboard-tile clicks are instant.\r\n  useEffect(() => {\r\n    preloadFleetTab(activeTab);\r\n    const others = (Object.keys(tabLoaders) as VisibleFleetTab[]).filter(\r\n      (t) => t !== activeTab\r\n    );\r\n    const handles = others.map((t) => onIdle(() => preloadFleetTab(t)));\r\n    return () => handles.forEach(cancelIdle);\r\n  }, [activeTab]);\r\n\r\n  return (\r\n    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">\n      <div className="w-full min-w-0">\r\n        {(Object.keys(tabComponents) as VisibleFleetTab[]).map((tab) => {\r\n          if (!visitedTabs.has(tab) && tab !== activeTab) return null;\r\n          return <FleetTabPane key={tab} tab={tab} active={tab === activeTab} />;\r\n        })}\r\n      </div>\r\n    </div>\r\n  );\r\n}\r\n\r\nexport default React.memo(FleetPages);\r\n',
+    expected: /max-w-\[1600px\]/,
+    operator: 'match',
+    diff: 'simple'
+  }

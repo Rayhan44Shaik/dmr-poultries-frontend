@@ -5,7 +5,7 @@
  * Context: Pending Collection was found calling the wrong backend route
  * (DELETE /collection-entry/:id, the unrestricted Collection Entry delete)
  * instead of its own gated route (DELETE /collection-entry/pending/:id).
- * That mistake silently defeated the backend's 7-day deletion window for
+ * That mistake silently defeated the backend's 14-day deletion window for
  * real users. These tests pin the exact URL each service function calls,
  * using a mock axios adapter (no network/server required), so a future
  * change cannot reintroduce the mix-up without failing CI.
@@ -138,7 +138,7 @@ test("refreshFromBackend() requests deleted rows for global collection-number in
   }
 });
 
-test("fetchRecentCollectionsForShop() requests the shop's complete latest 10 across statuses", async () => {
+test("fetchRecentCollectionsForShop() excludes deleted rows from the operational shop view", async () => {
   const { calls, restore } = installMockAdapter();
   try {
     await collectionService.fetchRecentCollectionsForShop(5, 10);
@@ -147,7 +147,7 @@ test("fetchRecentCollectionsForShop() requests the shop's complete latest 10 acr
     assert.equal(getCalls[0].url, "/operations/collection-entry/recent");
     assert.equal(getCalls[0].params?.shopId, 5);
     assert.equal(getCalls[0].params?.limit, 10);
-    assert.equal(getCalls[0].params?.includeDeleted, "true");
+    assert.equal(getCalls[0].params?.includeDeleted, undefined);
   } finally {
     restore();
   }

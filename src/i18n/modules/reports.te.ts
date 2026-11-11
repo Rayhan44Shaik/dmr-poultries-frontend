@@ -38,6 +38,8 @@ export default {
   'shop_ledger.opening_balance': 'ప్రారంభ బకాయి',
   'shop_ledger.total_sales_debit': 'మొత్తం అమ్మకాలు (డెబిట్)',
   'shop_ledger.total_collections_credit': 'మొత్తం కలెక్షన్లు (క్రెడిట్)',
+  'shop_ledger.sale_entries': 'అమ్మకాల ఎంట్రీలు: {count}',
+  'shop_ledger.collection_entries': 'కలెక్షన్ ఎంట్రీలు: {count}',
   'shop_ledger.total_birds': 'మొత్తం పక్షులు',
   'shop_ledger.total_weight_kg': 'మొత్తం బరువు (కెజి)',
   'shop_ledger.closing_balance': 'ముగింపు బకాయి',
@@ -109,6 +111,18 @@ export default {
   'shop_ledger.detail.download_pdf': 'PDF డౌన్‌లోడ్',
   'shop_ledger.detail.downloading': 'PDF సిద్ధమవుతోంది…',
   'shop_ledger.detail.select_shop_hint': 'లెడ్జర్‌ను చూడటానికి ఒక షాప్‌ను ఎంచుకోండి.',
+  'shop_ledger.detail.total_birds': 'మొత్తం పక్షులు',
+  'shop_ledger.detail.total_weight': 'మొత్తం బరువు (KG)',
+  'shop_ledger.detail.delivered_birds': 'డెలివరీ పక్షులు',
+  'shop_ledger.detail.delivered_weight': 'డెలివరీ బరువు (KG)',
+  'shop_ledger.detail.box_mortality': 'బాక్స్ మోర్టాలిటీ',
+  'shop_ledger.detail.box_mortality_weight': 'బాక్స్ మోర్టాలిటీ బరువు',
+  'shop_ledger.detail.mortality_birds': 'మోర్టాలిటీ పక్షులు',
+  'shop_ledger.detail.mortality_weight_loss': 'మోర్టాలిటీ బరువు / బరువు నష్టం',
+  'shop_ledger.detail.box_mode': 'బాక్స్ మోడ్',
+  'shop_ledger.detail.weight_mode': 'వెయిట్ మోడ్',
+  'shop_ledger.detail.box_weight': 'బాక్స్ బరువు',
+  'shop_ledger.detail.weight_loss': 'బరువు నష్టం',
 
   // ── WhatsApp modal (UI chrome — the message body itself stays
   //    English because it is the business text delivered to shops) ──

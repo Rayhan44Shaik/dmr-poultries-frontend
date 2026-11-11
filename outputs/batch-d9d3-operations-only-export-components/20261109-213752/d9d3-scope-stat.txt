@@ -1,0 +1,4 @@
+warning: in the working copy of 'src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx', LF will be replaced by CRLF the next time Git touches it
+ .../components/entry/CollectionAmount.tsx          |  16 +-
+ .../components/Step_5/DieselExpensesTable.tsx      | 189 +++++++++++++++++----
+ 2 files changed, 157 insertions(+), 48 deletions(-)

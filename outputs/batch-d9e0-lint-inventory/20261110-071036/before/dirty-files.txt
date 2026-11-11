@@ -1,0 +1,40 @@
+ M src/i18n/modules/operations.en.ts
+ M src/i18n/modules/operations.te.ts
+ M src/i18n/modules/reports.en.ts
+ M src/i18n/modules/reports.te.ts
+ M src/modules/fleet-operations/activeFleetScope.test.ts
+ M src/modules/fleet-operations/index.ts
+ M src/modules/fleet-operations/routes.tsx
+ M src/modules/masters/components/MasterDropdown.tsx
+ M src/modules/operations/collections/components/entry/CollectionAmount.test.ts
+ M src/modules/operations/collections/components/entry/CollectionAmount.tsx
+ M src/modules/operations/collections/components/pending/PendingCollectionsTable.tsx
+ M src/modules/operations/collections/components/pending/ShopCollectionDetailModal.tsx
+ M src/modules/operations/collections/pages/PendingCollectionsPage.tsx
+ M src/modules/operations/collections/services/collectionService.contract.test.ts
+ M src/modules/operations/collections/services/collectionService.ts
+ M src/modules/operations/fuel-expenses/components/FuelBillTable.tsx
+ M src/modules/operations/fuel-expenses/utils/filterFuelExpenses.test.ts
+ M src/modules/operations/fuel-expenses/utils/filterFuelExpenses.ts
+ M src/modules/operations/shop-sales/components/CompletedTripsTable.tsx
+ M src/modules/operations/shop-sales/pages/RatesEntryPage.tsx
+ M src/modules/operations/trip-expenses/pages/TripExpensesPage.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx
+ M src/modules/operations/vehicle-trips/components/Step_5/dieselRows.test.ts
+ M src/modules/operations/vehicle-trips/components/TripListHeader.tsx
+ M src/modules/operations/vehicle-trips/components/TripMasterTable.tsx
+ M src/modules/operations/vehicle-trips/hooks/useStep5DurableDraft.ts
+ M src/modules/operations/vehicle-trips/pages/TripListPage.tsx
+ M src/modules/operations/vehicle-trips/utils/pickupImport.ts
+ M src/modules/reports/components/CumulativeQuantityCell.tsx
+ M src/modules/reports/components/PdfBlobPreview.tsx
+ M src/modules/reports/components/ShopLedgerDetailModal.test.tsx
+ M src/modules/reports/components/ShopLedgerDetailModal.tsx
+ M src/modules/reports/components/shopLedgerDetailData.ts
+ M src/modules/reports/pages/ShopLedgerPage.tsx
+?? outputs/
+?? src/modules/fleet-operations/fleetLazyPages.tsx
+?? src/modules/fleet-operations/fleetRouteConfig.tsx
+?? src/modules/operations/collections/components/entry/formatCollectionAmountInput.ts
+?? src/modules/operations/vehicle-trips/components/Step_5/mergeVisibleDieselRows.ts

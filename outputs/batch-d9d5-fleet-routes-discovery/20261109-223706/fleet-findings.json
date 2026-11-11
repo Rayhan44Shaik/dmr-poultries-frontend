@@ -1,0 +1,49 @@
+{
+  "file": "D:\\Development\\DMR-Poultries-ERP\\frontend\\dmr-poultries-web\\src\\modules\\fleet-operations\\routes.tsx",
+  "errorCount": 7,
+  "warningCount": 0,
+  "findings": [
+    {
+      "line": 7,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 8,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 9,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 10,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 11,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 12,
+      "col": 7,
+      "rule": "react-refresh/only-export-components",
+      "text": "Fast refresh only works when a file only exports components. Move your component(s) to a separate file. If all exports are HOCs, add them to the `extraHOCs` option."
+    },
+    {
+      "line": 20,
+      "col": 54,
+      "rule": "@typescript-eslint/no-explicit-any",
+      "text": "Unexpected any. Specify a different type."
+    }
+  ]
+}

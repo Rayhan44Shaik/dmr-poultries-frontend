@@ -19,6 +19,7 @@ interface Props {
   isLoading?: boolean;
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
+  onView: (trip: Trip) => void;
   /** Select without toggling, used by keyboard row navigation. */
   onRowSelect?: (trip: Trip) => void;
   startIndex?: number;
@@ -107,6 +108,7 @@ function TripMasterTable({
   isLoading = false,
   selectedRowId,
   onRowClick,
+  onView,
   onRowSelect,
   startIndex = 0,
   sortBy = null,
@@ -273,7 +275,11 @@ function TripMasterTable({
                       <RowSelectMark selected={isSelected} serialNo={serialNo} label={`Trip ${trip.tripNo} selected`} />
                     </td>
                     {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
-                    <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{localizeTripViewText(trip.tripNo, language)}</td>
+                    <td className="px-4 py-5 pl-9 whitespace-nowrap">
+                      <button type="button" onClick={(event) => { event.stopPropagation(); onView(trip); }} className="rounded px-0.5 text-[13px] font-bold text-emerald-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" aria-label={`View trip ${trip.tripNo}`}>
+                        {localizeTripViewText(trip.tripNo, language)}
+                      </button>
+                    </td>
                     <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
                     <td className={`px-4 py-5 pl-9 text-[13px] font-medium whitespace-nowrap ${trip.isRentedVehicle ? "text-orange-600" : "text-slate-700"}`}>
                       <div className={trip.isRentedVehicle ? "font-bold" : undefined}>{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</div>

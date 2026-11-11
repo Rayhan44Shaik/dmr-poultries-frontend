@@ -1,7 +1,7 @@
 /**
  * Collection deletion window.
  *
- * Pending (never-approved) entries may be deleted on their entry day only.
+ * Pending (never-approved) entries use their database creation timestamp.
  * Approved entries follow Shop Sales: 14 days from the moment of approval
  * (`approvedAt`), never from the original collection date.
  *
@@ -10,8 +10,8 @@
  * never the enforcement point.
  */
 
-/** Inclusive calendar window for pending entries: the entry day only. */
-export const PENDING_DELETE_WINDOW_DAYS = 0;
+/** Pending records may be edited or deleted for two calendar weeks. */
+export const PENDING_DELETE_WINDOW_DAYS = 14;
 
 /** Two weeks after approval, matching Shop Sales' 14-day edit window. */
 export const COLLECTION_DELETE_WINDOW_DAYS = 14;
@@ -123,10 +123,11 @@ export function getDeleteWindowForStatus(
   status: string | null | undefined,
   now: Date = new Date(),
   approvedAt?: string | Date | null,
+  createdAt?: string | Date | null,
 ): DeleteWindowState {
   const isPending = String(status ?? "").toLowerCase().startsWith("pending");
   if (isPending) {
-    return getDeleteWindow(entryDate, now, PENDING_DELETE_WINDOW_DAYS);
+    return getApprovedDeleteWindow(createdAt, now);
   }
   return getApprovedDeleteWindow(approvedAt ?? entryDate, now);
 }

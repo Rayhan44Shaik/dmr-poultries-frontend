@@ -39,6 +39,8 @@ export default {
   'shop_ledger.opening_balance': 'Opening Balance',
   'shop_ledger.total_sales_debit': 'Total Sales (Debit)',
   'shop_ledger.total_collections_credit': 'Total Collections (Credit)',
+  'shop_ledger.sale_entries': 'Sale entries: {count}',
+  'shop_ledger.collection_entries': 'Collection entries: {count}',
   'shop_ledger.total_birds': 'Total Birds',
   'shop_ledger.total_weight_kg': 'Total Weight (KG)',
   'shop_ledger.closing_balance': 'Closing Balance',
@@ -110,6 +112,18 @@ export default {
   'shop_ledger.detail.download_pdf': 'Download PDF',
   'shop_ledger.detail.downloading': 'Preparing PDF…',
   'shop_ledger.detail.select_shop_hint': 'Select a shop to view its ledger.',
+  'shop_ledger.detail.total_birds': 'Total Birds',
+  'shop_ledger.detail.total_weight': 'Total Weight (KG)',
+  'shop_ledger.detail.delivered_birds': 'Delivered Birds',
+  'shop_ledger.detail.delivered_weight': 'Delivered Weight (KG)',
+  'shop_ledger.detail.box_mortality': 'Box Mortality',
+  'shop_ledger.detail.box_mortality_weight': 'Box Mortality Weight',
+  'shop_ledger.detail.mortality_birds': 'Mortality Birds',
+  'shop_ledger.detail.mortality_weight_loss': 'Mortality Weight / Weight Loss',
+  'shop_ledger.detail.box_mode': 'Box mode',
+  'shop_ledger.detail.weight_mode': 'Weight mode',
+  'shop_ledger.detail.box_weight': 'Box wt',
+  'shop_ledger.detail.weight_loss': 'Wt loss',
 
   // ── WhatsApp modal (UI chrome — the message body itself stays
   //    English because it is the business text delivered to shops) ──

@@ -68,24 +68,6 @@ export default function PendingCollectionsPage() {
   const [recoveryThreshold, setRecoveryThreshold] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Debounced search
-  const debouncedSearchRef = useRef<NodeJS.Timeout | null>(null);
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-
-  useEffect(() => {
-    if (debouncedSearchRef.current) {
-      clearTimeout(debouncedSearchRef.current);
-    }
-    debouncedSearchRef.current = setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-    }, 300);
-    return () => {
-      if (debouncedSearchRef.current) {
-        clearTimeout(debouncedSearchRef.current);
-      }
-    };
-  }, [searchQuery]);
-
   // Applied filters
   const [appliedShopName, setAppliedShopName] = useState("");
   const [appliedSortBy, setAppliedSortBy] = useState<PendingShopSortKey | null>("shopName");
@@ -153,79 +135,39 @@ export default function PendingCollectionsPage() {
     [loadSummary],
   );
 
-  useEffect(() => {
-    setAppliedFromDate(fromDate);
-    setAppliedToDate(toDate);
-  }, [fromDate, toDate]);
-
-  useEffect(() => {
-    setAppliedShopName(shopName);
-  }, [shopName]);
-
-  useEffect(() => {
-    setAppliedSortBy(sortBy);
-    setAppliedSortDir(sortDir);
-  }, [sortBy, sortDir]);
-
-  useEffect(() => {
-    setAppliedRecoveryThreshold(recoveryThreshold);
-  }, [recoveryThreshold]);
-
-  useEffect(() => {
-    setAppliedSearchQuery(debouncedSearchQuery);
-  }, [debouncedSearchQuery]);
-
-// Build the complete report from ALL shops + backend data
+  // Build the report only from backend-authoritative pending/outstanding rows.
+  // Mapping every master shop here used to resurrect shops whose only sale
+  // belonged to a deleted trip, using the master's stale currentBalance.
   const reportData = useMemo((): PendingReportRow[] => {
-    const summaryMap = new Map<string, CollectionPendingSummaryRow>();
-    pendingSummaryRows.forEach((row) => summaryMap.set(row.shopName, row));
-
-    return allShops.map((shop) => {
-      const backendData = summaryMap.get(shop.shopName);
-      if (backendData) {
-        return {
-          shopId: backendData.shopId,
-          shopName: backendData.shopName,
-          ownerName: shop.ownerName,
-          phoneNumber: shop.phoneNumber,
-          weekStart: backendData.weekStart,
-          weekEnd: backendData.weekEnd,
-          balance: backendData.balance,
-          weeklySales: backendData.weeklySales,
-          weeklyApprovedCollections: backendData.weeklyApprovedCollections,
-          weeklyPendingCollections: backendData.weeklyPendingCollections,
-          recoveryPercentage: backendData.recoveryPercentage,
-          overdueDays: backendData.overdueDays,
-          lastCollectionDate: backendData.lastCollectionDate,
-          hasPendingCollections: backendData.hasPendingCollections,
-        };
-      }
-      // Shop exists in Master but has no backend summary - show zeros
+    const shopsById = new Map(allShops.map((shop) => [shop.id, shop]));
+    return pendingSummaryRows.map((backendData) => {
+      const shop = shopsById.get(backendData.shopId);
       return {
-        shopId: shop.id,
-        shopName: shop.shopName,
-        ownerName: shop.ownerName,
-        phoneNumber: shop.phoneNumber,
-        weekStart: appliedFromDate,
-        weekEnd: appliedToDate,
-        balance: shop.currentBalance ?? 0,
-        weeklySales: 0,
-        weeklyApprovedCollections: 0,
-        weeklyPendingCollections: 0,
-        recoveryPercentage: 0,
-        overdueDays: null,
-        lastCollectionDate: null,
-        hasPendingCollections: false,
+        shopId: backendData.shopId,
+        shopName: backendData.shopName,
+        ownerName: shop?.ownerName ?? "",
+        phoneNumber: shop?.phoneNumber ?? "",
+        weekStart: backendData.weekStart,
+        weekEnd: backendData.weekEnd,
+        balance: backendData.balance,
+        weeklySales: backendData.weeklySales,
+        weeklyApprovedCollections: backendData.weeklyApprovedCollections,
+        weeklyPendingCollections: backendData.weeklyPendingCollections,
+        recoveryPercentage: backendData.recoveryPercentage,
+        overdueDays: backendData.overdueDays,
+        lastCollectionDate: backendData.lastCollectionDate,
+        hasPendingCollections: backendData.hasPendingCollections,
       };
     });
-  }, [allShops, pendingSummaryRows, appliedFromDate, appliedToDate]);
+  }, [allShops, pendingSummaryRows]);
 
-  // Apply filters (debounced search)
+  // Render only the last explicitly applied filter set. Editing any field in
+  // the bar is a draft until Search is pressed, matching Shop Ledger.
   const filteredData = useMemo(() => {
     let data = [...reportData];
 
-    if (debouncedSearchQuery.trim()) {
-      const query = debouncedSearchQuery.toLowerCase().trim();
+    if (appliedSearchQuery.trim()) {
+      const query = appliedSearchQuery.toLowerCase().trim();
       data = data.filter((s) => s.shopName.toLowerCase().includes(query));
     }
 
@@ -272,7 +214,7 @@ export default function PendingCollectionsPage() {
     return data;
   }, [
     reportData,
-    debouncedSearchQuery,
+    appliedSearchQuery,
     appliedShopName,
     appliedSortBy,
     appliedSortDir,
@@ -391,6 +333,17 @@ export default function PendingCollectionsPage() {
     }
   };
 
+  const applyFilters = () => {
+    setAppliedFromDate(fromDate);
+    setAppliedToDate(toDate);
+    setAppliedShopName(shopName);
+    setAppliedSortBy(sortBy);
+    setAppliedSortDir(sortDir);
+    setAppliedRecoveryThreshold(recoveryThreshold);
+    setAppliedSearchQuery(searchQuery.trim());
+    setCurrentPage(1);
+  };
+
   const resetFilters = () => {
     setFromDate("");
     setToDate("");
@@ -441,6 +394,7 @@ export default function PendingCollectionsPage() {
         setSearchQuery={setSearchQuery}
         onReset={resetFilters}
         onRefresh={refreshData}
+        onSearch={applyFilters}
         onExportPdf={handleExportPdf}
         onExportExcel={handleExportExcel}
         exportEnabled={hasKpiFilters && filteredData.length > 0 && !tableLoading}
@@ -493,6 +447,8 @@ export default function PendingCollectionsPage() {
           shopIndex={shopPosition >= 0 ? shopPosition + 1 : undefined}
           shopTotal={filteredData.length}
           allowDelete={can(CAPABILITIES.COLLECTION_DELETE)}
+          fromDate={appliedFromDate || undefined}
+          toDate={appliedToDate || undefined}
         />
       )}
     </div>

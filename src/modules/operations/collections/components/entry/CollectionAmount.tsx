@@ -2,6 +2,7 @@ import { Calculator, AlertTriangle, CheckCircle, Clock, X, Save, Loader2 } from 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useI18n } from "../../../../../i18n";
 import { amountInWords } from "../../utils/amountInWords";
+import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
 
 /**
  * One line of the collection preview: the period it belongs to (Before
@@ -75,21 +76,6 @@ const formatWithCommas = (num: number): string => {
       : lastThree;
   return formattedInteger + "." + decimalPart;
 };
-
-export function formatCollectionAmountInput(value: string): { display: string; amount: number } {
-  let raw = value.replace(/,/g, "").replace(/[^0-9.]/g, "");
-  const parts = raw.split(".");
-  if (parts.length > 2) raw = parts[0] + "." + parts.slice(1).join("");
-  const [integer = "", decimal] = raw.split(".");
-  const normalizedInteger = integer.replace(/^0+(?=\d)/, "");
-  const grouped = normalizedInteger
-    ? Number(normalizedInteger).toLocaleString("en-IN", { maximumFractionDigits: 0 })
-    : "";
-  return {
-    display: decimal !== undefined ? `${grouped}.${decimal.slice(0, 2)}` : grouped,
-    amount: Number.isFinite(Number(raw)) ? Number(raw) : 0,
-  };
-}
 
 export default function CollectionAmount({
   amount,

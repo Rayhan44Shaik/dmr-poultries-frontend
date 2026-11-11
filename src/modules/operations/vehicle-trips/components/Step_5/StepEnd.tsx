@@ -316,7 +316,7 @@ export default function StepEnd({
       [trip.id]
     ),
   });
-  const { restoredFields, recordEdit, saveProgress, discardDraft, isOffline } = step5Draft;
+  const { restoredFields, recordEdit, replaceDraft, saveProgress, discardDraft, isOffline } = step5Draft;
 
   const withoutEndMeter = useCallback((fields: Record<string, unknown>) => {
     const safe = { ...fields };
@@ -421,6 +421,13 @@ export default function StepEnd({
     userTouchedRef.current = true;
     setSheetData((prev) => ({ ...prev, ...updates }));
   };
+
+  const persistDieselDeletion = useCallback(
+    async (nextSheet: Record<string, unknown>) => {
+      await replaceDraft(withoutEndMeter(nextSheet) as Step5DraftFields);
+    },
+    [replaceDraft, withoutEndMeter]
+  );
 
   // ─── Compute derived values ──────────────────────────────────────
   const totalExpenses1 =
@@ -903,6 +910,7 @@ export default function StepEnd({
             sheetData={sheetData}
             handleChange={handleChange}
             applyBatchUpdates={applyBatchUpdates}
+            onRowsDeleted={persistDieselDeletion}
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}
@@ -1008,6 +1016,7 @@ export default function StepEnd({
             sheetData={sheetData}
             handleChange={handleChange}
             applyBatchUpdates={applyBatchUpdates}
+            onRowsDeleted={persistDieselDeletion}
             dieselAmounts={dieselAmounts}
             totalDieselAmount={totalDieselAmount}
             destMeter={destMeter}

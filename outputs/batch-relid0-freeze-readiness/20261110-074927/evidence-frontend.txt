@@ -1,0 +1,8 @@
+outputs/batch-d9d3-operations-only-export-components/
+outputs/batch-d9d4-auth-ui-only-export-components/
+outputs/batch-d9d5-fleet-routes-discovery/
+outputs/batch-d9d5a-fleet-route-isolation/
+outputs/batch-d9e0-lint-inventory/
+outputs/batch-d9e1-safe-types/
+outputs/batch-e2e0-readiness/
+outputs/batch-relid0-freeze-readiness/

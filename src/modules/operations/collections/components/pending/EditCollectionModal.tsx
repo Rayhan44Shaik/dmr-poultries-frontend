@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   X, Save, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
-  FileDown, Trash2, Store, Activity, Wallet, Clock, UserCog, Search, Settings2,
+  FileDown, Trash2, Store, Activity, Wallet, Clock, UserCog, Search, Settings2, Pencil,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
@@ -105,6 +105,10 @@ export function EditCollectionModal({
    * the records area states what it is loading instead.
    */
   const [recentListShop, setRecentListShop] = useState<string | null>(null);
+  // Ref mirrors the owner synchronously. Using recentListShop itself as an
+  // effect dependency caused the first request to be cancelled and repeated
+  // immediately after setRecentListShop(), making this small modal feel slow.
+  const recentListShopRef = useRef<string | null>(null);
   const [recentReady, setRecentReady] = useState(false);
   const [recentLoading, setRecentLoading] = useState(false);
   /** The rows that describe THIS shop — never a leftover from the last one. */
@@ -118,6 +122,8 @@ export function EditCollectionModal({
   const creditRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   /** Row the pointer last touched, so Up/Down resumes from there. */
   const [creditFocusIndex, setCreditFocusIndex] = useState(0);
+  /** Focus handles for the visible left-side history cards. */
+  const historyButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
@@ -198,6 +204,7 @@ export function EditCollectionModal({
     amount: 0,
     remarks: "",
   });
+  const [viewEditing, setViewEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,14 +212,16 @@ export function EditCollectionModal({
     if (!isOpen) {
       setRecentList([]);
       setRecentListShop(null);
+      recentListShopRef.current = null;
       setRecentReady(false);
       return;
     }
     // A different shop means the previous rows are no longer this shop's
     // history: drop them so the loader shows for the right shop.
-    if (recentListShop !== shopName) {
+    if (recentListShopRef.current !== shopName) {
       setRecentList([]);
       setRecentListShop(shopName);
+      recentListShopRef.current = shopName;
       setRecentReady(false);
     }
     if (!shopId) {
@@ -238,7 +247,11 @@ export function EditCollectionModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, shopName, recentListShop, creditsSignature, mergeCredits]);
+  }, [isOpen, shopName, creditsSignature, mergeCredits]);
+
+  useEffect(() => {
+    setViewEditing(false);
+  }, [isOpen, shopName]);
 
   useEffect(() => {
     if (selected) {
@@ -345,6 +358,44 @@ export function EditCollectionModal({
   /** Exactly what the table renders: the shop's latest ten, search applied. */
   const visibleCredits = useMemo(() => filteredCredits.slice(0, 10), [filteredCredits]);
 
+  const focusHistoryCard = (index: number) => {
+    if (!visibleCredits.length) return;
+    const next = Math.min(Math.max(index, 0), visibleCredits.length - 1);
+    const record = visibleCredits[next];
+    setCreditFocusIndex(next);
+    setPickedId(String(record.id));
+    window.requestAnimationFrame(() => {
+      historyButtonRefs.current[next]?.focus({ preventScroll: true });
+      historyButtonRefs.current[next]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+
+  const handleHistoryCardKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        focusHistoryCard(index + 1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        focusHistoryCard(index - 1);
+        break;
+      case "Home":
+        event.preventDefault();
+        focusHistoryCard(0);
+        break;
+      case "End":
+        event.preventDefault();
+        focusHistoryCard(visibleCredits.length - 1);
+        break;
+      default:
+        break;
+    }
+  };
+
   /** Typing restarts the keyboard walk from the top of the filtered list. */
   const handleCreditSearchChange = (value: string) => {
     setCreditSearch(value);
@@ -373,6 +424,7 @@ export function EditCollectionModal({
     };
     const success = await collectionService.updateCollection(updated);
     if (success) {
+      globalNotify.success(`${selected.collectionNo} saved successfully.`, { placement: "top-right" });
       onRefresh();
       onClose();
     } else {
@@ -411,8 +463,8 @@ export function EditCollectionModal({
     selected?.status,
     new Date(),
     selected?.approvedDate,
+    selected?.createdDate,
   );
-  const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
   const canDelete = allowDelete && Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
 
   /**
@@ -439,18 +491,15 @@ export function EditCollectionModal({
   const deleteHint = !selected
     ? ""
     : !deleteWindow.canDelete
-      ? isPendingEntry
-        ? t("ops.collection.delete_today_only")
-        : t("ops.collection.delete_window_closed")
-      : isPendingEntry
-        ? t("ops.collection.delete_window_today")
-        : deleteWindow.daysRemaining === 0
+      ? t("ops.collection.delete_window_closed")
+      : deleteWindow.daysRemaining === 0
           ? t("ops.collection.delete_window_last_day")
           : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining });
 
   if (!isOpen) return null;
 
-  const isView = mode === "view";
+  const isView = mode === "view" && !viewEditing;
+  const canEditSelected = Boolean(selected && selected.status !== "Deleted" && deleteWindow.canDelete);
 
   const renderField = ({
     label,
@@ -534,7 +583,7 @@ export function EditCollectionModal({
     // Same shell as the Trip List view: one global panel size
     // (max-w 96rem, max-h 100vh − header − gaps), centred against the whole
     // page including the sidebar, with no backdrop blur.
-    <AppShellModal open={isOpen} onClose={onClose} panelClassName="bg-white">
+    <AppShellModal open={isOpen} onClose={onClose} panelClassName="h-full bg-white">
       <div
         ref={panelRef}
         tabIndex={-1}
@@ -602,8 +651,8 @@ export function EditCollectionModal({
             {/* Maintenance Record layout: a fixed history rail on the left and
               * the selected collection's complete label/value record on the right. */}
             <div className="flex h-full min-h-0 flex-col lg:flex-row">
-              <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
-                <div className="flex items-center justify-between px-4 pt-4">
+              <aside className="flex h-full min-h-0 w-full flex-shrink-0 flex-col overflow-hidden border-b border-slate-100 bg-slate-50/40 lg:w-96 lg:border-b-0 lg:border-r xl:w-[25rem]">
+                <div className="flex items-center justify-between px-5 pt-5">
                   <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     <FileText size={13} className="shrink-0 text-slate-400" />
                     All collection records
@@ -612,7 +661,7 @@ export function EditCollectionModal({
                     {filteredCredits.length}
                   </span>
                 </div>
-                <div className="px-3 pt-2.5">
+                <div className="px-4 pt-3">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
@@ -624,28 +673,36 @@ export function EditCollectionModal({
                     />
                   </div>
                 </div>
-                <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none">
+                <div className="collection-history-scroll max-h-72 min-h-0 flex-1 touch-pan-y overflow-y-scroll overscroll-contain px-3 pb-4 pt-3 [scrollbar-gutter:stable] lg:max-h-none" role="listbox" aria-label="Collection history">
                   {creditsLoading ? (
                     <p className="px-2 py-8 text-center text-xs text-slate-400"><Loader2 size={15} className="mx-auto mb-2 animate-spin" />{t("common.loading")}</p>
                   ) : filteredCredits.length === 0 ? (
                     <p className="px-2 py-8 text-center text-xs text-slate-400">{t("ops.collection.no_collections_for_shop")}</p>
                   ) : (
-                    <div className="space-y-1.5">
-                      {filteredCredits.map((col) => {
+                    <div className="space-y-2">
+                      {visibleCredits.map((col, index) => {
                         const active = selected != null && String(selected.id) === String(col.id);
                         return (
                           <button
                             key={col.id}
+                            ref={(node) => { historyButtonRefs.current[index] = node; }}
                             type="button"
-                            onClick={() => setPickedId(String(col.id))}
-                            className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}
+                            onClick={() => {
+                              setCreditFocusIndex(index);
+                              setPickedId(String(col.id));
+                            }}
+                            onKeyDown={(event) => handleHistoryCardKeyDown(event, index)}
+                            role="option"
+                            aria-selected={active}
+                            tabIndex={active || (!selected && index === 0) ? 0 : -1}
+                            className={`w-full rounded-xl border px-3.5 py-2.5 text-left outline-none transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}
                           >
-                            <p className="truncate text-xs font-bold text-slate-700">{formatTripListDay(col.collectionDate, language)}</p>
-                            <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500">
-                              <span className="truncate">{col.collectionNo || "—"}</span>
-                              <span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatCurrency(Number(col.amount) || 0)}</span>
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="truncate text-xs font-bold leading-5 text-slate-700">{formatTripListDay(col.collectionDate, language)}</p>
+                              <span className="shrink-0 text-xs font-bold leading-5 tabular-nums text-emerald-700">{formatCurrency(Number(col.amount) || 0)}</span>
                             </div>
-                            <p className="mt-0.5 truncate text-[10px] text-slate-400">{tr(col.paymentMode) || "—"}</p>
+                            <p className="mt-0.5 truncate text-[11px] font-medium leading-4 text-slate-500">{col.collectionNo || "—"}</p>
+                            <p className="mt-0.5 truncate text-[10px] leading-4 text-slate-400">{tr(col.paymentMode) || "—"}</p>
                           </button>
                         );
                       })}
@@ -704,7 +761,30 @@ export function EditCollectionModal({
                 <section className="animate-fade-in-up" style={{ animationDelay: "80ms" }}>
                   <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 px-4 py-3">
                     <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700"><IndianRupee size={15} />Amount received</span>
-                    <span className="text-lg font-bold tabular-nums text-emerald-700">{formatCurrency(formData.amount)}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg font-bold tabular-nums text-emerald-700">{formatCurrency(formData.amount)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setViewEditing(true)}
+                        disabled={!canEditSelected}
+                        title={canEditSelected ? "Edit collection" : "Collection is outside the 14-day edit window"}
+                        className="group inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-50 active:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                      >
+                        <Pencil size={14} className="transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110" />
+                        {t("common.edit")}
+                      </button>
+                      {allowDelete && selected ? (
+                        <button
+                          type="button"
+                          onClick={() => pendingDelete.requestDelete(String(selected.id), { label: `${t("ops.collection.delete_collection")} · ${selected.collectionNo}` })}
+                          disabled={!canDelete || pendingDelete.isPending(String(selected.id)) || pendingDelete.isCommitting(String(selected.id))}
+                          className="group inline-flex h-9 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-rose-50 active:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                        >
+                          <Trash2 size={14} className={uiActionIconMotionClass.delete} />
+                          {t("common.delete")}
+                        </button>
+                      ) : null}
+                    </span>
                   </div>
                 </section>
               </div>
@@ -1167,7 +1247,7 @@ export function EditCollectionModal({
           )}
           <button
             type="button"
-            onClick={onClose}
+            onClick={mode === "view" && viewEditing ? () => setViewEditing(false) : onClose}
             className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
           >
             <span className={`inline-flex ${uiActionIconMotionClass.close}`}>

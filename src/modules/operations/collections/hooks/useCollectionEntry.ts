@@ -86,30 +86,10 @@ export default function useCollectionEntry() {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  /** Includes "All": the table's cross-status toggle backed by `list()` + rolling window. */
-  const [statusFilter, setStatusFilter] = useState<"All" | "Pending" | "Approved" | "Deleted">("Approved");
+  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "Deleted">("Approved");
 
   const today = useMemo(() => new Date().toLocaleDateString("en-GB"), []);
   const dashboard = useMemo(() => collectionService.getDashboardSummary(), []);
-
-  /** Rolling four-week window for "All" toggle: asOfDate minus 28 calendar days, inclusive on both ends. */
-  const rollingWindow = useMemo(() => {
-    const asOfDate = today;
-    // rollingStart = asOfDate minus 28 calendar days (inclusive)
-    const rollingStart = new Date(Date.UTC(Number(asOfDate.slice(0, 4)), Number(asOfDate.slice(5, 7)) - 1, Number(asOfDate.slice(8, 10)) - 28));
-    rollingStart.setUTCHours(0, 0, 0, 0);
-    // rollingEnd = asOfDate (inclusive end)
-    const rollingEnd = new Date(Date.UTC(Number(asOfDate.slice(0, 4)), Number(asOfDate.slice(5, 7)) - 1, Number(asOfDate.slice(8, 10))));
-    rollingEnd.setUTCHours(23, 59, 59, 999);
-    return { rollingStartISO: formatDateYMD(rollingStart), rollingEndISO: formatDateYMD(rollingEnd), asOfDateISO: asOfDate };
-  }, [today]);
-
-  function formatDateYMD(d: Date): string {
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-    const dt = String(d.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${dt}`;
-  }
 
   function loadMasterData() {
     setLoading(true);
@@ -143,7 +123,11 @@ export default function useCollectionEntry() {
           .forEach((bank) => modes.push({ id: bank.bankName, name: bank.bankName }));
         setPaymentModes(modes);
         setPendingCollections(collectionService.getPendingCollections());
-        setRecentCollections(collectionService.getRecentCollections("Pending"));
+        // The table opens on Approved. Loading Pending here made the first
+        // render say "No approved collections" even though approved rows were
+        // already in the refreshed cache; changing tabs then appeared to fix
+        // it only because changeStatusFilter read the correct bucket.
+        setRecentCollections(collectionService.getRecentCollections(statusFilter));
         setAllCollections(collectionService.getCollections());
       })
       .catch(() => {
@@ -509,15 +493,9 @@ export default function useCollectionEntry() {
     resetEntry();
   }
 
-  function changeStatusFilter(status: "All" | "Pending" | "Approved" | "Deleted") {
+  function changeStatusFilter(status: "Pending" | "Approved" | "Deleted") {
     setStatusFilter(status);
-    if (status === "All") {
-      // Fetch all collections (including deleted) using the list method,
-      // then the frontend rolling window filter will apply the 4-week window.
-      setRecentCollections(collectionService.list({ includeDeleted: true }));
-    } else {
-      setRecentCollections(collectionService.getRecentCollections(status));
-    }
+    setRecentCollections(collectionService.getRecentCollections(status));
   }
 
   async function approveCollection(id: string) {
@@ -593,11 +571,7 @@ export default function useCollectionEntry() {
     const all = collectionService.getCollections();
     setPendingCollections(pending);
     setAllCollections(all);
-    if (statusFilter === "All") {
-      setRecentCollections(collectionService.list({ includeDeleted: true }));
-    } else {
-      setRecentCollections(collectionService.getRecentCollections(statusFilter));
-    }
+    setRecentCollections(collectionService.getRecentCollections(statusFilter));
   }
 
   function reloadCollections() {
@@ -829,7 +803,6 @@ export default function useCollectionEntry() {
     pendingApprovalCount,
     approvedCount,
     recentCollectionCount,
-    rollingWindow,
     formStatus,
     disableSave,
     loading,

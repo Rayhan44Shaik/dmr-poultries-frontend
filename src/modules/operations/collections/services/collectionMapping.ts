@@ -63,6 +63,7 @@ export function mapRawEntry(raw: Record<string, unknown>): CollectionApiEntry {
     createdAt: raw.createdAt != null ? String(raw.createdAt) : (raw.created_at != null ? String(raw.created_at) : null),
     updatedAt: raw.updatedAt != null ? String(raw.updatedAt) : (raw.updated_at != null ? String(raw.updated_at) : null),
     canDelete: raw.canDelete == null ? undefined : Boolean(raw.canDelete),
+    canEdit: raw.canEdit == null ? undefined : Boolean(raw.canEdit),
   };
 }
 

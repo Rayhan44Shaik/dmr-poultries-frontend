@@ -26,6 +26,10 @@ export interface ShopDetailFilters {
   ownerName?: string;
   mobile?: string;
   city?: string;
+  /** Changes only when the user explicitly refreshes Shop Ledger. It is not
+   *  sent to the API; it forces an already-open detail modal to discard its
+   *  settled snapshot and consume the newly fetched authoritative rows. */
+  refreshToken?: number;
 }
 
 /** Raw (unscoped) ledger cache: one in-flight or settled promise per
@@ -117,9 +121,17 @@ export interface ScopedShopDetail {
   opening: number;
   totalSales: number;
   totalCollections: number;
+  saleCount: number;
+  collectionCount: number;
   closing: number;
   totalBirds: number;
   totalWeight: number;
+  totalFarmBirds: number;
+  totalFarmWeight: number;
+  boxMortalityBirds: number;
+  boxMortalityWeight: number;
+  weightModeMortalityBirds: number;
+  weightModeWeightLoss: number;
 }
 
 /**
@@ -142,14 +154,29 @@ export function scopeShopDetailLedger(
     body.reduce((sum, tx) => (tx.type === type ? sum + tx.debit : sum), 0);
   const sumCredit = (type: LedgerTransaction["type"]) =>
     body.reduce((sum, tx) => (tx.type === type ? sum + tx.credit : sum), 0);
+  const saleRows = body.filter((tx) => tx.type === "sale");
   return {
     scoped,
     opening: scoped[0]?.balance ?? 0,
     totalSales: sumDebit("sale") + sumDebit("correction"),
     totalCollections: sumCredit("collection") + sumCredit("correction"),
+    saleCount: body.filter((tx) => tx.type === "sale").length,
+    collectionCount: body.filter((tx) => tx.type === "collection").length,
     closing: scoped.length > 0 ? scoped[scoped.length - 1].balance : 0,
     totalBirds: body.reduce((sum, tx) => sum + (tx.birds || 0), 0),
     totalWeight: body.reduce((sum, tx) => sum + (tx.weight || 0), 0),
+    totalFarmBirds: saleRows.reduce((sum, tx) => {
+      const farm = Number(tx.farmBirds || 0);
+      return sum + (farm > 0 ? farm : Number(tx.birds || 0) + Number(tx.mortalityBirds || 0));
+    }, 0),
+    totalFarmWeight: saleRows.reduce((sum, tx) => {
+      const farm = Number(tx.farmWeight || 0);
+      return sum + (farm > 0 ? farm : Number(tx.weight || 0) + Number(tx.mortalityWeight || 0) + Number(tx.weightLoss || 0));
+    }, 0),
+    boxMortalityBirds: saleRows.reduce((sum, tx) => sum + Number(tx.mortalityBirds || 0), 0),
+    boxMortalityWeight: saleRows.reduce((sum, tx) => sum + Number(tx.mortalityWeight || 0), 0),
+    weightModeMortalityBirds: 0,
+    weightModeWeightLoss: saleRows.reduce((sum, tx) => sum + Number(tx.weightLoss || 0), 0),
   };
 }
 
@@ -167,7 +194,7 @@ export function useShopLedgerDetail(
   filters: ShopDetailFilters | null,
 ): ShopDetailStatus & { retry: () => void } {
   const requestKey = filters
-    ? `${filters.shopId}|${filters.fromDate}|${filters.toDate}`
+    ? `${filters.shopId}|${filters.fromDate}|${filters.toDate}|${filters.refreshToken ?? 0}`
     : null;
   const [status, setStatus] = useState<ShopDetailStatus>({ kind: "loading" });
   // Render-phase sync (never an effect): a new shop or range shows loading

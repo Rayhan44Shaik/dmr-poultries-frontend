@@ -78,13 +78,17 @@ export function cumulativeLoadLines(
 }
 
 /**
- * A tooltip is only meaningful when a shop genuinely has more than one load
- * in the selected range. Single-load shops (including legacy leg-less trips,
- * which always sit on Load 1) render their plain value with no tooltip.
+ * Delivered quantities need multiple loads before a split is useful. Mortality
+ * is different: even one load needs a tooltip to explain Box mode versus
+ * Weight mode and the box-only mortality kg.
  */
 export function hasCumulativeLoadBreakdown(
   row: ShopLedgerCumulativeRow,
   metric: CumulativeQuantityMetric,
 ): boolean {
-  return cumulativeLoadLines(row, metric).length > 1;
+  const lines = cumulativeLoadLines(row, metric);
+  if (metric === "mortalityBirds" || metric === "mortalityWeight") {
+    return lines.some((line) => line.value !== 0 || Boolean(line.sub));
+  }
+  return lines.length > 1;
 }

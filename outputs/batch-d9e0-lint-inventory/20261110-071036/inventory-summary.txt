@@ -1,0 +1,35 @@
+TOTAL files=962 errors=478 warnings=48 problems=526
+PROD errors=465 warnings=48 | TEST errors=13 warnings=0
+DIRTY-USER files-with-findings=9 errors=78 warnings=5
+CLEAN-COMMITTED errors=400 warnings=43
+
+--- BY RULE (errors+warnings, files, test#, dirty#) ---
+@typescript-eslint/no-explicit-any total=379 (E379/W0) files=47 test=13 dirty=57
+react-hooks/set-state-in-effect total=61 (E61/W0) files=36 test=0 dirty=16
+react-hooks/exhaustive-deps total=48 (E0/W48) files=18 test=0 dirty=5
+@typescript-eslint/no-unused-vars total=17 (E17/W0) files=15 test=0 dirty=2
+react-hooks/refs total=11 (E11/W0) files=4 test=0 dirty=1
+no-useless-assignment total=7 (E7/W0) files=1 test=0 dirty=0
+no-useless-escape total=2 (E2/W0) files=1 test=0 dirty=2
+react-hooks/immutability total=1 (E1/W0) files=1 test=0 dirty=0
+
+--- BY MODULE ---
+src/middleware problems=1 (E1/W0) files=1
+src/services problems=1 (E1/W0) files=1
+src/components problems=3 (E3/W0) files=1
+src/core problems=1 (E1/W0) files=1
+src/deleted_files_backup problems=98 (E88/W10) files=2
+src/hooks problems=4 (E3/W1) files=1
+modules/accounts problems=58 (E57/W1) files=6
+modules/auth problems=3 (E3/W0) files=3
+modules/fleet-operations problems=70 (E68/W2) files=22
+modules/operations problems=264 (E237/W27) files=37
+modules/reports problems=6 (E1/W5) files=1
+modules/settings problems=5 (E5/W0) files=1
+modules/staff problems=6 (E5/W1) files=4
+src/performance problems=2 (E2/W0) files=2
+src/types problems=1 (E1/W0) files=1
+src/ui problems=2 (E1/W1) files=2
+src/utils problems=1 (E1/W0) files=1
+
+per-file.json written with 87 files having findings

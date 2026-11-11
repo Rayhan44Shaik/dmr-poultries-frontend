@@ -7,6 +7,7 @@ import {
   opsInputClass,
   opsExcelButtonClass,
   opsPdfButtonClass,
+  opsPrimaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
@@ -29,6 +30,7 @@ interface Props {
   setSortBy: (value: string) => void;
   setSearchQuery: (value: string) => void;
   onReset: () => void;
+  onSearch: () => void;
   onRefresh: () => void;
   onExportPdf?: () => void;
   onExportExcel?: () => void;
@@ -60,6 +62,7 @@ function ShopSalesFilters({
   searchQuery,
   setSearchQuery,
   onReset,
+  onSearch,
   onRefresh,
   onExportPdf,
   onExportExcel,
@@ -214,6 +217,7 @@ function ShopSalesFilters({
         )}
 
         <div className={`flex flex-wrap items-center justify-end gap-2 ${hasAssignmentNotice ? "lg:col-span-4" : "lg:col-span-7"}`}>
+          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label="Search shop sales"><Search size={15} />Search</button>
           <button type="button" onClick={onExportPdf} disabled={!exportEnabled} title={exportEnabled ? "Export the displayed Shop Sales data as PDF" : "No Shop Sales data is available to export"} className={`${opsPdfButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} aria-label="Export Shop Sales PDF"><FileDown size={15} />PDF</button>
           <button type="button" onClick={onExportExcel} disabled={!exportEnabled} title={exportEnabled ? "Export the displayed Shop Sales data as Excel" : "No Shop Sales data is available to export"} className={`${opsExcelButtonClass} disabled:cursor-not-allowed disabled:opacity-40`} aria-label="Export Shop Sales Excel"><FileSpreadsheet size={15} />Excel</button>
           <FilterResetButton

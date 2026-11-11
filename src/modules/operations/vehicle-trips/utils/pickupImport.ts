@@ -128,7 +128,13 @@ export async function parsePickupImport(file: File): Promise<PickupImportResult>
     // binary-fixture harness loads pdfjs directly and uses its built-in fake
     // worker, so do not assign the module object as an invalid worker URL.
     if (typeof worker.default === "string") pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
-    const pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+    // Uploaded pickup documents are data-only inputs. Disable embedded PDF
+    // JavaScript so imports remain compatible with the strict production CSP.
+    const source = {
+      data: new Uint8Array(await file.arrayBuffer()),
+      isEvalSupported: false,
+    } as Parameters<typeof pdfjs.getDocument>[0];
+    const pdf = await pdfjs.getDocument(source).promise;
     const lines: unknown[][] = [];
     for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
       const content = await (await pdf.getPage(pageNo)).getTextContent();

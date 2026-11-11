@@ -31,7 +31,6 @@ interface CellProps {
   onClose: () => void;
   cellClassName?: string;
   buttonClassName?: string;
-  title?: string;
 }
 
 /**
@@ -51,7 +50,6 @@ export function CumulativeQuantityCell({
   onClose,
   cellClassName = "",
   buttonClassName = "",
-  title,
 }: CellProps): React.ReactElement {
   const showBreakdown = hasCumulativeLoadBreakdown(row, metric);
   const isOpen = openTip?.key === tipKey;
@@ -62,14 +60,14 @@ export function CumulativeQuantityCell({
 
   if (!showBreakdown) {
     return (
-      <td className={cellClassName} title={title}>
+      <td className={cellClassName}>
         <span className="tabular-nums">{display}</span>
       </td>
     );
   }
 
   return (
-    <td className={cellClassName} title={title}>
+    <td className={cellClassName}>
       <span
         className="inline-flex items-center justify-end"
         onMouseLeave={() => {
@@ -145,13 +143,14 @@ export function CumulativeLoadPopover({
     [tip.row, tip.metric],
   );
   const isMortalityBirds = tip.metric === "mortalityBirds";
-  const popoverWidth = isMortalityBirds
+  const isMortality = isMortalityBirds || tip.metric === "mortalityWeight";
+  const popoverWidth = isMortality
     ? MORTALITY_POPOVER_WIDTH
     : DEFAULT_POPOVER_WIDTH;
 
   const position = useMemo(() => {
     if (typeof window === "undefined") return { left: 12, top: 12 };
-    const estimatedHeight = Math.min(420, 118 + lines.length * (isMortalityBirds ? 36 : 44));
+    const estimatedHeight = Math.min(420, 118 + lines.length * (isMortality ? 36 : 44));
     const top =
       tip.rect.bottom + estimatedHeight + 12 <= window.innerHeight
         ? tip.rect.bottom + 8
@@ -163,7 +162,7 @@ export function CumulativeLoadPopover({
       Math.max(12, tip.rect.left + tip.rect.width / 2 - popoverWidth / 2),
     );
     return { left, top: Math.max(8, top) };
-  }, [tip.rect, lines.length, isMortalityBirds, popoverWidth]);
+  }, [tip.rect, lines.length, isMortality, popoverWidth]);
 
   // Dismiss on Escape, any outside interaction, scroll or resize — the anchor
   // rect would go stale otherwise. Button taps are ignored here (they toggle).
@@ -210,7 +209,7 @@ export function CumulativeLoadPopover({
       </div>
       <div className="space-y-1 p-2.5">
         {lines.map((line) => {
-          const mortality = isMortalityBirds
+          const mortality = isMortality
             ? tip.row.mortalityByLoad?.find((load) => load.load === line.load)
             : undefined;
           return (
@@ -221,19 +220,18 @@ export function CumulativeLoadPopover({
               <span className="shrink-0 text-[11px] font-bold text-indigo-700">
                 {loadWord} {line.load}
               </span>
-              {mortality ? (
+              {mortality && isMortalityBirds ? (
                 <span className="flex min-w-0 items-center justify-end gap-3 whitespace-nowrap text-[10px] font-semibold tabular-nums">
                   <span className="text-[11px] font-extrabold text-slate-900">
                     {formatValue(line.value)}
                   </span>
-                  <span className="inline-flex items-center gap-1 text-slate-500">
-                    <Package size={12} className="text-amber-600" aria-hidden="true" />
-                    Box {Math.round(mortality.boxBirds || 0)} birds · {Number(mortality.boxWeight || 0).toFixed(2)} kg
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-slate-500">
-                    <Scale size={12} className="text-violet-600" aria-hidden="true" />
-                    Wt {Math.round(mortality.weightModeBirds || 0)} birds
-                  </span>
+                  {Number(mortality.boxBirds || 0) > 0 && <span className="inline-flex items-center gap-1 text-slate-500"><Package size={12} className="text-amber-600" aria-hidden="true" />Box mode {Math.round(mortality.boxBirds)} birds · {Number(mortality.boxWeight || 0).toFixed(2)} kg</span>}
+                  {Number(mortality.weightModeBirds || 0) > 0 && <span className="inline-flex items-center gap-1 text-slate-500"><Scale size={12} className="text-violet-600" aria-hidden="true" />Weight mode {Math.round(mortality.weightModeBirds)} birds</span>}
+                </span>
+              ) : mortality ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold tabular-nums text-slate-500">
+                  <Package size={12} className="text-amber-600" aria-hidden="true" />
+                  Box mode wt {Number(mortality.boxWeight || 0).toFixed(2)} kg
                 </span>
               ) : (
                 <span className="text-right">

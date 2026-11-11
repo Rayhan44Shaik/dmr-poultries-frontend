@@ -156,7 +156,6 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onRefresh={vm.reloadCollections}
         refreshing={vm.loading}
         onSelectionChange={handleSelectionChange}
-        rollingWindow={vm.rollingWindow}
 />
 
       <EditCollectionModal

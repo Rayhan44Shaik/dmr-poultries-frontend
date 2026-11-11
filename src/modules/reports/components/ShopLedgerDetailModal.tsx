@@ -147,10 +147,10 @@ export function ShopLedgerDetailView({
     );
   }
 
-  const stats: Array<{ label: string; value: string; tone: string }> = [
+  const stats: Array<{ label: string; value: string; tone: string; detail?: string }> = [
     { label: t("shop_ledger.opening_balance"), value: formatAmount(summary.opening), tone: "text-slate-800" },
-    { label: t("shop_ledger.total_sales_debit"), value: formatAmount(summary.totalSales), tone: "text-emerald-700" },
-    { label: t("shop_ledger.total_collections_credit"), value: formatAmount(summary.totalCollections), tone: "text-blue-700" },
+    { label: t("shop_ledger.total_sales_debit"), value: formatAmount(summary.totalSales), tone: "text-emerald-700", detail: t("shop_ledger.sale_entries", { count: summary.saleCount }) },
+    { label: t("shop_ledger.total_collections_credit"), value: formatAmount(summary.totalCollections), tone: "text-blue-700", detail: t("shop_ledger.collection_entries", { count: summary.collectionCount }) },
     { label: t("shop_ledger.closing_balance"), value: formatAmount(summary.closing), tone: summary.closing < 0 ? "text-rose-600" : "text-slate-800" },
   ];
 
@@ -161,15 +161,37 @@ export function ShopLedgerDetailView({
           <div key={stat.label} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
             <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
             <p className={`mt-0.5 whitespace-nowrap text-sm font-extrabold tabular-nums ${stat.tone}`}>{stat.value}</p>
+            {stat.detail && <p className="mt-0.5 text-[10px] font-semibold text-slate-500">{stat.detail}</p>}
           </div>
         ))}
       </div>
-      {(summary.totalBirds > 0 || summary.totalWeight > 0) && (
-        <p className="px-5 pt-2 text-[11px] font-semibold text-slate-500">
-          {t("shop_ledger.total_birds")}: <span className="tabular-nums text-slate-700">{summary.totalBirds.toLocaleString("en-IN")}</span>
-          {" · "}
-          {t("shop_ledger.total_weight_kg")}: <span className="tabular-nums text-slate-700">{summary.totalWeight.toFixed(2)}</span>
-        </p>
+      {(summary.totalFarmBirds > 0 || summary.totalFarmWeight > 0 || summary.totalBirds > 0 || summary.totalWeight > 0) && (
+        <div className="grid grid-cols-2 gap-2 px-5 pt-2 sm:grid-cols-4 lg:grid-cols-6">
+          {([
+            { label: t("shop_ledger.detail.total_birds"), value: summary.totalFarmBirds.toLocaleString("en-IN"), tone: "text-indigo-700" },
+            { label: t("shop_ledger.detail.total_weight"), value: summary.totalFarmWeight.toFixed(2), tone: "text-cyan-700" },
+            { label: t("shop_ledger.detail.delivered_birds"), value: summary.totalBirds.toLocaleString("en-IN"), tone: "text-emerald-700" },
+            { label: t("shop_ledger.detail.delivered_weight"), value: summary.totalWeight.toFixed(2), tone: "text-teal-700" },
+            ...((summary.boxMortalityBirds + summary.weightModeMortalityBirds) > 0 ? [{
+              label: t("shop_ledger.detail.mortality_birds"),
+              value: (summary.boxMortalityBirds + summary.weightModeMortalityBirds).toLocaleString("en-IN"),
+              tone: "text-rose-700",
+              detail: `${t("shop_ledger.detail.box_mode")} ${summary.boxMortalityBirds.toLocaleString("en-IN")} · ${t("shop_ledger.detail.weight_mode")} ${summary.weightModeMortalityBirds.toLocaleString("en-IN")}`,
+            }] : []),
+            ...((summary.boxMortalityWeight + summary.weightModeWeightLoss) > 0 ? [{
+              label: t("shop_ledger.detail.mortality_weight_loss"),
+              value: (summary.boxMortalityWeight + summary.weightModeWeightLoss).toFixed(2),
+              tone: "text-orange-700",
+              detail: `${t("shop_ledger.detail.box_weight")} ${summary.boxMortalityWeight.toFixed(2)} · ${t("shop_ledger.detail.weight_loss")} ${summary.weightModeWeightLoss.toFixed(2)}`,
+            }] : []),
+          ] as Array<{ label: string; value: string; tone: string; detail?: string }>).map((metric) => (
+            <div key={metric.label} className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
+              <p className="truncate text-[9px] font-bold uppercase tracking-wider text-slate-500">{metric.label}</p>
+              <p className={`mt-0.5 text-sm font-extrabold tabular-nums ${metric.tone}`}>{metric.value}</p>
+              {metric.detail && <p className="mt-0.5 truncate text-[9px] font-semibold tabular-nums text-slate-500" title={metric.detail}>{metric.detail}</p>}
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
@@ -284,6 +306,11 @@ export interface ShopLedgerDetailModalProps {
   onClose: () => void;
   t: Translate;
   language: "en" | "te";
+  /** Box-mode mortality only. Weight-mode mortality is intentionally excluded. */
+  boxMortalityBirds?: number;
+  boxMortalityWeight?: number;
+  weightModeMortalityBirds?: number;
+  weightModeWeightLoss?: number;
 }
 
 /** On-screen statement for one cumulative shop — the same authoritative rows
@@ -298,6 +325,10 @@ export default function ShopLedgerDetailModal({
   onClose,
   t,
   language,
+  boxMortalityBirds = 0,
+  boxMortalityWeight = 0,
+  weightModeMortalityBirds = 0,
+  weightModeWeightLoss = 0,
 }: ShopLedgerDetailModalProps): React.ReactElement {
   const { shopId, shopName, fromDate, toDate, reportType, searchTerm } = filters;
   const detail = useShopLedgerDetail(filters);
@@ -336,13 +367,28 @@ export default function ShopLedgerDetailModal({
 
   const viewStatus = detail.kind === "loading" ? "loading" : detail.kind === "error" ? "error" : "ready";
 
-  const summary = scopedDetail ?? {
+  const baseSummary = scopedDetail ?? {
     opening: 0,
     totalSales: 0,
     totalCollections: 0,
+    saleCount: 0,
+    collectionCount: 0,
     closing: 0,
     totalBirds: 0,
     totalWeight: 0,
+    totalFarmBirds: 0,
+    totalFarmWeight: 0,
+    boxMortalityBirds: 0,
+    boxMortalityWeight: 0,
+    weightModeMortalityBirds: 0,
+    weightModeWeightLoss: 0,
+  };
+  const summary = {
+    ...baseSummary,
+    boxMortalityBirds,
+    boxMortalityWeight,
+    weightModeMortalityBirds,
+    weightModeWeightLoss,
   };
 
   const handleDownloadPdf = useCallback(async () => {
@@ -468,9 +514,9 @@ export default function ShopLedgerDetailModal({
               disabled={pdfBusy || !scopedDetail || scopedDetail.scoped.length === 0}
               aria-label={t("shop_ledger.detail.download_pdf")}
               title={t("shop_ledger.detail.download_pdf")}
-              className="inline-flex h-9 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3.5 text-xs font-bold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group inline-flex h-9 items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3.5 text-xs font-bold text-red-600 transition-all hover:-translate-y-0.5 hover:bg-red-100 hover:shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Download size={14} className={pdfBusy ? "animate-pulse" : undefined} aria-hidden="true" />
+              <span className={`inline-flex ${pdfBusy ? "animate-pulse" : "motion-safe:group-hover:animate-[var(--animate-action-pdf)]"}`}><Download size={14} aria-hidden="true" /></span>
               {pdfBusy ? t("shop_ledger.detail.downloading") : t("shop_ledger.detail.download_pdf")}
             </button>
             <button
@@ -478,9 +524,9 @@ export default function ShopLedgerDetailModal({
               type="button"
               onClick={onClose}
               aria-label={t("common.close")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+              className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:scale-95"
             >
-              <X size={16} />
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={16} /></span>
             </button>
           </div>
         </div>

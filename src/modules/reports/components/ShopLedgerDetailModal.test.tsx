@@ -122,8 +122,12 @@ describe("ShopLedgerDetailView: statement content", () => {
     const detail = summaryOf(ledger);
     assert.equal(detail.totalSales, 9550);
     assert.equal(detail.totalCollections, 12000);
+    assert.equal(detail.saleCount, 1);
+    assert.equal(detail.collectionCount, 1);
     assert.equal(detail.totalBirds, 100);
     assert.equal(detail.totalWeight, 200.5);
+    assert.equal(detail.totalFarmBirds, 100);
+    assert.equal(detail.totalFarmWeight, 200.5);
     const html = renderToStaticMarkup(
       <ShopLedgerDetailView
         scoped={detail.scoped}
@@ -134,8 +138,41 @@ describe("ShopLedgerDetailView: statement content", () => {
         language="en"
       />,
     );
+    assert.ok(html.includes("Sale entries: 1"));
+    assert.ok(html.includes("Collection entries: 1"));
     assert.ok(html.includes("₹ 9,550"), "total sales renders");
     assert.ok(html.includes("₹ 12,000"), "total collections renders");
+  });
+
+  it("shows delivered and farm totals, and only shows box mortality when present", () => {
+    const mortalitySale: LedgerTransaction = {
+      ...sale,
+      farmBirds: 105,
+      farmWeight: 212.5,
+      mortalityBirds: 5,
+      mortalityWeight: 12,
+    };
+    const detail = summaryOf([opening, mortalitySale]);
+    assert.equal(detail.totalFarmBirds, 105);
+    assert.equal(detail.totalFarmWeight, 212.5);
+    assert.equal(detail.totalBirds, 100);
+    assert.equal(detail.totalWeight, 200.5);
+    assert.equal(detail.boxMortalityBirds, 5);
+    assert.equal(detail.boxMortalityWeight, 12);
+    const html = renderToStaticMarkup(
+      <ShopLedgerDetailView scoped={detail.scoped} summary={detail} status="ready" resetKey={7} t={t} language="en" />,
+    );
+    assert.ok(html.includes("Delivered Birds"));
+    assert.ok(html.includes("Delivered Weight (KG)"));
+    assert.ok(html.includes("Mortality Birds"));
+    assert.ok(html.includes("Mortality Weight / Weight Loss"));
+    assert.ok(html.includes("Box mode 5"));
+    assert.ok(html.includes("Box wt 12.00"));
+
+    const noMortalityHtml = renderToStaticMarkup(
+      <ShopLedgerDetailView scoped={summaryOf(ledger).scoped} summary={summaryOf(ledger)} status="ready" resetKey={8} t={t} language="en" />,
+    );
+    assert.ok(!noMortalityHtml.includes("Mortality Birds"));
   });
 
   it("marks the active transaction row without a focus trap", () => {

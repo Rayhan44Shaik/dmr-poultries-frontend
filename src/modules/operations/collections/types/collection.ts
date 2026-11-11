@@ -46,6 +46,8 @@ export interface CollectionApiEntry {
   updatedAt?: string | null;
   /** Backend-authoritative Pending Collection delete eligibility (from GET .../recent). UI convenience only — backend enforces on DELETE regardless. */
   canDelete?: boolean;
+  /** Backend-authoritative pending edit eligibility (14-day window). */
+  canEdit?: boolean;
 }
 
 /** Payload for POST /operations/collection-entry */

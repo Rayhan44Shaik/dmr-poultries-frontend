@@ -45,7 +45,7 @@ test("real collection persists with a positive container id and no trip-zero req
   await page.goto(ASSIGNMENT);
   await expect(page.getByText("Orders E2E Shop 1", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/1 collected · 0 assigned · 1 available/)).toBeVisible();
-  await page.getByRole("button", { name: /Assign Shops/ }).click();
+  await page.getByRole("button", { name: /Assign Shops — ORD-E2E-TRUCK-01/ }).click();
   await page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" }).check();
   await page.getByRole("button", { name: "Save Progress", exact: true }).click();
   await expect(page.getByText("Assignment progress saved", { exact: true })).toBeVisible();
@@ -53,7 +53,7 @@ test("real collection persists with a positive container id and no trip-zero req
   await page.reload();
   await expect(page.locator("#orders-panel-assignment")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/1 collected · 1 assigned · 0 available/)).toBeVisible();
-  const vehicleButton = page.getByRole("button", { name: /Assign Shops/ });
+  const vehicleButton = page.getByRole("button", { name: /Assign Shops — ORD-E2E-TRUCK-01/ });
   const vehicleButtonText = await vehicleButton.innerText();
   const vehicleTripNo = vehicleButtonText.match(/TR-\d{8}-\d+/)?.[0];
   expect(vehicleTripNo).toBeTruthy();

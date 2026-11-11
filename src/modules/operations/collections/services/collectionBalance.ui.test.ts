@@ -27,6 +27,9 @@ const entryHookSrc = read("../hooks/useCollectionEntry.ts");
 const summarySrc = read("../components/entry/OutstandingSummary.tsx");
 const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
 const collectionInformationSrc = read("../components/entry/CollectionInformation.tsx");
+const collectionModalSrc = read("../components/pending/EditCollectionModal.tsx");
+const pendingDetailSrc = read("../components/pending/ShopCollectionDetailModal.tsx");
+const pendingFiltersSrc = read("../components/pending/PendingCollectionsFilters.tsx");
 const serviceSrc = read("./collectionService.ts");
 
 test("Opening Balance is correctly displayed as a carried-forward figure", () => {
@@ -160,12 +163,91 @@ test("Recent Collections uses selected-row toolbar actions instead of an actions
   assert.doesNotMatch(tableSrc, /t\("table\.actions"\)/);
 });
 
+test("Recent Collections has no All tab or separate View action", () => {
+  assert.doesNotMatch(tableSrc, /\["All", "Pending", "Approved", "Deleted"\]/);
+  assert.doesNotMatch(tableSrc, /ops\.collection\.no_all/);
+  assert.doesNotMatch(tableSrc, /canViewSelected/);
+  assert.match(tableSrc, /viewCollection\(col\)/);
+  assert.match(tableSrc, /aria-label=\{`\$\{t\("common\.view"\)\} \$\{col\.collectionNo\}`\}/);
+});
+
+test("Recent Collections initial Approved tab is hydrated from the Approved cache", () => {
+  assert.match(entryHookSrc, /useState<"Pending" \| "Approved" \| "Deleted">\("Approved"\)/);
+  assert.match(
+    entryHookSrc,
+    /setRecentCollections\(collectionService\.getRecentCollections\(statusFilter\)\)/,
+  );
+});
+
 test("Approve selected works for one pending row, many rows, and select-all", () => {
   assert.match(tableSrc, /idsReadyToApprove/);
   assert.match(tableSrc, /onApproveMany\(ids\)/);
   assert.match(tableSrc, /toggleAllPending/);
   assert.match(tableSrc, /Approve selected/);
   assert.match(tableSrc, /data-recent-collections/);
+});
+
+test("View Collection renders the latest ten in a spacious downward-scrolling left rail", () => {
+  assert.match(collectionModalSrc, /fetchRecentCollectionsForShop\(shopId, 10\)/);
+  assert.match(collectionModalSrc, /filteredCredits\.slice\(0, 10\)/);
+  assert.match(collectionModalSrc, /visibleCredits\.map/);
+  assert.match(collectionModalSrc, /overscroll-contain/);
+  assert.match(collectionModalSrc, /scrollbar-gutter:stable/);
+  assert.match(collectionModalSrc, /collection-history-scroll/);
+  assert.match(collectionModalSrc, /overflow-y-scroll/);
+  assert.match(collectionModalSrc, /panelClassName="h-full bg-white"/);
+  assert.match(collectionModalSrc, /flex h-full min-h-0/);
+  assert.match(collectionModalSrc, /touch-pan-y/);
+  assert.match(collectionModalSrc, /lg:w-96/);
+  assert.match(collectionModalSrc, /xl:w-\[25rem\]/);
+  assert.match(collectionModalSrc, /space-y-2/);
+});
+
+test("View Collection history supports arrow-key navigation and follows the active card", () => {
+  assert.match(collectionModalSrc, /case "ArrowDown"/);
+  assert.match(collectionModalSrc, /case "ArrowUp"/);
+  assert.match(collectionModalSrc, /case "Home"/);
+  assert.match(collectionModalSrc, /case "End"/);
+  assert.match(collectionModalSrc, /handleHistoryCardKeyDown\(event, index\)/);
+  assert.match(collectionModalSrc, /scrollIntoView\(\{ block: "nearest", behavior: "smooth" \}\)/);
+});
+
+test("View Collection does not repeat its initial shop-history request", () => {
+  assert.match(collectionModalSrc, /recentListShopRef\.current !== shopName/);
+  const effectDependencies = collectionModalSrc.match(
+    /\}, \[isOpen, shopName, creditsSignature, mergeCredits\]\);/,
+  );
+  assert.ok(effectDependencies, "shop ownership state must not retrigger the fetch effect");
+});
+
+test("Recent Collection view places Edit beside Delete inside the 14-day window", () => {
+  assert.match(collectionModalSrc, /const canEditSelected = Boolean/);
+  assert.match(collectionModalSrc, /onClick=\{\(\) => setViewEditing\(true\)\}/);
+  assert.match(collectionModalSrc, /Collection is outside the 14-day edit window/);
+  assert.match(collectionModalSrc, /pendingDelete\.requestDelete/);
+});
+
+test("Pending Collection view edits amount with animated Save and Cancel controls", () => {
+  assert.match(pendingDetailSrc, /updatePendingCollectionAmount/);
+  assert.match(pendingDetailSrc, /selectedRecord\.canEdit === false/);
+  assert.match(pendingDetailSrc, /saved successfully/);
+  assert.match(pendingDetailSrc, /group-hover:rotate-90/);
+});
+
+test("Pending Collection history has a real scroll viewport and keyboard navigation", () => {
+  assert.match(pendingDetailSrc, /panelClassName="h-full bg-white"/);
+  assert.match(pendingDetailSrc, /collection-history-scroll/);
+  assert.match(pendingDetailSrc, /overflow-y-scroll/);
+  assert.match(pendingDetailSrc, /flex h-full min-h-0/);
+  assert.match(pendingDetailSrc, /case "ArrowDown"/);
+  assert.match(pendingDetailSrc, /case "ArrowUp"/);
+  assert.match(pendingDetailSrc, /scrollIntoView\(\{ block: "nearest", behavior: "smooth" \}\)/);
+});
+
+test("Pending Collection filters expose the Shop Ledger-style Search action", () => {
+  assert.match(pendingFiltersSrc, /opsPrimaryButtonClass/);
+  assert.match(pendingFiltersSrc, /onClick=\{onSearch\}/);
+  assert.match(pendingFiltersSrc, /searchable/);
 });
 
 test("approveCollection() reads the backend-returned currentBalance", async () => {

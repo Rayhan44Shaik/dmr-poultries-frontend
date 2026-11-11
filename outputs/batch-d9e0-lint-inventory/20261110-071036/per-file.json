@@ -1,0 +1,4467 @@
+[
+ {
+  "file": "backend/src/middleware/errorHandler.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 22,
+    "col": 3,
+    "sev": 2,
+    "msg": "'_next' is defined but never used."
+   }
+  ]
+ },
+ {
+  "file": "backend/src/services/tripsService.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 252,
+    "col": 16,
+    "sev": 2,
+    "msg": "'replaceCrew' is defined but never used."
+   }
+  ]
+ },
+ {
+  "file": "src/components/common/DatePicker.tsx",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 368,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 757,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 759,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/core/hooks/useShopSearch.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 13,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/deleted_files_backup/StepEnd_backup.tsx",
+  "E": 60,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 138,
+    "col": 3,
+    "sev": 2,
+    "msg": "'editable' is assigned a value but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 141,
+    "col": 3,
+    "sev": 2,
+    "msg": "'clearForm' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 190,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 190,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 194,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 195,
+    "col": 24,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 196,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 197,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 198,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 201,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 202,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 203,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 204,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 205,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 206,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 207,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 208,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 209,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 210,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 213,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 214,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 214,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 217,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 217,
+    "col": 67,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 220,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 221,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 222,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 223,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 225,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 226,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 227,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 228,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 230,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 231,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 232,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 233,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 235,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 236,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 237,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 238,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 240,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 241,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 242,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 243,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 245,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 246,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 247,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 248,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 251,
+    "col": 23,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 256,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 256,
+    "col": 60,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 308,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 309,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 344,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 349,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'prepareFinalPayload'. Either include it or remove the dependency array"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 360,
+    "col": 47,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 371,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 390,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 453,
+    "col": 59,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 459,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 470,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/deleted_files_backup/UnLoadingTable_backup.tsx",
+  "E": 28,
+  "W": 9,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 175,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 176,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 195,
+    "col": 3,
+    "sev": 2,
+    "msg": "'tripNo' is assigned a value but never used."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 201,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 282) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 201,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 295) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 201,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 440) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 202,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeShops' logical expression could make the dependencies of useMemo Hook (at line 851) change on every render. Mov"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 203,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeBirdTypes' logical expression could make the dependencies of useMemo Hook (at line 864) change on every render."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 204,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeBoxDetails' logical expression could make the dependencies of useMemo Hook (at line 302) change on every render"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 399,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has an unnecessary dependency: 'formData.mortWeight'. Either exclude it or remove the dependency "
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 402,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 407,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 418,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useEffect has missing dependencies: 'formData.perBoxData.length' and 'formData.selectedBoxIds'. Either includ"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 431,
+    "col": 9,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 434,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useEffect has a missing dependency: 'formData.perBoxData'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 451,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 524,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 543,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 559,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 561,
+    "col": 43,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 603,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'finalBirds' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 604,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'finalWeight' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 605,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'selectedBoxIds' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 606,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'farmBirdsVal' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 607,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'farmWeightVal' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 608,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'mortKgVal' is not used in subsequent statements."
+   },
+   {
+    "rule": "no-useless-assignment",
+    "line": 609,
+    "col": 9,
+    "sev": 2,
+    "msg": "The value assigned to 'perBoxData' is not used in subsequent statements."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 843,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 858,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1034,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1041,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1048,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1048,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1084,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1091,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1098,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1098,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/hooks/usePendingDelete.ts",
+  "E": 3,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/refs",
+    "line": 39,
+    "col": 3,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 57,
+    "col": 29,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 68,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useEffect has a missing dependency: 'createController'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 72,
+    "col": 21,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/components/Summary/WeeklyMarketRates.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 80,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 86,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/components/Summary/exportHelpers.ts",
+  "E": 37,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 80,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 108,
+    "col": 98,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 133,
+    "col": 77,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 136,
+    "col": 130,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 137,
+    "col": 135,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 168,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 173,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 183,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 214,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 215,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 220,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 221,
+    "col": 37,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 229,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 236,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 237,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 244,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 246,
+    "col": 55,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 255,
+    "col": 75,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 259,
+    "col": 26,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 273,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 281,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 291,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 309,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 310,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 315,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 316,
+    "col": 37,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 324,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 328,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 334,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 336,
+    "col": 55,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 346,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 370,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 393,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 431,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 442,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 455,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 455,
+    "col": 87,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/components/payment-book/PaymentViewModal.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 40,
+    "col": 25,
+    "sev": 2,
+    "msg": "'_payment' is defined but never used."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/hooks/usePagination.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 43,
+    "col": 35,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/pages/MarketRatePage.tsx",
+  "E": 2,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 130,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 161,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 198,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useEffect has a missing dependency: 'showNotification'. Either include it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/accounts/pages/SummaryPage.tsx",
+  "E": 14,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1487,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1501,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1515,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1627,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1653,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1696,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1704,
+    "col": 71,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1726,
+    "col": 69,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1752,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1760,
+    "col": 71,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1782,
+    "col": 69,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1808,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1816,
+    "col": 71,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1838,
+    "col": 69,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/auth/IdleSessionGuard.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 73,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/auth/MfaSettingsDialog.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 88,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/auth/tokenStore.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 11,
+    "col": 28,
+    "sev": 2,
+    "msg": "'_token' is defined but never used."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/documents/DocumentDetailModal.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 5,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 6,
+    "col": 26,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/emi/EmiScheduleTable.tsx",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 13,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 14,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 89,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/emi/UpcomingEmiList.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 6,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 7,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/fastag/FastagBalanceTable.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 5,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 6,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/fastag/FastagTransactions.tsx",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 5,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 6,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 7,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/BillDetailsModal.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 10,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 18,
+    "col": 37,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/LatestMaintenanceTable.tsx",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 25,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 75,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 426,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/MaintenanceDocuments.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 31,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/MaintenanceForm.tsx",
+  "E": 4,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 48,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 49,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 50,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 51,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/PartsTable.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 17,
+    "col": 68,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/maintenance/ViewModal.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 33,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 87,
+    "col": 37,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/components/reports/ReportCard.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 8,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/fleetRouteConfig.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 21,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/hooks/useFastagData.ts",
+  "E": 9,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 20,
+    "col": 48,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 22,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 23,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 25,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 26,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 33,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 33,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 39,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 39,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/hooks/useFleetDashboardData.ts",
+  "E": 0,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 101,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'fastags' array makes the dependencies of useMemo Hook (at line 409) change on every render. Move it inside the useM"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/hooks/usePagination.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 40,
+    "col": 35,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/pages/FleetPages.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 110,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/pages/MaintenanceEntryPage.tsx",
+  "E": 11,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 23,
+    "col": 31,
+    "sev": 2,
+    "msg": "'_props' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 86,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 119,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 124,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 125,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 133,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 138,
+    "col": 41,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 142,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 143,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 146,
+    "col": 47,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 225,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'performDeletion'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 237,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/pages/VehicleAnalyticsPage.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 560,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/services/storage.ts",
+  "E": 14,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 67,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 69,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 70,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 71,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 73,
+    "col": 56,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 74,
+    "col": 53,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 75,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 76,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 85,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 87,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 95,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 102,
+    "col": 43,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 103,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 104,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/utils/fleetExport.ts",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 8,
+    "col": 9,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 52,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 71,
+    "col": 9,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/fleet-operations/utils/helpers.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 23,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/components/pending/EditCollectionModal.tsx",
+  "E": 5,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 206,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 245,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 294,
+    "col": 7,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'language'. Either exclude it or remove the dependency array."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 354,
+    "col": 47,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 464,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 465,
+    "col": 11,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/components/pending/ShopCollectionDetailDrawer.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 61,
+    "col": 20,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/components/pending/ShopCollectionDetailModal.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 190,
+    "col": 20,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 217,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/hooks/useCollectionEntry.ts",
+  "E": 2,
+  "W": 3,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 158,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 304,
+    "col": 9,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 337,
+    "col": 5,
+    "sev": 1,
+    "msg": "React Hook useEffect has a missing dependency: 'refreshPage'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 680,
+    "col": 91,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'recentCollections'. Either exclude it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 681,
+    "col": 77,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'recentCollections'. Either exclude it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/hooks/usePendingCollections.ts",
+  "E": 1,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 32,
+    "col": 10,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 40,
+    "col": 91,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'collections'. Either exclude it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/pages/CollectionEntryPage.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 19,
+    "col": 57,
+    "sev": 2,
+    "msg": "'_embedded' is assigned a value but never used."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/pages/PendingCollectionsPage.tsx",
+  "E": 7,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 145,
+    "col": 10,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 157,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 162,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 166,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 171,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 175,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 271,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/services/collectionBalance.ui.test.ts",
+  "E": 2,
+  "W": 0,
+  "test": true,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 184,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 192,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/collections/services/collectionService.contract.test.ts",
+  "E": 2,
+  "W": 0,
+  "test": true,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 65,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 75,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/fuel-expenses/components/FuelBillTable.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 151,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 157,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/fuel-expenses/components/FuelViewModal.tsx",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 53,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 94,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/fuel-expenses/hooks/useFuelExpenses.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 86,
+    "col": 10,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/fuel-expenses/pages/FuelExpensesPage.tsx",
+  "E": 1,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 222,
+    "col": 35,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 492,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has missing dependencies: 'summaryTotals.avgMileage', 'summaryTotals.totalAmount', 'summaryTotals"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/fuel-expenses/utils/filterFuelExpenses.ts",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "no-useless-escape",
+    "line": 31,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unnecessary escape character: \\/."
+   },
+   {
+    "rule": "no-useless-escape",
+    "line": 31,
+    "col": 45,
+    "sev": 2,
+    "msg": "Unnecessary escape character: \\/."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/mortality/components/TripLossRowExpand.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 150,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/shop-sales/components/EnterRateModal.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 148,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/shop-sales/hooks/useShopSales.ts",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 85,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 199,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/StepDeliveries.tsx",
+  "E": 4,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 19,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 20,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 65,
+    "col": 13,
+    "sev": 2,
+    "msg": "'_readOnly' is assigned a value but never used."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 92,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/StepFarm.tsx",
+  "E": 15,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 30,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 31,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 44,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 71,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 139,
+    "col": 20,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 144,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 144,
+    "col": 23,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 145,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 152,
+    "col": 20,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 153,
+    "col": 20,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 158,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 158,
+    "col": 23,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 159,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 193,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 205,
+    "col": 37,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/StepPickup.tsx",
+  "E": 3,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 129,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 158,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 231,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/StepStart.tsx",
+  "E": 2,
+  "W": 2,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 692,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 730,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 880,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'loadSnapshot.openingMeter'. Either include it or remove the dependency"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 904,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'loadSnapshot.meterLocked'. Either include it or remove the dependency "
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_4/ShopDeliveryForm.tsx",
+  "E": 21,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 40,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 41,
+    "col": 52,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 42,
+    "col": 21,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 55,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 64,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 65,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 67,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 69,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 70,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 75,
+    "col": 11,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 76,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 79,
+    "col": 18,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 173,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'selectedBoxIds' logical expression could make the dependencies of useMemo Hook (at line 200) change on every render"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 180,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 181,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 187,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 188,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 198,
+    "col": 11,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 202,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 217,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 280,
+    "col": 48,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 371,
+    "col": 50,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_4/index.tsx",
+  "E": 44,
+  "W": 15,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 53,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 54,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 99,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 111,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 117,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 119,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 120,
+    "col": 20,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 120,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 134,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 232,
+    "col": 15,
+    "sev": 2,
+    "msg": "'_stepNumber' is assigned a value but never used."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 342) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 467) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 472) change on every render. To f"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useEffect Hook (at line 480) change on every render. To"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 1082) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 1090) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 1097) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 1102) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 258,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 1131) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 259,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeShops' logical expression could make the dependencies of useMemo Hook (at line 467) change on every render. To "
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 261,
+    "col": 43,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 269,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 271,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeBoxDetails' conditional could make the dependencies of useMemo Hook (at line 472) change on every render. To fi"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 271,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeBoxDetails' conditional could make the dependencies of useEffect Hook (at line 480) change on every render. To "
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 271,
+    "col": 26,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 271,
+    "col": 61,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 271,
+    "col": 61,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 271,
+    "col": 61,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 271,
+    "col": 61,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 322,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 348,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/immutability",
+    "line": 445,
+    "col": 9,
+    "sev": 2,
+    "msg": "Error: Cannot access variable before it is declared\n\n`openEditForm` is accessed before it is declared, which prevents th"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 448,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useEffect has a missing dependency: 'openEditForm'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 479,
+    "col": 31,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 492,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 493,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 517,
+    "col": 21,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 533,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 534,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 535,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 536,
+    "col": 56,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 546,
+    "col": 31,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 549,
+    "col": 21,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 730,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 769,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 820,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 836,
+    "col": 39,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 838,
+    "col": 43,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 921,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1009,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1015,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 1026,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useMemo has a missing dependency: 't'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1033,
+    "col": 55,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1039,
+    "col": 22,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1043,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 1050,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useMemo has a missing dependency: 't'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 1141,
+    "col": 53,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1175,
+    "col": 21,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 1454,
+    "col": 35,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_4/useShopDeliveryForm.ts",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 261,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 286,
+    "col": 9,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_5/DieselExpensesTable.tsx",
+  "E": 8,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 33,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 34,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 35,
+    "col": 47,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 111,
+    "col": 18,
+    "sev": 2,
+    "msg": "'_dieselAmounts' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 136,
+    "col": 61,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 217,
+    "col": 48,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 221,
+    "col": 65,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 735,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_5/GeneralExpensesTable.tsx",
+  "E": 5,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 23,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 24,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 46,
+    "col": 21,
+    "sev": 2,
+    "msg": "'_totalAllExpenses' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 48,
+    "col": 17,
+    "sev": 2,
+    "msg": "'_averageKmLtr' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 74,
+    "col": 28,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/Step_5/StepEnd.tsx",
+  "E": 53,
+  "W": 0,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 48,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 93,
+    "col": 15,
+    "sev": 2,
+    "msg": "'_updateTrip' is defined but never used."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 115,
+    "col": 19,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 138,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 138,
+    "col": 79,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 144,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 144,
+    "col": 87,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 144,
+    "col": 129,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 146,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 147,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 148,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 149,
+    "col": 40,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 150,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 151,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 152,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 153,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 154,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 155,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 156,
+    "col": 32,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 160,
+    "col": 30,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 160,
+    "col": 73,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 161,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 161,
+    "col": 55,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 163,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 163,
+    "col": 76,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 166,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 167,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 168,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 170,
+    "col": 42,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 188,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 188,
+    "col": 41,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 244,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 253,
+    "col": 51,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 257,
+    "col": 50,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 261,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 265,
+    "col": 52,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 269,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 273,
+    "col": 75,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 277,
+    "col": 62,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 281,
+    "col": 56,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 282,
+    "col": 99,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 286,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 287,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 291,
+    "col": 49,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 295,
+    "col": 46,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 331,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/refs",
+    "line": 404,
+    "col": 53,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 410,
+    "col": 47,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 419,
+    "col": 54,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 467,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 468,
+    "col": 14,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 739,
+    "col": 52,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 761,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/TripInformation.tsx",
+  "E": 5,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 12,
+    "col": 43,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 13,
+    "col": 13,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 14,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 15,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 16,
+    "col": 10,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/components/TripTotals.tsx",
+  "E": 0,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 12,
+    "col": 9,
+    "sev": 1,
+    "msg": "The 'safeRows' logical expression could make the dependencies of useMemo Hook (at line 20) change on every render. Move "
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/hooks/useReverseGeocodedAddress.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 27,
+    "col": 7,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/hooks/useTripEntry.ts",
+  "E": 0,
+  "W": 2,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 769,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'applySavedTrip'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 792,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'applySavedTrip'. Either include it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/services/tripHeaderApiService.step2.test.ts",
+  "E": 3,
+  "W": 0,
+  "test": true,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 20,
+    "col": 8,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 94,
+    "col": 8,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 99,
+    "col": 87,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/services/tripHeaderApiService.step3.test.ts",
+  "E": 1,
+  "W": 0,
+  "test": true,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 15,
+    "col": 8,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/services/tripHeaderApiService.step4.test.ts",
+  "E": 3,
+  "W": 0,
+  "test": true,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 30,
+    "col": 12,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 32,
+    "col": 8,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 34,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/services/tripHeaderApiService.step5.test.ts",
+  "E": 2,
+  "W": 0,
+  "test": true,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 18,
+    "col": 8,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 51,
+    "col": 27,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/services/tripHeaderApiService.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 310,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/operations/vehicle-trips/utils/generateShopPDF.ts",
+  "E": 29,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 48,
+    "col": 25,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 127,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 128,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 129,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 130,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 131,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 132,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 133,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 134,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 259,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 260,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 261,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 262,
+    "col": 15,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 265,
+    "col": 58,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 268,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 272,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 283,
+    "col": 29,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 418,
+    "col": 26,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 424,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 425,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 426,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 431,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 432,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 433,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 434,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 435,
+    "col": 17,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 457,
+    "col": 16,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 510,
+    "col": 24,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 540,
+    "col": 19,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/reports/pages/ShopLedgerPage.tsx",
+  "E": 1,
+  "W": 5,
+  "test": false,
+  "dirty": true,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 746,
+    "col": 5,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'shops'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 858,
+    "col": 5,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'shops'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 897,
+    "col": 5,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 1622,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has unnecessary dependencies: 'appliedSelectedShop' and 'selectedShop'. Either exclude them or re"
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 2314,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useCallback has a missing dependency: 'shops'. Either include it or remove the dependency array."
+   },
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 2413,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'appliedSelectedShop'. Either exclude it or remove the dependency arra"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/settings/components/common/Table.tsx",
+  "E": 5,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 6,
+    "col": 57,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 7,
+    "col": 9,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 16,
+    "col": 14,
+    "sev": 2,
+    "msg": "'_isLoading' is defined but never used."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 27,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 76,
+    "col": 38,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/modules/staff/components/salary/usePopupGuard.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/refs",
+    "line": 18,
+    "col": 3,
+    "sev": 2,
+    "msg": "Error: Cannot access refs during render\n\nReact refs are values that are not needed for rendering. Refs should only be ac"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/staff/hooks/useEmployeeHistory.ts",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 22,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 113,
+    "col": 10,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/staff/hooks/useSalarySheet.ts",
+  "E": 2,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 15,
+    "col": 44,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   },
+   {
+    "rule": "react-hooks/set-state-in-effect",
+    "line": 50,
+    "col": 10,
+    "sev": 2,
+    "msg": "Error: Calling setState synchronously within an effect can trigger cascading renders\n\nEffects are intended to synchroniz"
+   }
+  ]
+ },
+ {
+  "file": "src/modules/staff/pages/SalaryRegisterPage.tsx",
+  "E": 0,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 292,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'language'. Either exclude it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/performance/memory.manager.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 7,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/performance/performance.monitor.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 24,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/types/global.d.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 9,
+    "col": 34,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ },
+ {
+  "file": "src/ui/BrandMark.tsx",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-unused-vars",
+    "line": 39,
+    "col": 10,
+    "sev": 2,
+    "msg": "'_inset' is assigned a value but never used."
+   }
+  ]
+ },
+ {
+  "file": "src/ui/Header/Header.tsx",
+  "E": 0,
+  "W": 1,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "react-hooks/exhaustive-deps",
+    "line": 328,
+    "col": 6,
+    "sev": 1,
+    "msg": "React Hook useMemo has an unnecessary dependency: 'language'. Either exclude it or remove the dependency array."
+   }
+  ]
+ },
+ {
+  "file": "src/utils/validation.ts",
+  "E": 1,
+  "W": 0,
+  "test": false,
+  "dirty": false,
+  "messages": [
+   {
+    "rule": "@typescript-eslint/no-explicit-any",
+    "line": 7,
+    "col": 33,
+    "sev": 2,
+    "msg": "Unexpected any. Specify a different type."
+   }
+  ]
+ }
+]

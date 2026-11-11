@@ -5,7 +5,6 @@ import {
   ArrowUp,
   Calendar,
   CheckCircle,
-  Eye,
   FileImage,
   Fuel,
   Gauge,
@@ -458,12 +457,6 @@ export function FuelBillTable({
           ) : null}
           {selectedBill ? (
             <div className="flex flex-wrap items-center gap-2">
-              {onView && (
-                <button type="button" onClick={() => onView(selectedBill)} className="group relative inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 text-xs font-semibold text-emerald-700 shadow-sm transition-all hover:bg-emerald-100 active:scale-95" title={t("common.view")}>
-                  <span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={13} /></span>
-                  <span>{t("common.view")}</span>
-                </button>
-              )}
               {isSelectedPending && onApprove && (
                 <button type="button" onClick={() => onApprove(selectedBill)} className="group relative inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-semibold text-white transition-all hover:bg-emerald-700 active:scale-95" title={t("common.approve")}>
                   <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><CheckCircle size={13} /></span>
@@ -575,9 +568,8 @@ export function FuelBillTable({
                           event.stopPropagation();
                           onView?.(bill);
                         }}
-                        className={`rounded-md underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${
-                          isDeleted ? "cursor-not-allowed text-slate-400 line-through" : "cursor-pointer text-emerald-700 hover:text-emerald-900 hover:underline"
-                        }`}
+                        className={`cursor-pointer rounded-md underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${isDeleted ? "text-slate-500 line-through hover:text-slate-700" : "text-emerald-700 hover:text-emerald-900"}`}
+                        aria-label={`View fuel bill ${bill.billNo || bill.id}`}
                       >
                         {bill.billNo || "—"}
                       </button>

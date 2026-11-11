@@ -1,0 +1,11 @@
+src/routes/AppRoutes.tsx:75:    lazyShell(() => import("../modules/fleet-operations/pages/FleetPages")),
+src/modules/fleet-operations/activeFleetScope.test.ts:93:    const source = read('pages/FleetPages.tsx');
+src/modules/fleet-operations/activeFleetScope.test.ts:235:    const source = read('pages/FleetPages.tsx');
+src/modules/fleet-operations/activeFleetScope.test.ts:242:    const fleet = read('pages/FleetPages.tsx');
+src/modules/fleet-operations/activeFleetScope.test.ts:262:  it('AppRoutes lazy-loads FleetPages so other modules do not evaluate Fleet tabs', () => {
+src/modules/fleet-operations/activeFleetScope.test.ts:267:    assert.match(appRoutes, /lazyShell\(\(\) => import\("\.\.\/modules\/fleet-operations\/pages\/FleetPages"\)\)/);
+src/modules/fleet-operations/index.ts:25:export { fleetRoutes } from './routes';
+src/modules/fleet-operations/pages/FleetPages.tsx:1:// src/modules/fleet-operations/pages/FleetPages.tsx
+src/modules/fleet-operations/pages/FleetPages.tsx:87:function FleetPages() {
+src/modules/fleet-operations/pages/FleetPages.tsx:142:export default React.memo(FleetPages);
+src/modules/fleet-operations/pages/fleetTabs.ts:1:// Fleet tab chunk loaders + warm-up helper (kept out of FleetPages.tsx so

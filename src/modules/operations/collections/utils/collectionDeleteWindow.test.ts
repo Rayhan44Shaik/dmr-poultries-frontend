@@ -1,6 +1,6 @@
 /**
  * Approved collections stay deletable for 14 days from approval, matching
- * Shop Sales. Pending entries remain deletable on their entry day only.
+ * Shop Sales. Pending entries use their database creation timestamp.
  */
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -59,15 +59,14 @@ test("ISO timestamps are counted by calendar day", () => {
   assert.equal(daysSinceEntry("2026-09-10T18:30:00Z", now), 5);
 });
 
-test("a pending entry is deletable on its entry day", () => {
-  const w = getDeleteWindowForStatus("2026-09-15", "Pending Approval", now);
+test("a newly created pending entry is editable with an old collection date", () => {
+  const w = getDeleteWindowForStatus("2026-08-01", "Pending Approval", nowUtc, null, "2026-09-15T11:00:00.000Z");
   assert.equal(w.canDelete, true);
-  assert.equal(w.daysRemaining, 0);
-  assert.equal(w.deadline, "2026-09-15");
+  assert.equal(w.daysRemaining, 14);
 });
 
-test("a pending entry is NOT deletable the next day", () => {
-  assert.equal(getDeleteWindowForStatus("2026-09-14", "Pending Approval", now).canDelete, false);
+test("a pending entry is locked 14 days after creation", () => {
+  assert.equal(getDeleteWindowForStatus("2026-09-14", "Pending Approval", nowUtc, null, "2026-09-01T12:00:00.000Z").canDelete, false);
 });
 
 test("an approved entry uses approval time, not the collection date", () => {
@@ -92,8 +91,8 @@ test("an approved entry is still open just under 14 days after approval", () => 
 });
 
 test("status matching is case-insensitive and tolerates plain 'Pending'", () => {
-  assert.equal(getDeleteWindowForStatus("2026-09-14", "pending", now).canDelete, false);
-  assert.equal(getDeleteWindowForStatus("2026-09-14", "PENDING APPROVAL", now).canDelete, false);
+  assert.equal(getDeleteWindowForStatus("2026-08-01", "pending", nowUtc, null, "2026-09-15T11:00:00.000Z").canDelete, true);
+  assert.equal(getDeleteWindowForStatus("2026-08-01", "PENDING APPROVAL", nowUtc, null, "2026-09-15T11:00:00.000Z").canDelete, true);
 });
 
 test("an unknown or missing status is treated as approved (14 days from the given stamp)", () => {

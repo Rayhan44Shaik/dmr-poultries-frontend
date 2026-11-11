@@ -23,11 +23,11 @@
 // never from the original collection date. One click starts the shared
 // 10-second countdown pop; aged rows render disabled with days remaining.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   X, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2, Loader2,
   Search, Wallet, Clock, Activity, Settings2, ChevronLeft, ChevronRight,
-  ArrowUp, ArrowDown, Store,
+  ArrowUp, ArrowDown, Store, Pencil, Save,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import type { Shop } from "../../../../masters/shops/types/shop";
@@ -44,6 +44,7 @@ import { ScopedI18nProvider, useI18n } from "../../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
+import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
 
 /** Every record for one shop in a single read; the pager handles the rest. */
 const SHOP_HISTORY_LIMIT = 500;
@@ -136,6 +137,8 @@ interface ShopCollectionDetailModalProps {
   shopTotal?: number;
   /** Roles without delete rights see the history without the delete affordance. */
   allowDelete?: boolean;
+  fromDate?: string;
+  toDate?: string;
 }
 
 function ShopCollectionDetailView({
@@ -151,6 +154,8 @@ function ShopCollectionDetailView({
   shopIndex,
   shopTotal,
   allowDelete = true,
+  fromDate,
+  toDate,
 }: ShopCollectionDetailModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   const { showNotification } = useSafeNotification();
@@ -175,6 +180,10 @@ function ShopCollectionDetailView({
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [sortKey, setSortKey] = useState<ViewSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const historyCardRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   // Find shop info for owner/mobile
   const shopInfo = shops.find((s) => s.shopName === shopName);
@@ -188,11 +197,12 @@ function ShopCollectionDetailView({
     }
     setRecentLoading(true);
     collectionService
-      .fetchRecentCollectionsForShop(shopId, SHOP_HISTORY_LIMIT)
+      .fetchRecentCollectionsForShop(shopId, SHOP_HISTORY_LIMIT, { fromDate, toDate })
       .then((rows) => {
         if (!cancelled) {
-          setRecentList(rows);
-          setSelectedRecordId((current) => rows.some((row) => String(row.id) === current) ? current : String(rows[0]?.id ?? "") || null);
+          const liveRows = rows.filter((row) => !row.deleted && row.status !== "Deleted");
+          setRecentList(liveRows);
+          setSelectedRecordId((current) => liveRows.some((row) => String(row.id) === current) ? current : String(liveRows[0]?.id ?? "") || null);
         }
       })
       .catch(() => {
@@ -204,7 +214,7 @@ function ShopCollectionDetailView({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, shopName, shopInfo?.id, refreshToken]);
+  }, [isOpen, shopName, shopInfo?.id, refreshToken, fromDate, toDate]);
 
   // Every open — and every shop step — starts on page 1, unsorted, clean search.
   useEffect(() => {
@@ -277,14 +287,11 @@ function ShopCollectionDetailView({
         collection.status,
         new Date(),
         collection.approvedAt,
+        collection.createdAt,
       );
-      const isPendingEntry = String(collection.status ?? "").toLowerCase().startsWith("pending");
       if (!window.canDelete) {
-        return isPendingEntry
-          ? t("ops.collection.delete_today_only")
-          : t("ops.collection.delete_window_closed");
+        return t("ops.collection.delete_window_closed");
       }
-      if (isPendingEntry) return t("ops.collection.delete_window_today");
       if (window.daysRemaining === 0) return t("ops.collection.delete_window_last_day");
       return t("ops.collection.delete_window_open", { days: window.daysRemaining });
     },
@@ -294,9 +301,8 @@ function ShopCollectionDetailView({
   /**
    * The money figures count APPROVED collections only.
    *
-   * `shopCollections` is the whole history — pending and deleted rows included,
-   * because they are what the table lists and what the 10-second delete acts
-   * on — but money that has not been approved yet is not collected money. The
+   * `shopCollections` may contain cached history, so deleted rows are excluded
+   * explicitly. Money that has not been approved yet is not collected money. The
    * two headline cards therefore answer from the approved rows alone, which is
    * also the scope of the page's own "Recent Collections" and "Last Collection"
    * columns, so the popup can never disagree with the table it was opened from.
@@ -322,6 +328,26 @@ function ShopCollectionDetailView({
         ].some((value) => String(value ?? "").toLowerCase().includes(searchTerm)),
       )
     : recentList;
+
+  const focusHistoryRecord = (index: number) => {
+    if (!filteredRecent.length) return;
+    const next = Math.min(Math.max(index, 0), filteredRecent.length - 1);
+    setSelectedRecordId(String(filteredRecent[next].id));
+    window.requestAnimationFrame(() => {
+      historyCardRefs.current[next]?.focus({ preventScroll: true });
+      historyCardRefs.current[next]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+  };
+
+  const handleHistoryKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    switch (event.key) {
+      case "ArrowDown": event.preventDefault(); focusHistoryRecord(index + 1); break;
+      case "ArrowUp": event.preventDefault(); focusHistoryRecord(index - 1); break;
+      case "Home": event.preventDefault(); focusHistoryRecord(0); break;
+      case "End": event.preventDefault(); focusHistoryRecord(filteredRecent.length - 1); break;
+      default: break;
+    }
+  };
 
   /**
    * Header sorting, exactly like the Trip List table: first click ascending,
@@ -367,6 +393,39 @@ function ShopCollectionDetailView({
   }, [filteredRecent, sortKey, sortDir]);
 
   const selectedRecord = recentList.find((row) => String(row.id) === selectedRecordId) ?? recentList[0] ?? null;
+  const selectedRecordEditLocked = selectedRecord !== null && selectedRecord.canEdit === false;
+
+  const startAmountEdit = (record: CollectionApiEntry) => {
+    setEditingRecordId(String(record.id));
+    setEditAmount(String(Number(record.amount) || ""));
+  };
+
+  const cancelAmountEdit = () => {
+    setEditingRecordId(null);
+    setEditAmount("");
+  };
+
+  const saveAmountEdit = async (record: CollectionApiEntry) => {
+    const amount = Number(editAmount.replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showNotification("Enter a valid collection amount.", "error");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const saved = await collectionService.updatePendingCollectionAmount(record.id, amount);
+      if (!saved) {
+        showNotification("This collection is outside the 14-day edit window.", "error");
+        return;
+      }
+      globalNotify.success(`${record.collectionNo} saved successfully.`, { placement: "top-right" });
+      cancelAmountEdit();
+      setRefreshToken((token) => token + 1);
+      await onRefresh();
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -438,7 +497,7 @@ function ShopCollectionDetailView({
   };
 
   return (
-    <AppShellModal open={isOpen} onClose={onClose} ariaLabelledBy="shop-collection-view-title">
+    <AppShellModal open={isOpen} onClose={onClose} ariaLabelledBy="shop-collection-view-title" panelClassName="h-full bg-white">
       {/* Header — shop identity BESIDE the title, walk-through arrows on the
         * right; the Trip List view header shape in this page's tone. */}
       <div className="flex flex-shrink-0 flex-col gap-3 border-b border-slate-200 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/40 px-6 py-3.5 lg:flex-row lg:items-center lg:justify-between">
@@ -526,7 +585,7 @@ function ShopCollectionDetailView({
         {/* Same structure as Collection Entry → Approved → View Collection and
           * Maintenance Record: history rail left, selected record right. */}
         <div className="flex h-full min-h-0 flex-col lg:flex-row">
-          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
+          <aside className="flex h-full min-h-0 w-full flex-shrink-0 flex-col overflow-hidden border-b border-slate-100 bg-slate-50/40 lg:w-96 lg:border-b-0 lg:border-r xl:w-[25rem]">
             <div className="flex items-center justify-between px-4 pt-4">
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500"><Wallet size={13} className="text-slate-400" />All collection records</p>
               <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-500 ring-1 ring-slate-200">{filteredRecent.length}</span>
@@ -537,17 +596,17 @@ function ShopCollectionDetailView({
                 <input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("ops.collection.search_collections_placeholder")} className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-medium outline-none transition focus:border-emerald-400 focus:ring-2 focus:ring-emerald-200" />
               </div>
             </div>
-            <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none">
+            <div className="collection-history-scroll max-h-72 min-h-0 flex-1 touch-pan-y overflow-y-scroll overscroll-contain px-3 pb-4 pt-3 [scrollbar-gutter:stable] lg:max-h-none" role="listbox" aria-label="Collection history">
               {recentLoading && recentList.length === 0 ? (
                 <p className="px-2 py-8 text-center text-xs text-slate-400"><Loader2 size={15} className="mx-auto mb-2 animate-spin" />{t("common.loading")}</p>
               ) : filteredRecent.length === 0 ? (
                 <p className="px-2 py-8 text-center text-xs text-slate-400">{t("ops.collection.no_collections_for_shop")}</p>
               ) : (
                 <div className="space-y-1.5">
-                  {filteredRecent.map((record) => {
+                  {filteredRecent.map((record, index) => {
                     const active = String(record.id) === String(selectedRecord?.id);
                     return (
-                      <button key={record.id} type="button" onClick={() => setSelectedRecordId(String(record.id))} className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}>
+                      <button key={record.id} ref={(node) => { historyCardRefs.current[index] = node; }} type="button" onClick={() => setSelectedRecordId(String(record.id))} onKeyDown={(event) => handleHistoryKeyDown(event, index)} role="option" aria-selected={active} tabIndex={active || (!selectedRecord && index === 0) ? 0 : -1} className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-200 ${active ? "border-emerald-200 bg-white shadow-sm ring-1 ring-emerald-200" : "border-transparent hover:border-slate-200 hover:bg-white/70"}`}>
                         <p className="text-xs font-bold text-slate-700">{formatDate(record.collectionDate)}</p>
                         <div className="mt-1 flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500"><span className="truncate">{record.collectionNo || "—"}</span><span className="shrink-0 font-bold tabular-nums text-emerald-700">{formatCurrency(Number(record.amount) || 0)}</span></div>
                         <p className="mt-0.5 truncate text-[10px] text-slate-400">{localizeTripViewText(record.paymentMode || "Cash", language)}</p>
@@ -586,16 +645,77 @@ function ShopCollectionDetailView({
                     <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
                       <IndianRupee size={15} />Amount received
                     </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-lg font-bold tabular-nums text-emerald-700">
-                        {formatCurrency(Number(selectedRecord.amount) || 0)}
-                      </span>
+                    <span className="flex flex-wrap items-center justify-end gap-2">
+                      {editingRecordId === String(selectedRecord.id) ? (
+                        <label className="relative block w-44">
+                          <IndianRupee size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600" />
+                          <input
+                            autoFocus
+                            inputMode="decimal"
+                            value={editAmount}
+                            onChange={(event) => setEditAmount(event.target.value.replace(/[^0-9.,]/g, ""))}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") void saveAmountEdit(selectedRecord);
+                              if (event.key === "Escape") cancelAmountEdit();
+                            }}
+                            className="h-9 w-full rounded-xl border border-emerald-300 bg-white pl-8 pr-3 text-right text-sm font-bold tabular-nums text-emerald-800 outline-none transition focus:ring-4 focus:ring-emerald-100"
+                            aria-label={`Amount for ${selectedRecord.collectionNo}`}
+                          />
+                        </label>
+                      ) : (
+                        <span className="text-lg font-bold tabular-nums text-emerald-700">
+                          {formatCurrency(Number(selectedRecord.amount) || 0)}
+                        </span>
+                      )}
+                      {!selectedRecord.deleted &&
+                      !selectedRecordEditLocked &&
+                      getDeleteWindowForStatus(
+                        selectedRecord.collectionDate,
+                        selectedRecord.status,
+                        new Date(),
+                        selectedRecord.approvedAt,
+                        selectedRecord.createdAt,
+                      ).canDelete ? (
+                        editingRecordId === String(selectedRecord.id) ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void saveAmountEdit(selectedRecord)}
+                              disabled={savingEdit}
+                              className="group inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {savingEdit ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} className="transition-transform duration-200 group-hover:scale-110" />}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelAmountEdit}
+                              disabled={savingEdit}
+                              className="group inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 active:translate-y-0 disabled:opacity-50"
+                              aria-label="Cancel amount edit"
+                            >
+                              <X size={15} className="transition-transform duration-200 group-hover:rotate-90" />
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => startAmountEdit(selectedRecord)}
+                            title="Edit collection amount"
+                            className="group inline-flex h-9 items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3 text-xs font-semibold text-blue-600 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-blue-50 active:translate-y-0 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300"
+                          >
+                            <Pencil size={14} className="transition-transform duration-200 group-hover:-rotate-12 group-hover:scale-110" />
+                            Edit
+                          </button>
+                        )
+                      ) : null}
                       {allowDelete && !selectedRecord.deleted ? (() => {
                         const deleteWindow = getDeleteWindowForStatus(
                           selectedRecord.collectionDate,
                           selectedRecord.status,
                           new Date(),
                           selectedRecord.approvedAt,
+                          selectedRecord.createdAt,
                         );
                         const canDelete = selectedRecord.canDelete !== false && deleteWindow.canDelete;
                         const isCounting = pendingDelete.isPending(String(selectedRecord.id));
@@ -806,7 +926,7 @@ function ShopCollectionDetailView({
                         const statusLabel = translatedStatus === statusKey
                           ? collectionStatusLabel(col.status, t)
                           : translatedStatus;
-                        const deleteWindow = getDeleteWindowForStatus(col.collectionDate, col.status, new Date(), col.approvedAt);
+                        const deleteWindow = getDeleteWindowForStatus(col.collectionDate, col.status, new Date(), col.approvedAt, col.createdAt);
                         const canDelete = allowDelete && col.canDelete !== false && deleteWindow.canDelete && !col.deleted;
                         const deleteHint = deleteHintFor(col);
                         const isCommitting = pendingDelete.isCommitting(String(col.id));
@@ -821,10 +941,15 @@ function ShopCollectionDetailView({
                             <td className={`${CELL_PADDING_X} py-3 text-center text-xs font-semibold tabular-nums text-slate-500`}>
                               {startIndex + index + 1}
                             </td>
-                            <td className={`${CELL_PADDING_X} py-3 text-center text-xs font-medium tabular-nums text-slate-700`}>
-                              <span className="block truncate">
+                            <td className={`${CELL_PADDING_X} py-3 text-center text-xs font-medium tabular-nums`}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecordId(String(col.id))}
+                                className="max-w-full truncate rounded-md text-emerald-700 underline-offset-4 transition-colors hover:text-emerald-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                                aria-label={`${t("common.view")} ${col.collectionNo || "collection"}`}
+                              >
                                 {col.collectionNo || "-"}
-                              </span>
+                              </button>
                             </td>
                             <td className={`${CELL_PADDING_X} py-3 text-center text-xs text-slate-600 tabular-nums whitespace-nowrap`}>
                               {formatDate(col.collectionDate)}

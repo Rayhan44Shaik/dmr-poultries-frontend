@@ -1,0 +1,8 @@
+src/modules/operations/collections/components/entry/CollectionAmount.test.ts:3:import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
+src/modules/operations/collections/components/entry/CollectionAmount.test.ts:6:  assert.deepEqual(formatCollectionAmountInput("700"), { display: "700", amount: 700 });
+src/modules/operations/collections/components/entry/CollectionAmount.test.ts:7:  assert.deepEqual(formatCollectionAmountInput("7000"), { display: "7,000", amount: 7000 });
+src/modules/operations/collections/components/entry/CollectionAmount.test.ts:8:  assert.deepEqual(formatCollectionAmountInput("100000"), { display: "1,00,000", amount: 100000 });
+src/modules/operations/collections/components/entry/CollectionAmount.test.ts:9:  assert.deepEqual(formatCollectionAmountInput("7,000.5"), { display: "7,000.5", amount: 7000.5 });
+src/modules/operations/collections/components/entry/CollectionAmount.tsx:5:import { formatCollectionAmountInput } from "./formatCollectionAmountInput";
+src/modules/operations/collections/components/entry/CollectionAmount.tsx:134:    const next = formatCollectionAmountInput(e.target.value);
+src/modules/operations/collections/components/entry/formatCollectionAmountInput.ts:1:export function formatCollectionAmountInput(value: string): { display: string; amount: number } {

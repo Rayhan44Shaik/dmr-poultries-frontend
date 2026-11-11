@@ -1,0 +1,25 @@
+files=961 errors=478 warnings=48 problems=526
+[["@typescript-eslint/no-unused-vars","@typescript-eslint/no-unused-vars1"],["react-hooks/set-state-in-effect","react-hooks/set-state-in-effect1"],["@typescript-eslint/no-explicit-any","@typescript-eslint/no-explicit-any1"],["react-hooks/exhaustive-deps","react-hooks/exhaustive-deps1"],["no-useless-assignment","no-useless-assignment1"],["react-hooks/refs","react-hooks/refs1"],["no-useless-escape","no-useless-escape1"],["react-hooks/immutability","react-hooks/immutability1"]]
+fleet files linted: 105
+  undefined E=2 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=3 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=2 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=2 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=3 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=2 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=3 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=1 W=0 react-hooks/set-state-in-effect
+  undefined E=4 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=1 W=0 @typescript-eslint/no-explicit-any
+  undefined E=2 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=1 W=0 @typescript-eslint/no-explicit-any
+  undefined E=1 W=0 @typescript-eslint/no-explicit-any
+  undefined E=9 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=0 W=1 react-hooks/exhaustive-deps
+  undefined E=1 W=0 react-hooks/set-state-in-effect
+  undefined E=1 W=0 react-hooks/set-state-in-effect
+  undefined E=11 W=1 @typescript-eslint/no-unused-vars,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,react-hooks/exhaustive-deps,@typescript-eslint/no-explicit-any
+  undefined E=1 W=0 react-hooks/set-state-in-effect
+  undefined E=14 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=3 W=0 @typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any,@typescript-eslint/no-explicit-any
+  undefined E=1 W=0 @typescript-eslint/no-explicit-any

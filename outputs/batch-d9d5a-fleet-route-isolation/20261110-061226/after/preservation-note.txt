@@ -1,0 +1,26 @@
+NON-SCOPE PRESERVATION CHECK — Batch D9D-5A
+============================================
+Before-edit capture: 20261110-061226 (34 dirty files hashed, 0 fleet files dirty).
+After-edit capture: hashes re-taken post-verification.
+
+Dirty file SET: identical before vs after, except the 5 in-scope fleet files
+(3 modified tracked + 2 new untracked). No non-scope file was added to or
+removed from the dirty set. See dirty-files-before.txt / dirty-files-after.txt.
+
+Byte drift (NOT caused by this batch): 5 non-scope files changed bytes DURING
+the batch window by an external concurrent editor (ShopLedger / reports i18n
+D9D-3 work):
+  src/i18n/modules/reports.en.ts
+  src/i18n/modules/reports.te.ts
+  src/modules/reports/components/ShopLedgerDetailModal.tsx
+  src/modules/reports/components/shopLedgerDetailData.ts
+  src/modules/reports/pages/ShopLedgerPage.tsx
+Evidence: mtimes 2026-11-10 06:24:56 – 06:28:20 (after this batch's
+before-capture at 06:12:26); this batch's tool calls wrote ONLY:
+  src/modules/fleet-operations/fleetLazyPages.tsx   (new)
+  src/modules/fleet-operations/fleetRouteConfig.tsx  (new)
+  src/modules/fleet-operations/routes.tsx            (shim)
+  src/modules/fleet-operations/index.ts              (1-line retarget)
+  src/modules/fleet-operations/activeFleetScope.test.ts (2-line retarget)
+No batch command addressed reports/ or i18n/ paths. The remaining 29 non-scope
+dirty files are byte-identical before vs after.

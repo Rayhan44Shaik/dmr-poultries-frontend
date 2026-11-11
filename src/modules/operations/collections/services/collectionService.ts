@@ -149,19 +149,19 @@ async function fetchShopSales(quiet404?: boolean): Promise<ShopSale[]> {
 /**
  * Recent collection/credit records for ONE shop — backend LIMIT 10, newest
  * first (ORDER BY collection_date DESC, created_at DESC, collection_no DESC).
- * `includeDeleted=true` makes "latest 10" a complete shop history across
- * Pending, Approved, Rejected, and Deleted records; deletion changes status,
- * never identity or collection number. Calls the dedicated
+ * Deleted records are intentionally excluded: this is the operational shop
+ * view, not an audit/recycle-bin screen. Calls the dedicated
  * GET /collection-entry/recent endpoint, which also returns the backend-
  * authoritative `canDelete` flag used by Pending Collection. Never downloads
  * the full register and never uses localStorage.
  */
 async function fetchRecentCollectionsForShop(
   shopId: number,
-  limit = 10
+  limit = 10,
+  range?: { fromDate?: string; toDate?: string },
 ): Promise<CollectionApiEntry[]> {
   const { data } = await apiGet<Record<string, unknown>[]>(`${COLLECTION_PATH}/recent`, {
-    params: { shopId, limit, includeDeleted: "true" },
+    params: { shopId, limit, ...range },
   });
   return (data ?? []).map((row) => mapRawEntry(row));
 }
@@ -562,6 +562,21 @@ async function updateCollection(collection: Collection): Promise<boolean> {
   }
 }
 
+async function updatePendingCollectionAmount(id: number, amount: number): Promise<boolean> {
+  try {
+    if (!Number.isInteger(id) || id <= 0 || !Number.isFinite(amount) || amount <= 0) return false;
+    const snapshot = findEntrySnapshot(id);
+    await apiPut(`${COLLECTION_PATH}/${id}`, { amount });
+    noteCollectionMutation();
+    await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "updated", "pending-collections");
+    return true;
+  } catch (error) {
+    handleApiError(error);
+    return false;
+  }
+}
+
 async function deleteCollection(id: string): Promise<boolean> {
   try {
     // Read the row first: after the delete the balance has to be republished
@@ -580,7 +595,7 @@ async function deleteCollection(id: string): Promise<boolean> {
 
 /**
  * Pending-approval delete — a DIFFERENT endpoint from deleteCollection().
- * Never-approved rows only; the backend keeps a 7-day entry-date window.
+ * Never-approved rows only; the backend keeps a 14-day entry-date window.
  * Approved collections in the shop view use deleteCollection() so the
  * ledger credit is reversed, gated by the 14-day post-approval window.
  */
@@ -867,6 +882,7 @@ getShopSales,
   validateCollectionImport,
   fetchCollectionImportMasters,
   updateCollection,
+  updatePendingCollectionAmount,
   deleteCollection,
   deletePendingCollection,
   approveCollection,

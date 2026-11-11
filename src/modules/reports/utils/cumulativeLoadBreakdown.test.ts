@@ -81,16 +81,18 @@ test("mortality lines name box birds with their kg weight, skipping zero parts",
   assert.equal(cumulativeLoadLines(empty, "mortalityBirds")[0].sub, undefined);
 });
 
-test("single-load and legacy shops render plain values with no tooltip", () => {
+test("single-load mortality still explains mode; other quantities stay plain", () => {
   const single = row({
     deliveriesByLoad: [
       { load: 1, birds: 90, weight: 180, mortalityBirds: 10, mortalityWeight: 5, weightLoss: 15 },
     ],
     mortalityByLoad: [{ load: 1, boxBirds: 10, boxWeight: 5, weightModeBirds: 0 }],
   });
-  for (const metric of ["birds", "mortalityBirds", "weight", "mortalityWeight", "weightLoss"] as const) {
+  for (const metric of ["birds", "weight", "weightLoss"] as const) {
     assert.equal(hasCumulativeLoadBreakdown(single, metric), false, metric);
   }
+  assert.equal(hasCumulativeLoadBreakdown(single, "mortalityBirds"), true);
+  assert.equal(hasCumulativeLoadBreakdown(single, "mortalityWeight"), true);
   assert.equal(hasCumulativeLoadBreakdown(twoLoads, "birds"), true);
   assert.equal(hasCumulativeLoadBreakdown(twoLoads, "mortalityWeight"), true);
 });

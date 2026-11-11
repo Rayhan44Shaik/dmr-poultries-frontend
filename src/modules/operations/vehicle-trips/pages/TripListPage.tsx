@@ -189,7 +189,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const viewButtonRef = useRef<HTMLButtonElement>(null);
 
   const setFilterSearch = useCallback((value: string) => {
     setSearch(value);
@@ -230,10 +229,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (
-        tableContainerRef.current?.contains(target) ||
-        viewButtonRef.current?.contains(target)
-      ) {
+      if (tableContainerRef.current?.contains(target)) {
         return;
       }
       setSelectedRowId(null);
@@ -418,15 +414,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const handleRowClick = (trip: Trip) => {
     setSelectedRowId(trip.id === selectedRowId ? null : trip.id);
-  };
-
-  const handleViewSelected = () => {
-    const trip = paginatedTrips.find((t) => t.id === visibleSelectedRowId);
-    if (trip) {
-      openView(trip);
-    } else {
-      showNotification(t("ops.trip.no_trip_selected"), "info");
-    }
   };
 
   /** Page navigation drops the selection unless it stays on the new page. */
@@ -627,23 +614,18 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
         <TripListHeader
           title={t("ops.trip.trip_list")}
-          viewLabel={t("common.view")}
-          viewDisabledTitle={t("ops.trip.select_trip_to_view")}
-          viewEnabledTitle={t("ops.trip.view_selected_trip")}
-          viewDisabled={visibleSelectedRowId == null}
-          onView={handleViewSelected}
-          viewButtonRef={viewButtonRef}
         />
 
         {/* Single coordinated scroll viewport: sticky column headings and rows
           share one horizontal + vertical scroll; toolbar stays above, and the
           footer pagination never scrolls away with the wide table. */}
-        <div className="overflow-auto max-h-[clamp(20rem,72vh,56rem)] min-h-[16rem]">
+        <div className="overflow-auto max-h-[clamp(20rem,72vh,56rem)]">
           <TripMasterTable
             trips={paginatedTrips}
             isLoading={isLoading}
             selectedRowId={visibleSelectedRowId}
             onRowClick={handleRowClick}
+            onView={openView}
             onRowSelect={(trip) => setSelectedRowId(trip.id)}
             startIndex={(currentPage - 1) * pageSize}
             sortBy={sortBy}
@@ -670,7 +652,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             viewRequestSeqRef.current += 1;
             setViewOpen(false);
             setSelectedTrip(null);
-            viewButtonRef.current?.focus();
           }}
         />
       )}

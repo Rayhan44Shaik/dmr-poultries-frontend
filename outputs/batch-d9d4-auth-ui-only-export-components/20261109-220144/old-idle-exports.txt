@@ -1,0 +1,3 @@
+export { isGenuineActivityEvent };
+export { ACTIVITY_KEY as ACTIVITY_BROADCAST_KEY } from "./authEvents";
+export const IDLE_SIGNOUT_KEY = "dmr:signout-reason";

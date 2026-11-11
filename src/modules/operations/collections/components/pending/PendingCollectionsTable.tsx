@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  ArrowDown, ArrowUp, Calendar, Clock3, CreditCard, Eye, Hash, LoaderCircle,
+  ArrowDown, ArrowUp, Calendar, Clock3, CreditCard, Hash, LoaderCircle,
   ShoppingBag, TrendingUp,
 } from "lucide-react";
 import type {
@@ -11,7 +11,6 @@ import type {
 } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
-import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { tableSelectedRowClass } from "../../../../../shared/ui/tableRowSelection";
 import { useTableRowSelection } from "../../../../../shared/ui/useTableRowSelection";
 import { RowSelectMark } from "../../../../../shared/ui/RowSelectMark";
@@ -82,9 +81,8 @@ interface Props {
  *     and the card keeps its identity. Rate Entry and Trip List behave the same
  *     way; the page around it never blanks.
  *
- *   • READ-ONLY ROWS — a row offers View only. View and Delete never sit on
- *     the table toolbar or in a second Actions control: opening the shop view
- *     is the one way in, and deletion lives inside that view, on the record.
+ *   • READ-ONLY ROWS — clicking a shop row opens its detail view, exactly like
+ *     clicking a Trip List row. Deletion lives inside that view, on the record.
  *
  *   • CUMULATIVE — the closing row totals the filtered set, not the page, so
  *     "overall" keeps its meaning at every page size and on every page.
@@ -118,8 +116,12 @@ function PendingCollectionsTable({
     toggleOnReselect: true,
     allowEscapeClear: true,
     getRowLabel: (shop) => `Shop ${shop.shopName}`,
-    onSelect: (shop) => onSelectShop(shop.shopName),
+    onSelect: (shop, _index, via) => {
+      onSelectShop(shop.shopName);
+      if (via === "pointer") onView(shop.shopName);
+    },
     onDeselect: () => onSelectShop(null),
+    onPrimaryAction: (shop) => onView(shop.shopName),
   });
 
   const selectedShop = data.find((s) => s.shopName === selectedShopName);
@@ -248,15 +250,12 @@ function PendingCollectionsTable({
                 <th className="px-3.5 py-3 text-center">
                   {sortable("overdueDays", t("ops.collection.overdue"), "center")}
                 </th>
-                <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                  {t("table.actions")}
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {data.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-[13px] font-medium text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-[13px] font-medium text-slate-400">
                     {t("empty.no_shops")}
                   </td>
                 </tr>
@@ -320,18 +319,6 @@ function PendingCollectionsTable({
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
-                      <td className="px-3.5 py-3 text-center">
-                        <div className="inline-flex items-center justify-center">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
-                            aria-label={t("ops.collection.view_details")}
-                            className="group inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
-                          >
-                            <Eye size={16} className={uiActionIconMotionClass.view} />
-                          </button>
-                        </div>
-                      </td>
                     </tr>
                   );
                 })
@@ -371,7 +358,6 @@ function PendingCollectionsTable({
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-3.5 py-3" />
                 </tr>
               </tfoot>
             )}

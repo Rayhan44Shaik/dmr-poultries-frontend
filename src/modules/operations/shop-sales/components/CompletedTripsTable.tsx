@@ -25,6 +25,7 @@ interface Props {
   trips: Trip[];
   onEnterRate: (trip: Trip) => void;
   onModifyRate: (trip: Trip) => void;
+  onOpen: (trip: Trip) => void;
   children?: ReactNode;
   selectedRowId?: number | null;
   onRowClick?: (trip: Trip) => void;
@@ -97,6 +98,7 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
 
 function CompletedTripsTable({
   trips,
+  onOpen,
   children,
   selectedRowId = null,
   onRowClick,
@@ -213,7 +215,11 @@ function CompletedTripsTable({
                     <RowSelectMark selected={isSelected} serialNo={serialNo} label={`Selected trip ${trip.tripNo}`} />
                   </td>
                   {/* Keep 2d logo in header but working start from name S */}
-                  <td className="px-4 py-4 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
+                  <td className="px-4 py-4 pl-9 whitespace-nowrap">
+                    <button type="button" onClick={(event) => { event.stopPropagation(); onOpen(trip); }} className="rounded px-0.5 text-[13px] font-bold text-emerald-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" aria-label={`Open rate entry for trip ${trip.tripNo}`}>
+                      {trip.tripNo}
+                    </button>
+                  </td>
                   <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
