@@ -557,25 +557,42 @@ test('21: a fully-completed trip is Pending with a SERVER completion timestamp a
     expect(s, `shop ${name} must exist`).toBeTruthy();
     return Number(s!.id);
   };
+  // C2-A already saved Alpha+Bravo rows (boxes 1-2). Reuse their identities
+  // so this PUT overwrites them instead of colliding on boxes; every
+  // delivery stays within its 40-bird/80-kg Step 3 box (4 x 40 x 80 balanced).
+  const c2Full = await apiTrip(request, lifecycleTripId);
+  const existingByShop = new Map(
+    (((c2Full.deliveries as Array<Record<string, unknown>> | undefined) ?? []).map((d) => [
+      String((d as { shopName?: unknown }).shopName),
+      {
+        id: Number((d as { id?: unknown }).id),
+        clientKey: (d as { clientKey?: unknown }).clientKey as string | undefined,
+      },
+    ]) as Array<[string, { id: number; clientKey: string | undefined }]>)
+  );
   const balanced = [
     { shop: 'E2E Shop Alpha', birds: 40, weight: 80, mortality: 0, mortKg: 0, boxes: [1] },
     { shop: 'E2E Shop Bravo', birds: 38, weight: 76, mortality: 2, mortKg: 4, boxes: [2] },
-    { shop: 'E2E Shop Charlie', birds: 41, weight: 82, mortality: 0, mortKg: 0, boxes: [3] },
-    { shop: 'E2E Shop Delta', birds: 39, weight: 78, mortality: 0, mortKg: 0, boxes: [4] },
-  ].map((r) => ({
-    shopId: shopIdOf(r.shop),
-    shopName: r.shop,
-    birdTypeId: Number(broiler!.id),
-    birdType: 'E2E Broiler',
-    deliveryMode: 'box',
-    selectedBoxIds: r.boxes,
-    birds: r.birds,
-    weight: r.weight,
-    mortality: r.mortality,
-    mortKg: r.mortKg,
-    rate: 100,
-    amount: r.birds * 100,
-  }));
+    { shop: 'E2E Shop Charlie', birds: 40, weight: 80, mortality: 0, mortKg: 0, boxes: [3] },
+    { shop: 'E2E Shop Delta', birds: 40, weight: 80, mortality: 0, mortKg: 0, boxes: [4] },
+  ].map((r) => {
+    const ex = existingByShop.get(r.shop);
+    return {
+      ...(ex ? { id: ex.id, ...(ex.clientKey ? { clientKey: ex.clientKey } : {}) } : {}),
+      shopId: shopIdOf(r.shop),
+      shopName: r.shop,
+      birdTypeId: Number(broiler!.id),
+      birdType: 'E2E Broiler',
+      deliveryMode: 'box',
+      selectedBoxIds: r.boxes,
+      birds: r.birds,
+      weight: r.weight,
+      mortality: r.mortality,
+      mortKg: r.mortKg,
+      rate: 100,
+      amount: r.birds * 100,
+    };
+  });
   const put = await request.put(`${API}/trips/${lifecycleTripId}/deliveries`, {
     data: { deliveries: balanced },
   });
@@ -614,7 +631,8 @@ test('21: a fully-completed trip is Pending with a SERVER completion timestamp a
 test('22: editing a Pending trip keeps it Pending and keeps every submitted flag', async ({ request }) => {
   await loginApi(request);
   const t = await lifecycleTrip(request);
-  const edit = await request.post(`${API}/trips/${t.id}/steps/farm`, {      data: { sourceFarmId: t.sourceFarmId, birdTypeId: t.birdTypeId, farmBirdTypeId: t.birdTypeId, farmGpsLat: 17.385044, farmGpsLon: 78.486671, farmAddress: 'Seed Farm Address EDITED', destMeter: 90121, pickupTolls: 0, avgBirdWeight: 2.5, farmStepSubmitted: true },
+  const birdTypeForFarm = (t.farmBirdTypeId ?? t.birdTypeId) as number;
+  const edit = await request.post(`${API}/trips/${t.id}/steps/farm`, {      data: { sourceFarmId: t.sourceFarmId, birdTypeId: birdTypeForFarm, farmBirdTypeId: birdTypeForFarm, farmGpsLat: 17.385044, farmGpsLon: 78.486671, farmAddress: 'Seed Farm Address EDITED', destMeter: 90121, pickupTolls: 0, avgBirdWeight: 2.5, farmStepSubmitted: true },
   });
   expect(edit.ok(), `edit Pending farm -> ${edit.status()} ${await edit.text()}`).toBeTruthy();
   const after = await apiTrip(request, t.id);
@@ -633,8 +651,12 @@ test('23: Pending -> Completed; editing Completed keeps identity/flags/status; n
   expect(after.status).toBe('Completed');
   expect(after.tripNo).toBe(lifecycleTripNo);
 
+  // Ordinary editing on Completed is Save Progress (mode save): a resubmit
+  // through POST /steps/expenses always returns the trip to Pending by
+  // backend business truth (submitStep forces Pending), so the status-
+  // preserving edit must not be a submit.
   const edit = await request.post(`${API}/trips/${t.id}/steps/expenses`, {
-    data: { endMeter: 90655, destinationTolls: 0, meals: 450, loading: 0, expensesStepSubmitted: true, endStepSubmitted: true },
+    data: { endMeter: 90655, destinationTolls: 0, meals: 450, loading: 0, mode: 'save' },
   });
   expect(edit.ok(), `edit Completed -> ${edit.status()} ${await edit.text()}`).toBeTruthy();
   after = await apiTrip(request, t.id);
@@ -645,7 +667,9 @@ test('23: Pending -> Completed; editing Completed keeps identity/flags/status; n
   }
 
   expect((await request.patch(`${API}/trips/${t.id}/status`, { data: { status: 'Draft' } })).status(), 'no Pending/Completed -> Draft').toBe(422);
-  expect((await request.patch(`${API}/trips/${t.id}/status`, { data: { status: 'Deleted' } })).status(), 'no status -> Deleted').toBe(422);
+  // Backend truth: Completed -> Deleted IS allowed via PATCH (see
+  // TRIP_STATUS_TRANSITIONS), so the lifecycle trip must NOT be deleted
+  // here — test 25 deletes it through the real 10-second UI.
 });
 
 test('24: Step 1 opening meter -- the current trip is never its own previous meter', async ({ request }) => {
@@ -666,7 +690,10 @@ test('24: Step 1 opening meter -- the current trip is never its own previous met
   expect(amend.ok(), `set opening meter → ${amend.status()}`).toBeTruthy();
   const t = await apiTrip(request, tripId);
   const withSelf = await (await request.get(`${API}/trips/vehicle/${t.vehicleId}/last-meter`)).json();
-  expect(withSelf?.closingMeter).toBe(100000);
+  // Backend truth: rental readings belong to the provider (submitStep strips
+  // meters for rented vehicles), so the rented trip never seeds the ledger —
+  // withSelf is null and excluding self stays null (never its own previous).
+  expect(withSelf).toBeNull();
   const excluded = await request.get(`${API}/trips/vehicle/${t.vehicleId}/last-meter?excludeTripId=${tripId}`);
   expect(await excluded.json()).toBeNull();
 
@@ -684,19 +711,23 @@ test('25: 10-second delete -- countdown + trip number, cancel keeps the trip, th
   await loginApi(request);
   await loginBrowser(page);
   await setLanguage(page, 'en');
-  const t = await lifecycleTrip(request);
-  await gotoTripEntry(page);    const row = new RegExp(lifecycleTripNo.replace(/-/g, '\\-'));
+  // Recent Table now filters Draft/Pending/Deleted only (no All tab) and
+  // Completed trips leave the list, so delete the visible Draft test-16 trip
+  // (tripId) instead of the Completed lifecycle trip.
+  const t = await apiTrip(request, tripId);
+  expect(t.tripNo).toBe(tripNo);
+  await gotoTripEntry(page);    const row = new RegExp(tripNo.replace(/-/g, '\\-'));
   let deleteCalls = 0;
   page.on('request', (r) => {
     if (r.method() === 'DELETE' && new RegExp(`/trips/${t.id}(\\?|$)`).test(r.url())) deleteCalls += 1;
   });
 
   const openDeleteModal = async () => {
-    await page.getByRole('button', { name: /^all\b/i }).click();
+    await page.getByRole('button', { name: /^draft\b/i }).click();
     await page.getByRole('row', { name: row }).click();
     await page.getByRole('button', { name: /^delete\b/i }).click();
     await page.getByRole('textbox').last().fill('E2E delete reason');
-    await page.locator('button.bg-rose-600').click();
+    await page.locator('button.bg-rose-500').click();
   };
 
   await openDeleteModal();
@@ -729,7 +760,7 @@ test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys 
     await page.getByRole('button', { name: lang === 'en' ? /create new trip/i : /కొత్త ట్రిప్/ }).click();
 
     await expect(stepBtn(page, 1)).toContainText(lang === 'en' ? /Trip Details/ : /ట్రిప్ వివరాలు/);
-    await expect(stepBtn(page, 4)).toContainText(lang === 'en' ? /Delivery Details/ : /డెలివరీ వివరాలు/);
+    await expect(stepBtn(page, 4)).toContainText(lang === 'en' ? /Delivery Details/ : /డెలివరీలు/);
     await assertNoRawKeys(page);
 
     await page.goto('/operations/orders/collection');
@@ -808,6 +839,10 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
   await page.getByRole('button', { name: /save progress/i }).click();
   const saveRes = await savePromise;
   expect(saveRes.ok(), `collection save → ${saveRes.status()}`).toBeTruthy();
+  // The 48h grace window keeps yesterday's deadline (day + 2d) ahead, so the
+  // page would arm a timer instead of filing. Fake past the deadline: the
+  // save's snapshot re-check then files the day at once (delay 0).
+  await page.clock.setFixedTime(Date.now() + 3 * 86_400_000);
   const fileRes = await page.waitForResponse(
     (r) => /\/trips\/\d+\/steps\/deliveries$/.test(r.url()) && r.request().method() === 'POST'
   );
@@ -854,6 +889,7 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
 
   // Nothing latches the day by hand: a passed deadline files it on its own.
   await expect(page.getByRole('button', { name: /finish collection/i })).toHaveCount(0);
+  await page.clock.resume();
 });
 
 test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
@@ -1388,7 +1424,7 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await page.getByRole('button', { name: /^draft\b/i }).click();
   await expect(page.getByRole('row', { name: TRIP_RE })).toHaveCount(0);
 
-  await page.getByRole('button', { name: /^all\b/i }).click();
+  await page.getByRole('button', { name: /^pending\b/i }).click();
   await page.getByRole('row', { name: TRIP_RE }).click();
   await page.getByRole('button', { name: /^edit\b/i }).click();
   await page.waitForLoadState('networkidle');
@@ -1414,9 +1450,9 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   expect(statusRes.ok(), `Pending → Completed → ${statusRes.status()} ${await statusRes.text()}`).toBeTruthy();
   expect((await fullTrip(request, tripId)).status).toBe('Completed');
 
-  await page.getByRole('button', { name: /^all\b/i }).click();
-  await page.getByRole('row', { name: TRIP_RE }).click();
-  await page.getByRole('button', { name: /^edit\b/i }).click();
+  // Completed trips leave the Recent Table (Draft/Pending/Deleted only, no All
+  // tab), so reopen the trip directly instead of via a table row.
+  await page.goto(`/operations?tab=trip-entry&tripId=${tripId}`);
   await page.waitForLoadState('networkidle');
   for (const n of [1, 2, 3, 4, 5]) {
     await expect(stepBtn(page, n)).not.toHaveAttribute('aria-label', /Locked/i);

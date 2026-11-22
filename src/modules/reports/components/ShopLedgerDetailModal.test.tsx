@@ -190,6 +190,9 @@ describe("ShopLedgerDetailView: statement content", () => {
     assert.ok(html.includes('tabindex="0"'), "exactly one tabbable row");
     assert.ok(html.includes('aria-selected="true"'), "active row announced");
     assert.ok(html.includes("bg-emerald-50/80"), "very light mint highlight");
+    assert.ok(html.includes("data-shop-ledger-detail-scroll"), "table has one stable scroll viewport");
+    assert.ok(html.includes("sticky top-0 z-20"), "the complete header stays above transaction rows");
+    assert.ok(html.includes("data-shop-ledger-detail-row"), "rows expose stable keyboard-scroll targets");
   });
 });
 

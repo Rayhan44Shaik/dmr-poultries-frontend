@@ -6,6 +6,7 @@ import {
   formatSaleRemark,
   formatSaleSequence,
   formatSaleWeight,
+  hasShopSaleMortality,
   shopSaleLockState,
   weekdayShort,
 } from "./shopSaleFormat";
@@ -64,6 +65,20 @@ describe("formats", () => {
     assert.equal(formatSaleSequence("TRP-20260911-001-S100"), "S100");
     assert.equal(formatSaleSequence("TRP-20260911-001"), null);
     assert.equal(formatSaleSequence(undefined), null);
+  });
+});
+
+describe("hasShopSaleMortality", () => {
+  it("flags box-mode mortality birds", () => {
+    assert.equal(hasShopSaleMortality({ mortality: 2, mortalityWeight: 0 }), true);
+  });
+
+  it("flags weight-mode mortality weight", () => {
+    assert.equal(hasShopSaleMortality({ mortality: 0, mortalityWeight: 3.25 }), true);
+  });
+
+  it("keeps mortality-free sales unflagged", () => {
+    assert.equal(hasShopSaleMortality({ mortality: 0, mortalityWeight: 0 }), false);
   });
 });
 

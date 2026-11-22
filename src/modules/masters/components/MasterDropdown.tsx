@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 import { useI18n } from "../../../i18n";
+import { dropdownReopenIndex } from "../../../shared/ui/dropdownReopen";
 
 export interface MasterDropdownOption {
   value: string;
@@ -182,8 +183,13 @@ export default function MasterDropdown({
         document.body,
     );
     setQuery("");
-    const selectedIndex = items.findIndex(
-      (option) => option.value === value && !option.disabled,
+    // Single-selects reopen at their value. Multi-selects intentionally have
+    // an empty `value`, so anchor them at the most recently selected item
+    // instead of incorrectly restarting at the first option.
+    const selectedIndex = dropdownReopenIndex(
+      items,
+      value,
+      multiple ? values : [],
     );
     const enabled = items.flatMap((option, index) =>
       option.disabled ? [] : [index],

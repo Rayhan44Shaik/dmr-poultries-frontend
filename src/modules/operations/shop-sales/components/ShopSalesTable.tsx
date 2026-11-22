@@ -20,6 +20,7 @@ import {
   formatSaleRate,
   formatSaleRemark,
   formatSaleWeight,
+  hasShopSaleMortality,
   shopSaleLockState,
 } from "../utils/shopSaleFormat";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
@@ -97,6 +98,7 @@ function ShopSalesTable({
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
   const editingTripDeliveries = useMemo(() => editingSale ? allSales.filter((row) => row.numericTripId === editingSale.numericTripId) : [], [allSales, editingSale]);
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
+  const selectedHasMortality = selectedSale ? hasShopSaleMortality(selectedSale) : false;
   const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
     const values = SORT_VALUES[column];
     if (sortBy === values.asc) return "asc";
@@ -175,8 +177,12 @@ function ShopSalesTable({
           <h3 className="truncate text-base font-bold tracking-tight text-slate-800">Shop Sales</h3>
           {selectedSale && (
             <span
-              className="inline-flex whitespace-nowrap rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
-              title={selectedSale.saleNo || ""}
+              className={`inline-flex whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                selectedHasMortality
+                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                  : "border-emerald-200/70 bg-emerald-50 text-emerald-700"
+              }`}
+              title={selectedHasMortality ? `${selectedSale.saleNo || "Shop sale"} — mortality recorded` : selectedSale.saleNo || ""}
             >
               {selectedSale.saleNo || "—"}
             </span>
@@ -228,6 +234,7 @@ function ShopSalesTable({
               const isSelected = selectedId === sale.id;
               const isEditing = editingSale?.id === sale.id;
               const lock = shopSaleLockState(sale);
+              const hasMortality = hasShopSaleMortality(sale);
               return (
                 <tr
                   key={sale.id}
@@ -245,7 +252,17 @@ function ShopSalesTable({
                       onClick={(event) => { event.stopPropagation(); startEditingSale(sale); }}
                       aria-label={`${lock.editable ? t("common.edit") : "View"} ${sale.saleNo || sale.tripNo || "shop sale"}`}
                       title={lock.editable ? "Edit trip shop deliveries" : `View locked trip details. ${lock.message}`}
-                      className={`rounded-md underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 ${saving ? "cursor-not-allowed text-slate-400" : lock.editable ? "cursor-pointer text-emerald-700 hover:text-emerald-900 hover:underline" : "cursor-pointer text-slate-600 hover:text-slate-900 hover:underline"}`}
+                      className={`rounded-md underline-offset-4 transition-colors focus-visible:outline-none focus-visible:ring-2 ${
+                        hasMortality ? "focus-visible:ring-rose-400" : "focus-visible:ring-emerald-400"
+                      } ${
+                        saving
+                          ? `cursor-not-allowed opacity-60 ${hasMortality ? "text-rose-600" : "text-slate-400"}`
+                          : hasMortality
+                            ? "cursor-pointer font-bold text-rose-600 hover:text-rose-800 hover:underline"
+                            : lock.editable
+                              ? "cursor-pointer text-emerald-700 hover:text-emerald-900 hover:underline"
+                              : "cursor-pointer text-slate-600 hover:text-slate-900 hover:underline"
+                      }`}
                     >{sale.saleNo || sale.tripNo || "—"}</button>
                   </td>
                   <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>

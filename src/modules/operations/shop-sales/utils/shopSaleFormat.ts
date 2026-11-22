@@ -58,6 +58,17 @@ export function formatSaleRemark(remark: string | null | undefined): string {
 }
 
 /**
+ * A Shop Sale is mortality-bearing when either persisted mortality quantity is
+ * positive. This intentionally ignores delivery mode: box mode and weight mode
+ * must receive the same unmistakable red sale-number signal.
+ */
+export function hasShopSaleMortality(
+  sale: Pick<ShopSale, "mortality" | "mortalityWeight">,
+): boolean {
+  return Number(sale.mortality || 0) > 0 || Number(sale.mortalityWeight || 0) > 0;
+}
+
+/**
  * Read the server-authoritative Shop Sale suffix in a compact, user-facing
  * form. Both legacy `…-S001` and current `…-S01` values render as `S01`, so
  * delivery sequencing stays clear while the API migrates safely.

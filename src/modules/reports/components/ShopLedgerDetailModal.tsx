@@ -95,7 +95,12 @@ export function ShopLedgerDetailView({
 
   const focusTx = useCallback((index: number) => {
     setActiveTx(index);
-    requestAnimationFrame(() => rowRefs.current.get(index)?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => {
+      const row = rowRefs.current.get(index);
+      if (!row) return;
+      row.focus({ preventScroll: true });
+      row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
   }, []);
 
   const handleTxKeyDown = useCallback(
@@ -194,20 +199,20 @@ export function ShopLedgerDetailView({
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-auto px-5 py-4">
-        <table className="w-full min-w-[980px] border-collapse text-left text-[13px]">
-          <thead className="bg-slate-50/80 text-slate-600">
+      <div className="relative isolate min-h-0 flex-1 overflow-auto px-5 py-4" data-shop-ledger-detail-scroll>
+        <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-[13px]">
+          <thead className="sticky top-0 z-20 bg-slate-50/95 text-slate-600 shadow-[0_1px_0_rgba(226,232,240,0.95)] backdrop-blur">
             <tr className="text-[11px] font-bold uppercase tracking-wider">
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("shop_ledger.col.s_no")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-left backdrop-blur">{t("common.date")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-left backdrop-blur">{t("common.type")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-left backdrop-blur">{t("shop_ledger.col.particulars")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("common.birds")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("shop_ledger.col.weight_kg")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("common.rate")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("shop_ledger.col.sale")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("shop_ledger.col.collection")}</th>
-              <th className="sticky top-0 z-10 bg-slate-50/95 px-3 py-3 text-center backdrop-blur">{t("common.balance")}</th>
+              <th className="px-3 py-3 text-center">{t("shop_ledger.col.s_no")}</th>
+              <th className="px-3 py-3 text-left">{t("common.date")}</th>
+              <th className="px-3 py-3 text-left">{t("common.type")}</th>
+              <th className="px-3 py-3 text-left">{t("shop_ledger.col.particulars")}</th>
+              <th className="px-3 py-3 text-center">{t("common.birds")}</th>
+              <th className="px-3 py-3 text-center">{t("shop_ledger.col.weight_kg")}</th>
+              <th className="px-3 py-3 text-center">{t("common.rate")}</th>
+              <th className="px-3 py-3 text-center">{t("shop_ledger.col.sale")}</th>
+              <th className="px-3 py-3 text-center">{t("shop_ledger.col.collection")}</th>
+              <th className="px-3 py-3 text-center">{t("common.balance")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -232,6 +237,7 @@ export function ShopLedgerDetailView({
                   onFocus={() => setActiveTx(index)}
                   onClick={() => focusTx(index)}
                   onKeyDown={(event) => handleTxKeyDown(event, index)}
+                  data-shop-ledger-detail-row
                   className={`cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isActive
                       ? "bg-emerald-50/80"

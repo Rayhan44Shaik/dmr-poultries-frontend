@@ -6,8 +6,9 @@
 // option and a scrollable result list that shows exactly VISIBLE_ITEMS rows
 // at a time (the rest are reached by scrolling or searching).
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, Search } from 'lucide-react';
+import { dropdownReopenIndex } from '../../shared/ui/dropdownReopen';
 
 export interface SearchableSelectOption {
   value: string;
@@ -62,6 +63,7 @@ const SearchableSelect = ({
   const [activeIndex, setActiveIndex] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const items = useMemo(
@@ -96,6 +98,30 @@ const SearchableSelect = ({
 
   const visibleActiveIndex = Math.min(activeIndex, Math.max(0, filtered.length - 1));
 
+  const selectedReopenIndex = () => {
+    return dropdownReopenIndex(items, value, multi ? selectedValues : []);
+  };
+
+  const openAtSelection = () => {
+    setQuery('');
+    setActiveIndex(selectedReopenIndex());
+    setOpen(true);
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const frame = window.requestAnimationFrame(() => {
+      const list = listRef.current;
+      const option = optionRefs.current[visibleActiveIndex];
+      if (!list || !option) return;
+      list.scrollTop = Math.max(
+        0,
+        option.offsetTop - (list.clientHeight - option.offsetHeight) / 2,
+      );
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, visibleActiveIndex]);
+
   const moveActive = (direction: 1 | -1) => {
     if (filtered.length === 0) return;
     setActiveIndex((current) => {
@@ -109,8 +135,7 @@ const SearchableSelect = ({
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       if (!open) {
-        setOpen(true);
-        setActiveIndex(0);
+        openAtSelection();
       } else {
         moveActive(event.key === 'ArrowDown' ? 1 : -1);
       }
@@ -163,8 +188,8 @@ const SearchableSelect = ({
         aria-expanded={open}
         onKeyDown={handleMenuKeyDown}
         onClick={() => {
-          if (!open) setQuery('');
-          setOpen((o) => !o);
+          if (open) setOpen(false);
+          else openAtSelection();
         }}
         className={`h-9 px-3 ${widthClass} rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between gap-2 hover:border-slate-300 transition font-medium ${open ? 'ring-2 ring-blue-500/20 border-blue-500' : ''}`}
       >
@@ -221,6 +246,7 @@ const SearchableSelect = ({
           )}
 
           <ul
+            ref={listRef}
             role="listbox"
             className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
             style={{ maxHeight: LIST_MAX_HEIGHT }}
