@@ -5,8 +5,6 @@
 // existing persisted values (no recalculation). Shop deliveries flow onto
 // additional A4 pages automatically without cutting rows.
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import type { Trip, ShopDelivery } from "../types/trip";
 import henImage from "../../../../assets/dmr-hen.jpg";
 import {
@@ -84,7 +82,10 @@ export async function generateTripReportPDF(
   trip: Trip,
   emailInfo?: TripReportEmailInfo | null
 ): Promise<void> {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  // Loaded on demand: opening a trip never downloads the PDF libraries.
+  const { default: JsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — Trip Report`,
     subject: "DMR POULTRIES trip report",

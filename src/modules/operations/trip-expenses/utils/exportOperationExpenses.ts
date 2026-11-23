@@ -1,4 +1,3 @@
-import autoTable from "jspdf-autotable";
 import type { jsPDF } from "jspdf";
 import { createDmrPoultryPdf, drawPreparedDmrPoultryHeader, prepareDmrPoultryHeaderAssets } from "../../../../utils/drawDmrPoultryHeader";
 import henImage from "../../../../assets/dmr-hen.jpg";
@@ -21,7 +20,9 @@ export async function exportOperationExpensesPdf(
   rows: TripExpenseRow[],
   options: { includeMasterBunks: boolean; fromDate?: string; toDate?: string; filename: string },
 ): Promise<void> {
-  const doc = createDmrPoultryPdf("landscape");
+  // Loaded on demand: the expenses page opens without the export libraries.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("landscape");
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
   const margin = 12;
   const headerBottom = drawPreparedDmrPoultryHeader(doc, { margin }, assets);

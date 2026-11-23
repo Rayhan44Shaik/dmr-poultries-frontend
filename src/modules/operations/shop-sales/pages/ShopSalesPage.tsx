@@ -119,13 +119,23 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const assignmentNoticeTripNo = sourceTripWithGap?.tripNo ?? assignmentLock?.assignmentLockTripNo ?? null;
 
   const exportFileName = `shop-sales-${new Date().toISOString().slice(0, 10)}`;
-  const handleExportPdf = useCallback(() => {
-    void exportShopSalesPdf(filteredSales, summary, exportFileName);
-  }, [exportFileName, filteredSales, summary]);
+  const handleExportPdf = useCallback(async () => {
+    try {
+      await exportShopSalesPdf(filteredSales, summary, exportFileName);
+    } catch (error) {
+      console.error("Shop sales PDF export failed:", error);
+      showNotification("Unable to export PDF. Please try again.", "error");
+    }
+  }, [exportFileName, filteredSales, summary, showNotification]);
 
-  const handleExportExcel = useCallback(() => {
-    exportShopSalesExcel(filteredSales, summary, exportFileName);
-  }, [exportFileName, filteredSales, summary]);
+  const handleExportExcel = useCallback(async () => {
+    try {
+      await exportShopSalesExcel(filteredSales, summary, exportFileName);
+    } catch (error) {
+      console.error("Shop sales Excel export failed:", error);
+      showNotification("Unable to export Excel. Please try again.", "error");
+    }
+  }, [exportFileName, filteredSales, summary, showNotification]);
 
   const content = (
     <div className="w-full space-y-5 animate-in fade-in duration-500">

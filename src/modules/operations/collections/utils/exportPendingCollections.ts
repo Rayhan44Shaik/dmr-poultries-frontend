@@ -1,6 +1,3 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
 import { drawPreparedDmrPoultryHeader, prepareDmrPoultryHeaderAssets } from "../../../../utils/drawDmrPoultryHeader";
 import henImage from "../../../../assets/dmr-hen.jpg";
 
@@ -34,7 +31,10 @@ function rows(data: readonly PendingCollectionExportRow[]): (string | number)[][
 }
 
 export async function exportPendingCollectionsPdf(data: readonly PendingCollectionExportRow[], filename: string): Promise<void> {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  // Loaded on demand so opening the page never downloads the export libraries.
+  const { default: JsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = new JsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
   const margin = 12;
   const headerBottom = drawPreparedDmrPoultryHeader(doc, { margin }, assets);
@@ -65,7 +65,8 @@ export async function exportPendingCollectionsPdf(data: readonly PendingCollecti
   doc.save(`${filename}.pdf`);
 }
 
-export function exportPendingCollectionsExcel(data: readonly PendingCollectionExportRow[], filename: string): void {
+export async function exportPendingCollectionsExcel(data: readonly PendingCollectionExportRow[], filename: string): Promise<void> {
+  const XLSX = await import("xlsx");
   const sheet = XLSX.utils.aoa_to_sheet([["DMR POULTRIES — PENDING COLLECTIONS"], [], columns, ...rows(data)]);
   sheet["!cols"] = columns.map((label) => ({ wch: Math.max(14, label.length + 3) }));
   const workbook = XLSX.utils.book_new();

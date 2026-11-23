@@ -34,6 +34,8 @@ export const CAPABILITIES = {
   LEAVE_REJECT: "leave.reject",
   LEAVE_DELETE: "leave.delete",
   DUTY_DELETE: "duty.delete",
+  SALARY_GENERATE: "salary.generate",
+  SALARY_SUBMIT: "salary.submit",
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
@@ -99,9 +101,31 @@ const AUDIT_ACCESS: RoleAccess = {
   tabs: {settings:["profile"]}, capabilities: [],
 };
 
+/**
+ * FULL_ACCESS — every module, but not the owner-only financial/destructive
+ * actions. The backend boundaries deny these regardless of UI visibility; the
+ * capability list must mirror that so no dead action button is shown.
+ * Staff leave/duty approvals remain because staffBoundary intentionally
+ * treats FULL_ACCESS as an elevated HR manager. Salary generation and
+ * submission are explicitly delegated to FULL_ACCESS by business policy;
+ * bulk Paid/Pending permission is unchanged.
+ */
+const FULL_ACCESS_ACCESS: RoleAccess = {
+  sections: "*",
+  tabs: {},
+  capabilities: [
+    CAPABILITIES.LEAVE_APPROVE,
+    CAPABILITIES.LEAVE_REJECT,
+    CAPABILITIES.LEAVE_DELETE,
+    CAPABILITIES.DUTY_DELETE,
+    CAPABILITIES.SALARY_GENERATE,
+    CAPABILITIES.SALARY_SUBMIT,
+  ],
+};
+
 const ROLE_ACCESS: Readonly<Record<AppRole, RoleAccess>> = {
   OWNER: OWNER_ACCESS,
-  FULL_ACCESS: OWNER_ACCESS,
+  FULL_ACCESS: FULL_ACCESS_ACCESS,
   AUDIT: AUDIT_ACCESS,
   OFFICE: OFFICE_ACCESS,
   COLLECTION: COLLECTION_ACCESS,

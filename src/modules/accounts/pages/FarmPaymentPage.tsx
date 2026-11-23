@@ -623,7 +623,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       // Yield once so the animated busy state paints before XLSX work starts.
       await new Promise<void>((resolve) => window.setTimeout(resolve, 40));
       const { exportFarmPaymentsExcel } = await import('../utils/farmPaymentExport');
-      exportFarmPaymentsExcel(exportRows, exportScope);
+      await exportFarmPaymentsExcel(exportRows, exportScope);
       showNotification(`Excel exported for ${exportRows.length} filtered payable row(s).`, 'success');
     } catch (error) {
       console.error('Farm payment Excel export failed:', error);

@@ -370,9 +370,14 @@ export default function PendingCollectionsPage() {
   const handleExportPdf = useCallback(() => {
     void exportPendingCollectionsPdf(filteredData, exportFileName);
   }, [filteredData, exportFileName]);
-  const handleExportExcel = useCallback(() => {
-    exportPendingCollectionsExcel(filteredData, exportFileName);
-  }, [filteredData, exportFileName]);
+  const handleExportExcel = useCallback(async () => {
+    try {
+      await exportPendingCollectionsExcel(filteredData, exportFileName);
+    } catch (error) {
+      console.error("Pending collections Excel export failed:", error);
+      toast.error("Unable to export Excel. Please try again.");
+    }
+  }, [filteredData, exportFileName, toast]);
 
   return (
     <div className="w-full space-y-5 animate-in fade-in duration-500">

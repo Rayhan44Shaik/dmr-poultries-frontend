@@ -4,8 +4,7 @@
 // Minimalist, high-legibility A4 format supporting Box Mode & Weight Mode.
 // Uses the shared branded DMR POULTRIES letterhead (drawDmrPoultryHeader).
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
 import { allocateSavedDeliveryAcrossBoxes } from "./shopPdfAllocation";
 import type { BoxDetail } from "../types/trip";
 import { resolveShopPdfHeader, type ShopPdfEmployeeRef } from "./shopPdfHeader";
@@ -90,7 +89,10 @@ export async function generateShopPDFBlob(
   employeeRef?: ShopPdfEmployeeRef
 ): Promise<Blob> {
   try {
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    // Loaded on demand: the delivery receipt only exists when requested.
+    const { jsPDF: JsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
     doc.setProperties({
       title: "Delivery Receipt",

@@ -17,8 +17,7 @@
  * Telugu) would be the fix, and this is the single place to change.
  */
 
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
 
 import henImage from "../../../../assets/dmr-hen.jpg";
 import {
@@ -144,7 +143,9 @@ function drawFooters(doc: jsPDF, generatedAt: string): void {
 export async function exportCollectionPdf(options: ExportCollectionPdfOptions): Promise<void> {
   const { shopName, recent = [] } = options;
 
-  const doc = createDmrPoultryPdf("portrait");
+  // Loaded on demand: the collection statement is only built on export.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("portrait");
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
 
   const headerBottom = drawPreparedDmrPoultryHeader(

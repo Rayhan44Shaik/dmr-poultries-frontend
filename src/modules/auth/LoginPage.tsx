@@ -88,6 +88,19 @@ export default function LoginPage() {
       return "";
     }
   });
+  // The reset token is a bearer credential: take it out of the address bar
+  // so it cannot leak through browser history, a screenshot, or a shared
+  // URL. It stays in component state for the reset form only.
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has("resetToken")) return;
+      url.searchParams.delete("resetToken");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // address-bar scrubbing is best-effort
+    }
+  }, []);
   // Why are we on the sign-in screen? Read once at mount: "idle" means the
   // 10-minute inactivity logout brought us here, "expired" a dead session.
   const [noticeReason] = useState<"none" | "idle" | "expired" | "password">(() => {

@@ -1,6 +1,5 @@
-import { jsPDF } from "jspdf";
+import type { jsPDF } from "jspdf";
 import { toBusinessDate } from '../../../../utils/businessDate';
-import autoTable from "jspdf-autotable";
 
 import henImage from "../../../../assets/dmr-hen.jpg";
 
@@ -392,7 +391,11 @@ export async function exportBankPdf(
     );
   }
 
-  const doc = new jsPDF({
+  // Loaded on demand so opening the Banks page never downloads jsPDF.
+  const { jsPDF: JsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new JsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",

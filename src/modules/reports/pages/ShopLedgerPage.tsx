@@ -82,10 +82,6 @@ import {
   mapLedgerRowToTx as mapRowToTx,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
-import {
-  generateShopLedgerPDF,
-  prepareShopLedgerPdfAssets,
-} from "../components/ShopLedgerPDF";
 import type {
   LedgerTransaction,
   ShopLedgerCumulativeRow,
@@ -114,6 +110,20 @@ import {
   findShopDetailIndex,
   pageForRowIndex,
 } from "../utils/shopLedgerDetailNav";
+
+type ShopLedgerPdfModule = typeof import("../components/ShopLedgerPDF");
+let shopLedgerPdfModule: Promise<ShopLedgerPdfModule> | null = null;
+
+/** Load jsPDF and the ledger PDF builder only when an export is requested. */
+function loadShopLedgerPdf(): Promise<ShopLedgerPdfModule> {
+  if (!shopLedgerPdfModule) {
+    shopLedgerPdfModule = import("../components/ShopLedgerPDF").catch((error) => {
+      shopLedgerPdfModule = null;
+      throw error;
+    });
+  }
+  return shopLedgerPdfModule;
+}
 
 interface ShopLedgerProps {
   embedded?: boolean;
@@ -1230,7 +1240,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   useEffect(() => {
     const warm = () => {
       prefetchPdfJs();
-      void prepareShopLedgerPdfAssets().catch(() => undefined);
+      void loadShopLedgerPdf()
+        .then(({ prepareShopLedgerPdfAssets }) => prepareShopLedgerPdfAssets())
+        .catch(() => undefined);
     };
     const id = window.setTimeout(warm, 500);
     return () => window.clearTimeout(id);
@@ -1424,6 +1436,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         );
         const ledger = scoped?.data ?? rawLedger;
         const master = shopMasterMap.get(shop);
+        const { prepareShopLedgerPdfAssets, generateShopLedgerPDF } = await loadShopLedgerPdf();
         const assets = await prepareShopLedgerPdfAssets();
         const generated = await generateShopLedgerPDF(
           [
@@ -1576,6 +1589,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
     const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
+    const { prepareShopLedgerPdfAssets, generateShopLedgerPDF } = await loadShopLedgerPdf();
     const assets = await prepareShopLedgerPdfAssets();
     const generated = await generateShopLedgerPDF(
       ledgers,
@@ -2052,6 +2066,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         const ledger =
           (await getCachedLedger(waDateFrom, waDateTo, shop)) ?? [];
         const master = shopMasterMap.get(shop);
+        const { generateShopLedgerPDF } = await loadShopLedgerPdf();
         const generated = await generateShopLedgerPDF(
           [
             {
@@ -2210,6 +2225,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     let failedCount = 0;
 
     try {
+      const { generateShopLedgerPDF } = await loadShopLedgerPdf();
       for (const shop of pendingTargets) {
         setWaSendingShop(shop);
         try {

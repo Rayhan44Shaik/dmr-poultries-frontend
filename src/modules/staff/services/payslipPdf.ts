@@ -31,7 +31,7 @@ export async function generatePayslipPdf(
   record: SalaryRecord,
   mode: "download" | "preview" = "download"
 ): Promise<PayslipPdfResult> {
-  const { doc, fileName } = drawPayslipPdf(record);
+  const { doc, fileName } = await drawPayslipPdf(record);
 
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
@@ -61,7 +61,7 @@ export async function generateCombinedPayslipPdf(
   mode: "download" | "preview" = "download"
 ): Promise<PayslipPdfResult> {
   if (records.length === 0) throw new Error("No salary records to combine");
-  const { doc, fileName } = drawCombinedPayslipsPdf(records);
+  const { doc, fileName } = await drawCombinedPayslipsPdf(records);
 
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);

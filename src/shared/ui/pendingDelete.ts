@@ -16,8 +16,13 @@ export function pendingDeleteBarPercent(
 }
 
 export function pendingDeleteCountdownLabel(secondsLeft: number): string {
+  // The controller commits at one second, so zero is only a transient clamp;
+  // never render the ungrammatical "0 seconds" / "1 seconds".
   const seconds = Math.max(secondsLeft, 1);
-  return translate("pendingDelete.countdown", { seconds });
+  return translate(
+    seconds === 1 ? "pendingDelete.countdown_one" : "pendingDelete.countdown_many",
+    { seconds },
+  );
 }
 
 export type PendingDeleteSnapshot<TId extends string | number> = {
