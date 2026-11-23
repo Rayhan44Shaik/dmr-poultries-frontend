@@ -49,7 +49,7 @@ const record = {
   correctionWindowDaysRemaining: 12,
 };
 
-const { doc, fileName } = drawPayslipPdf(record);
+const { doc, fileName } = await drawPayslipPdf(record);
 
 // ── Page geometry ─────────────────────────────────────────────────────────
 const pages = doc.getNumberOfPages();
@@ -115,7 +115,7 @@ const second = {
   employeeName: "Lakshmi Devi",
   netSalary: 22100,
 };
-const combined = drawCombinedPayslipsPdf([record, second, { ...record, id: "sal-3", employeeId: 9, employeeName: "Suresh Babu" }]);
+const combined = await drawCombinedPayslipsPdf([record, second, { ...record, id: "sal-3", employeeId: 9, employeeName: "Suresh Babu" }]);
 assert.equal(combined.doc.getNumberOfPages(), 3, "combined PDF: one page per employee");
 assert.equal(
   combined.fileName,

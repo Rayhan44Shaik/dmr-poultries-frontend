@@ -23,7 +23,6 @@
 //                                    note + generated-on date
 
 import type { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
 import {
   createDmrPoultryPdf,
   DMR_POULTRY_DETAILS,
@@ -135,11 +134,14 @@ export type PayslipPdfDocument = {
  *                CURRENT page (pass a doc + addPage() between employees to
  *                compose one combined file for the whole register)
  */
-export function drawPayslipPdf(
+export async function drawPayslipPdf(
   record: SalaryRecord,
   target?: jsPDF
-): PayslipPdfDocument {
-  const doc = target ?? createDmrPoultryPdf("portrait");
+): Promise<PayslipPdfDocument> {
+  // Loaded on demand: the payslip is only rendered when the user opens or
+  // downloads it, never when the salary register page is opened.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = target ?? (await createDmrPoultryPdf("portrait"));
   if (!target) {
     doc.setProperties({
       title: `Payslip — ${record.employeeName} — ${record.month}`,
@@ -460,13 +462,13 @@ export function drawPayslipPdf(
  *
  * @param records  the salary rows to include (in register order)
  */
-export function drawCombinedPayslipsPdf(
+export async function drawCombinedPayslipsPdf(
   records: SalaryRecord[]
-): PayslipPdfDocument {
+): Promise<PayslipPdfDocument> {
   const [first] = records;
   if (!first) throw new Error("drawCombinedPayslipsPdf requires at least one record");
 
-  const doc = createDmrPoultryPdf("portrait");
+  const doc = await createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `Payslips — ${first.month} — ${records.length} employees`,
     subject: "DMR POULTRIES salary payslips",
@@ -474,10 +476,12 @@ export function drawCombinedPayslipsPdf(
     creator: "DMR POULTRIES",
   });
 
-  records.forEach((record, index) => {
+  // Sequential on purpose: each payslip draws onto the current page, so
+  // awaiting keeps the register order and the one-page-per-employee layout.
+  for (const [index, record] of records.entries()) {
     if (index > 0) doc.addPage();
-    drawPayslipPdf(record, doc);
-  });
+    await drawPayslipPdf(record, doc);
+  }
 
   const fileName = `DMR-Poultries-Payslips-${first.month}-${records.length}-employees.pdf`;
   return { doc, fileName };

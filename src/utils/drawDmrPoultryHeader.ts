@@ -1,4 +1,4 @@
-import { jsPDF } from "jspdf";
+import type { jsPDF } from "jspdf";
 
 type RGB = [number, number, number];
 
@@ -57,12 +57,16 @@ const MUTED: RGB = [110, 118, 132];
 
 /**
  * Creates a compressed ISO A4 PDF using millimetres.
+ *
+ * jsPDF is loaded on demand: every page that can draw a PDF imports this
+ * helper, so a static import would put the library in page-opening payloads.
  */
-export function createDmrPoultryPdf(
+export async function createDmrPoultryPdf(
   orientation:
     DmrPdfOrientation = "portrait",
-): jsPDF {
-  return new jsPDF({
+): Promise<jsPDF> {
+  const { jsPDF: JsPDF } = await import("jspdf");
+  return new JsPDF({
     orientation,
     unit: "mm",
     format: "a4",

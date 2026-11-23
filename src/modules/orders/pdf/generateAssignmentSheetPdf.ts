@@ -8,7 +8,6 @@
 // weight / shop mobile). Reuses the existing header assets and the autoTable
 // grid conventions, so it looks native to the ERP.
 
-import autoTable from "jspdf-autotable";
 import type { Trip } from "../../../shared/trip";
 import henImage from "../../../assets/dmr-hen.jpg";
 import {
@@ -98,7 +97,9 @@ export async function generateAssignmentSheetPdf({
     await ensureTeluguWebFont();
   }
 
-  const doc = createDmrPoultryPdf("portrait");
+  // Loaded on demand: the orders board opens without the PDF libraries.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — DMR POULTRIES`,
     subject: "DMR POULTRIES shop assignment sheet",

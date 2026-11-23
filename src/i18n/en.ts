@@ -814,6 +814,7 @@ export default {
   'settings.access_pw_age_today': 'Today',
   'settings.access_pw_reveal': 'View password (owner only)',
   'settings.access_pw_hide': 'Hide password',
+  'settings.access_password_not_stored': 'Not stored — use Reset Password to issue a new one-time password.',
   'settings.access_reveal_title': 'View employee password',
   'settings.access_reveal_note': "Enter your own login password to view {name}'s password. Viewing is read-only: it shows the temporary password issued at grant or reset and changes nothing. If {name} already set a private password, use Reset Password to issue a new one.",
   'settings.access_reveal_prompt': 'Enter your login password',

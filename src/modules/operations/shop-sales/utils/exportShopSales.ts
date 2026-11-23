@@ -1,6 +1,4 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import * as XLSX from "xlsx";
+import type { jsPDF } from "jspdf";
 import type { ShopSale, ShopSaleSummary } from "../types/shopSale";
 import { formatShopWithSubShop } from "../../vehicle-trips/utils/shopDisplayName";
 import { drawPreparedDmrPoultryHeader, prepareDmrPoultryHeaderAssets } from "../../../../utils/drawDmrPoultryHeader";
@@ -47,7 +45,10 @@ function kpis(sales: ShopSale[], summary: ShopSaleSummary, includeMortality = tr
 }
 
 export async function exportShopSalesPdf(sales: ShopSale[], summary: ShopSaleSummary, filename: string): Promise<void> {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  // Loaded on demand: the sales register opens without the export libraries.
+  const { default: JsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = new JsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
   // The Shop Sales PDF is intentionally financial-only: mortality remains in
   // the interactive view, but the document contains exactly the requested
@@ -102,7 +103,8 @@ export async function exportShopSalesPdf(sales: ShopSale[], summary: ShopSaleSum
   doc.save(`${filename}.pdf`);
 }
 
-export function exportShopSalesExcel(sales: ShopSale[], summary: ShopSaleSummary, filename: string): void {
+export async function exportShopSalesExcel(sales: ShopSale[], summary: ShopSaleSummary, filename: string): Promise<void> {
+  const XLSX = await import("xlsx");
   const { headers, rows } = matrix(sales);
   const [kpiHeaders, kpiValues] = kpis(sales, summary);
   const worksheet = XLSX.utils.aoa_to_sheet([

@@ -5,7 +5,7 @@
  *  - sequential per-row create helper for masters without a bulk endpoint
  */
 
-import * as XLSX from "xlsx";
+import type { WorkBook } from "xlsx";
 import type {
   BulkImportColumn,
   BulkImportConfig,
@@ -29,6 +29,8 @@ export async function downloadImportTemplate<T, E = T>(
   const templateRows = templateRecords.map((record) =>
     config.columns.map((column) => record[column.key] ?? ""),
   );
+  // Loaded on demand: opening a master page never downloads the sheet library.
+  const XLSX = await import("xlsx");
   const worksheet = XLSX.utils.aoa_to_sheet([headers, ...templateRows]);
   worksheet["!cols"] = config.columns.map((column) => ({
     wch: column.key === "Shop Name" ? 38 : 22,
@@ -125,7 +127,9 @@ export async function parseImportFile<T, E = T>(
     parseError: null,
   };
 
-  let workbook: XLSX.WorkBook;
+  // Loaded on demand: parsing only happens after the user picks a file.
+  const XLSX = await import("xlsx");
+  let workbook: WorkBook;
   try {
     if (
       !/\.(xlsx|xls|csv)$/i.test(file.name) ||

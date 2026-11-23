@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { BoxDetail } from "../types/trip";
 import { loadPdfJs } from "../../../reports/components/pdfJsLoader";
 
@@ -118,6 +117,8 @@ export function parsePickupRows(rows: unknown[][]): PickupImportResult {
 export async function parsePickupImport(file: File): Promise<PickupImportResult> {
   const lower = file.name.toLowerCase();
   if (/\.xlsx?$/.test(lower)) {
+    // Loaded on demand: opening a trip never downloads the sheet library.
+    const XLSX = await import("xlsx");
     const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     return parsePickupRows(XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: false }));

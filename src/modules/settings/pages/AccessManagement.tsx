@@ -3,8 +3,6 @@ import {
   Ban as BanIcon,
   AlertTriangle,
   Copy,
-  Eye,
-  EyeOff,
   History,
   History as HistoryColor,
   KeyRound,
@@ -21,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import { apiClient } from "../../../api/client";
-import { handleApiError } from "../../../api/errors";
 import { useAuth } from "../../../providers/authContext";
 import { useI18n } from "../../../i18n";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
@@ -297,15 +294,6 @@ export default function AccessManagement() {
 
   const [dialog, setDialog] = useState<DialogState>(null);
   const [history, setHistory] = useState<HistoryRow[]>([]);
-  /** Rows whose masked password is revealed — OWNER/FULL_ACCESS only, one row at a time. */
-  /** Employee password revealed after the owner re-authenticated — id → secret. */
-  const [revealed, setRevealed] = useState<number | null>(null);
-  const [revealedSecret, setRevealedSecret] = useState("");
-  /** Owner re-authentication popup: { row } while asking for login password. */
-  const [revealAsk, setRevealAsk] = useState<{ row: AccessRow } | null>(null);
-  const [actorPassword, setActorPassword] = useState("");
-  const [revealInputReady, setRevealInputReady] = useState(false);
-  const [revealBusy, setRevealBusy] = useState(false);
   const [eligible, setEligible] = useState<HistoryRow[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState("");
   const [employeeQuery, setEmployeeQuery] = useState("");
@@ -421,47 +409,6 @@ export default function AccessManagement() {
   const close = () => {
     setSecret("");
     setDialog(null);
-    setRevealAsk(null);
-    setActorPassword("");
-    setRevealInputReady(false);
-  };
-
-  /** Revealed passwords hide themselves after 10 seconds — the owner had
-   *  their moment to read/copy it; the secret never lingers on screen. */
-  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startRevealHideTimer = useCallback(() => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-    hideTimer.current = setTimeout(() => {
-      setRevealed(null);
-      setRevealedSecret("");
-      hideTimer.current = null;
-    }, 10_000);
-  }, []);
-  useEffect(() => () => {
-    if (hideTimer.current) clearTimeout(hideTimer.current);
-  }, []);
-
-  /** Verify the manager's login password server-side, then reveal only a
-   *  manager-issued temporary password. This operation is strictly read-only. */
-  const revealPassword = async () => {
-    const row = revealAsk?.row;
-    if (!row?.user_id || !actorPassword) return;
-    setRevealBusy(true);
-    try {
-      const { data } = await apiClient.post(`/access-management/${row.user_id}/reveal-password`, {
-        actorPassword,
-      });
-      setRevealed(row.employee_id);
-      setRevealedSecret(String(data.password ?? ""));
-      setRevealAsk(null);
-      setActorPassword("");
-      startRevealHideTimer();
-      await load();
-    } catch (cause) {
-      showNotification(handleApiError(cause) || t("settings.access_reveal_failed"), "error");
-    } finally {
-      setRevealBusy(false);
-    }
   };
 
   const filterSelects = [
@@ -668,45 +615,13 @@ export default function AccessManagement() {
                     </td>
                     <td className="px-3 text-center align-middle font-medium text-slate-600">{row.username ?? "—"}</td>
 
-                    {/* Password column: mask + gated eye, centred. Revealing
-                        requires the manager to re-enter their own login password
-                        (backend-verified); it is strictly read-only — it shows
-                        the stored temporary password and never rotates it. */}
+                    {/* Passwords are one-way credentials. A temporary password
+                        is shown once at grant/reset and is never persisted for
+                        later retrieval. */}
                     <td className="px-3 align-middle">
-                      <div className="flex items-center justify-center gap-2">
-                        <span
-                          className={`inline-block max-w-[220px] rounded font-mono transition-all duration-200 select-all ${
-                            revealed === row.employee_id
-                              ? "break-all bg-rose-50 px-2 py-0.5 text-[13px] font-bold text-rose-600 ring-1 ring-rose-200"
-                              : "px-0.5 text-[11px] tracking-widest text-slate-400"
-                          }`}
-                        >
-                          {revealed === row.employee_id ? revealedSecret || "••••••••" : "••••••••"}
-                        </span>
-                        {revealed === row.employee_id && revealedSecret && (
-                          <CopyPasswordButton value={revealedSecret} label={t("settings.access_copy_password")} />
-                        )}
-                        {rowActions(row, editable, user?.role) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (revealed === row.employee_id) {
-                                setRevealed(null);
-                                setRevealedSecret("");
-                              } else {
-                                setRevealAsk({ row });
-                                setActorPassword("");
-                              }
-                            }}
-                            className={`group relative rounded p-1 transition hover:bg-slate-100 ${
-                              revealed === row.employee_id ? "text-rose-500" : "text-slate-400 hover:text-slate-600"
-                            }`}
-                          >
-                            {revealed === row.employee_id ? <EyeOff size={14} /> : <Eye size={14} />}
-                            <ActionTooltip label={revealed === row.employee_id ? t("settings.access_pw_hide") : t("settings.access_pw_reveal")} side="top" className="whitespace-nowrap" />
-                          </button>
-                        )}
-                      </div>
+                      <p className="mx-auto max-w-[220px] text-center text-[11px] leading-snug text-slate-400">
+                        {t("settings.access_password_not_stored")}
+                      </p>
                     </td>
 
                     <td className="px-3 text-center align-middle">
@@ -803,15 +718,13 @@ export default function AccessManagement() {
       </div>
 
       <Modal
-        open={dialog !== null || revealAsk !== null}
+        open={dialog !== null}
         onClose={close}
         size={dialog?.kind?.includes("history") ? "xl" : "md"}
         overlayClassName="backdrop-blur-none"
         closeButtonClassName="text-rose-500 hover:bg-rose-50 hover:text-rose-600"
         title={
-          revealAsk ? (
-            <span className="inline-flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-rose-50 text-rose-500"><Eye size={17} strokeWidth={2.4} /></span>{t("settings.access_reveal_title")}</span>
-          ) : dialog?.kind === "grant"
+          dialog?.kind === "grant"
             ? <span className="inline-flex items-center gap-2"><span className="grid size-8 place-items-center rounded-lg bg-emerald-50 text-emerald-600"><UserCheck size={17} strokeWidth={2.4} /></span>{t("settings.access_grant")}</span>
             : dialog?.kind === "secret"
               ? t("settings.access_temp_password")
@@ -823,7 +736,7 @@ export default function AccessManagement() {
                   ? `${dialog.kind[0].toUpperCase()}${dialog.kind.slice(1)} ${t("settings.access_col_access_status")}`
                   : ""
         }
-        description={revealAsk ? revealAsk.row.employee_name : dialog?.row?.employee_name}
+        description={dialog?.row?.employee_name}
       >
         {dialog?.kind === "grant" ? (
           <div className="space-y-4">
@@ -904,65 +817,6 @@ export default function AccessManagement() {
             <div className="mt-3 flex items-center gap-2 rounded-lg bg-slate-100 p-3 font-mono text-sm">
               <span className="flex-1 break-all">{secret}</span>
               <CopyPasswordButton value={secret} label={t("settings.access_copy_password")} />
-            </div>
-          </div>
-        ) : revealAsk ? (
-          /* Owner re-authentication — viewing an employee's password requires
-             the owner's own login password, verified server-side. */
-          <div>
-            <div className="flex items-start gap-3.5 rounded-xl border border-rose-100 bg-gradient-to-br from-rose-50/70 via-white to-white px-4 py-4">
-              <div className="mt-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full border border-rose-100 bg-white text-rose-500 shadow-sm">
-                <KeyRound size={20} strokeWidth={2.1} aria-hidden />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">{t("settings.access_reveal_title")}</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-600">
-                  {t("settings.access_reveal_note", { name: revealAsk.row.employee_name })}
-                </p>
-              </div>
-            </div>
-            <div className="mt-4">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-700" htmlFor="owner-actor-password">
-                {t("settings.access_reveal_prompt")}
-              </label>
-              <input
-                id="owner-actor-password"
-                name="dmr-owner-password-verification"
-                type="password"
-                autoComplete="new-password"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                data-form-type="other"
-                readOnly={!revealInputReady}
-                value={actorPassword}
-                onChange={(event) => setActorPassword(event.target.value)}
-                onFocus={() => setRevealInputReady(true)}
-                onPointerDown={() => setRevealInputReady(true)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && actorPassword && !revealBusy) void revealPassword();
-                }}
-                autoFocus
-                className={`${opsInputClass} w-full`}
-              />
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={close}
-                className="group inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 hover:shadow-md active:translate-y-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/50"
-              >
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={15} strokeWidth={2.4} /></span>
-                {t("common.cancel")}
-              </button>
-              <button
-                type="button"
-                disabled={!actorPassword || revealBusy}
-                onClick={() => void revealPassword()}
-                className="group relative inline-flex min-h-10 items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-rose-500 to-red-600 px-5 py-2 text-xs font-bold text-white shadow-md shadow-rose-500/25 transition-all duration-200 before:absolute before:inset-0 before:-translate-x-full before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent before:transition-transform before:duration-500 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-rose-500/40 hover:before:translate-x-full active:translate-y-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:from-slate-300 disabled:to-slate-300 disabled:shadow-none disabled:hover:translate-y-0"
-              >
-                <span className="relative z-10 inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Eye size={14} strokeWidth={2.4} /></span>
-                <span className="relative z-10">{t("settings.access_reveal_confirm")}</span>
-              </button>
             </div>
           </div>
         ) : dialog?.kind?.includes("history") ? (

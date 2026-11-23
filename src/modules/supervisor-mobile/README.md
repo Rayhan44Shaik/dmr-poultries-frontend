@@ -1,30 +1,21 @@
-# Supervisor Mobile Trip Entry — Phase 2
+# Supervisor Mobile Trip Entry — disabled in this release
 
-This application area is isolated at `/mobile/trips`. It imports the existing Step 1–5 presentation and validation components but does not use the existing ERP authentication or unprotected Trip endpoints.
+Supervisor Mobile is **not part of the current production release**.
 
-## Runtime path
+- The frontend `/mobile` and `/mobile/trips` routes redirect to `/operations`.
+- The backend mounts no `/mobile` router and issues no mobile Bearer token.
+- Desktop authentication is HttpOnly-cookie-only and must not be mixed with a
+  mobile token flow.
+- The module source remains for a future, separately approved release. It is
+  not reachable from navigation and is not loaded by the route table.
 
-```text
-Supervisor Mobile PWA
-  → IndexedDB working copy + durable operation queue
-  → VITE_MOBILE_API_BASE_URL (HTTPS in production)
-  → /api/mobile authenticated namespace
-  → existing backend Trip service
-  → PostgreSQL transaction
-```
+Re-enabling it requires a complete design decision covering:
 
-## Production configuration
+1. A dedicated `/api/mobile` backend router and Supervisor-only role checks.
+2. A separate Bearer-token lifecycle (issue, refresh/expiry, revoke, logout).
+3. Mobile-safe storage and transport, plus rate limiting.
+4. Full login, MFA, session-expiry, revocation and cross-role-denial tests.
+5. Cloudflare Pages proxy compatibility for the Bearer flow.
 
-```env
-VITE_MOBILE_API_BASE_URL=/api/mobile
-```
-
-Use a same-origin HTTPS reverse proxy path where possible. An absolute URL is accepted only when it is HTTPS. Never configure a deployed phone with `localhost` or a PostgreSQL address.
-
-Local development login (created on first sign-in after `npm run db:migrate` in `backend`):
-
-- Username: `RuhullaShaik`
-- Password: `Supervisor@123`
-- URL: `http://localhost:5173/mobile` or `http://localhost:5173/mobile/trips`
-
-The queue retains `PENDING`, `SYNCING`, retryable failure, conflict, and permanent-failure records until an authoritative operation acknowledgement is durably recorded. A request retried after a response loss reuses the same UUID.
+Do not expose `/api/mobile/*` or issue mobile tokens until those requirements
+are implemented and verified.

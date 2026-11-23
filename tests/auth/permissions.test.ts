@@ -99,4 +99,31 @@ describe("OFFICE / COLLECTION / AUDIT / FULL_ACCESS",()=>{
   test("Collection sees trips, orders and collections only",()=>{assert.equal(canAccessLocation("COLLECTION","/operations","?tab=trip-list"),true);assert.equal(canAccessLocation("COLLECTION","/operations/orders/collection"),true);assert.equal(canAccessLocation("COLLECTION","/fleet","?tab=entry"),false)});
   test("Audit sees business pages and Profile, but not Access Management",()=>{assert.equal(canAccessLocation("AUDIT","/reports"),true);assert.equal(canAccessLocation("AUDIT","/settings","?tab=profile"),true);assert.equal(canAccessLocation("AUDIT","/settings","?tab=access"),false)});
   test("Full Access sees business settings",()=>assert.equal(canAccessLocation("FULL_ACCESS","/settings"),true));
+  test("salary generation and submission are Owner / Full Access only",()=>{
+    for (const role of ["OWNER", "FULL_ACCESS"] as const) {
+      assert.equal(hasCapability(role, CAPABILITIES.SALARY_GENERATE), true, role);
+      assert.equal(hasCapability(role, CAPABILITIES.SALARY_SUBMIT), true, role);
+    }
+    for (const role of ["OFFICE", "COLLECTION", "SUPERVISOR", "AUDIT"] as const) {
+      assert.equal(hasCapability(role, CAPABILITIES.SALARY_GENERATE), false, role);
+      assert.equal(hasCapability(role, CAPABILITIES.SALARY_SUBMIT), false, role);
+    }
+  });
+  test("Full Access has no owner-only financial/destructive capability",()=>{
+    const ownerOnly = [
+      CAPABILITIES.TRIP_DELETE,
+      CAPABILITIES.COLLECTION_APPROVE,
+      CAPABILITIES.COLLECTION_REJECT,
+      CAPABILITIES.COLLECTION_DELETE,
+      CAPABILITIES.FUEL_APPROVE,
+      CAPABILITIES.FUEL_DELETE,
+      CAPABILITIES.MAINTENANCE_APPROVE,
+      CAPABILITIES.MAINTENANCE_DELETE,
+    ];
+    for (const cap of ownerOnly) assert.equal(hasCapability("FULL_ACCESS", cap), false, cap);
+    // Staff HR approvals remain intentionally delegated to FULL_ACCESS.
+    assert.equal(hasCapability("FULL_ACCESS", CAPABILITIES.LEAVE_APPROVE), true);
+    assert.equal(hasCapability("FULL_ACCESS", CAPABILITIES.LEAVE_DELETE), true);
+    assert.equal(hasCapability("FULL_ACCESS", CAPABILITIES.DUTY_DELETE), true);
+  });
 });

@@ -6,19 +6,16 @@
 // key metrics, GPS coordinates with Google Maps Location URL, receipt slip,
 // and the vehicle's complete fuel history table.
 
-import jsPDF from "jspdf";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import type { FuelExpense } from "../types/fuelExpense";
 import { googleMapsUrl, resolveFuelGps } from "./fuelGps";
+import { escapeHtml as esc } from "../../../../utils/escapeHtml";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
 const inr = (value: number) =>
   `Rs. ${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const esc = (v: string | number | null | undefined) =>
-  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const BRAND_GREEN = "#0d7a3f";
 const INK = "#0f172a";
@@ -228,7 +225,9 @@ export async function generateFuelPdf(
       useCORS: true,
     });
 
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    // jsPDF is only needed once the DOM sheet has been captured.
+    const { default: JsPDF } = await import("jspdf");
+    const pdf = new JsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
 

@@ -809,6 +809,7 @@ export default {
   'settings.access_pw_age_today': 'ఈ రోజు',
   'settings.access_pw_reveal': 'పాస్‌వర్డ్ చూడండి (ఓనర్ మాత్రమే)',
   'settings.access_pw_hide': 'పాస్‌వర్డ్ దాచు',
+  'settings.access_password_not_stored': 'నిల్వ చేయబడదు — కొత్త వన్-టైమ్ పాస్‌వర్డ్ కోసం Reset Password ఉపయోగించండి.',
   'settings.access_reveal_title': 'ఉద్యోగి పాస్‌వర్డ్ చూడండి',
   'settings.access_reveal_note': "{name} పాస్‌వర్డ్ చూడటానికి మీ సొంత లాగిన్ పాస్‌వర్డ్ నమోదు చేయండి. ఇది కేవలం చూడటం మాత్రమే — జారీ చేసిన తాత్కాలిక పాస్‌వర్డ్ మాత్రమే కనిపిస్తుంది, ఎలాంటి మార్పు ఉండదు. {name} ఇప్పటికే సొంత పాస్‌వర్డ్ ఎంచుకుంటే, కొత్త పాస్‌వర్డ్ జారీ చేయడానికి 'పాస్‌వర్డ్ రీసెట్' ఉపయోగించండి.",
   'settings.access_reveal_prompt': 'మీ లాగిన్ పాస్‌వర్డ్ నమోదు చేయండి',

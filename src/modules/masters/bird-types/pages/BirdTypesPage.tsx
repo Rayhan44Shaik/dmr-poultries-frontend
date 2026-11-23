@@ -88,7 +88,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
       const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
 
       try {
-        exportBirdTypesToPDF(filteredBirdTypes, filename);
+        await exportBirdTypesToPDF(filteredBirdTypes, filename);
 
         logAuditEvent("EXPORT_PDF", "BirdTypes", undefined, {
           count: filteredBirdTypes.length,

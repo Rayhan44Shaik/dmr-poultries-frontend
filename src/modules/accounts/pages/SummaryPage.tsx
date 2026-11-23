@@ -4,6 +4,7 @@ import './SummaryPage.css';
 import { analysisWeeks } from '../utils/analysisWeeks';
 import { parseBusinessDate } from '../../../utils/businessDate';
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import {
   Download,
   ChevronLeft,
@@ -316,6 +317,7 @@ type PeriodId = (typeof PERIOD_TABS)[number]['id'];
 type SummaryPageProps = { embedded?: boolean };
 
 export default function SummaryPage({ embedded = false }: SummaryPageProps) {
+  const { showNotification } = useSafeNotification();
   const [period, setPeriod] = useState<PeriodId>('week');
   const [customEditorOpen, setCustomEditorOpen] = useState(false);
   const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
@@ -962,18 +964,28 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     setTripViewerOpen(false);
   }, []);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (dataLoading || !hasLoaded) return;
     const title = getReportTitle();
     const dateRange = getDateRangeLabel();
-    exportPDF(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses, { totalDistanceKm });
+    try {
+      await exportPDF(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses, { totalDistanceKm });
+    } catch (error) {
+      console.error('Business summary PDF export failed:', error);
+      showNotification('Unable to export PDF. Please try again.', 'error');
+    }
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (dataLoading || !hasLoaded) return;
     const title = getReportTitle();
     const dateRange = getDateRangeLabel();
-    exportExcel(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses);
+    try {
+      await exportExcel(title, dateRange, weeklyGroups, weeklyMetrics, weeklyExpenses, totalMetrics, totalExpenses);
+    } catch (error) {
+      console.error('Business summary Excel export failed:', error);
+      showNotification('Unable to export Excel. Please try again.', 'error');
+    }
   };
 
   // Comparison shows up as the Previous columns inside the tables themselves —

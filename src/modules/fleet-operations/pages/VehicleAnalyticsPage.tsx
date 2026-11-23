@@ -1,6 +1,4 @@
 import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import * as XLSX from 'xlsx';
-import autoTable from 'jspdf-autotable';
 import type { jsPDF } from 'jspdf';
 import { useI18n } from '../../../i18n';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
@@ -380,7 +378,7 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
     [fromDate, toDate]
   );
 
-  const exportExcel = useCallback(() => {
+  const exportExcel = useCallback(async () => {
     if (!hasAnyData) {
       showNotification(t('fleet.analytics.no_data'), 'error');
       return;
@@ -401,6 +399,8 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         [t('fleet.analytics.table_maint_cost')]: inr(row.maintenanceCost),
         [t('fleet.analytics.table_total_cost')]: inr(row.totalExpense),
       }));
+      // Loaded on demand: the analytics page opens without the exporters.
+      const XLSX = await import('xlsx');
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Summary');
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), 'Vehicles');
@@ -427,7 +427,8 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
       const num = (v: number) => new Intl.NumberFormat('en-IN').format(Math.round(v || 0));
 
-      const doc: jsPDF = createDmrPoultryPdf('portrait');
+      const { default: autoTable } = await import('jspdf-autotable');
+      const doc: jsPDF = await createDmrPoultryPdf('portrait');
       doc.setProperties({
         title: 'Vehicle Analytics',
         subject: 'DMR POULTRIES vehicle analytics',

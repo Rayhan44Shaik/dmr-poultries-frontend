@@ -1,6 +1,8 @@
 // src/modules/auth/ResetPasswordPage.tsx
-// Reset completion: consumes the single-use token from the reset link (?token=
-// or pasted). Never signs in automatically — the user signs in afterwards.
+// Reset completion: consumes the single-use token from the reset link
+// (?resetToken=) or a pasted value. A token that arrived in the link is never
+// rendered — only a neutral "link loaded" state. Never signs in
+// automatically; the user signs in afterwards.
 import { useState, type FormEvent } from "react";
 import { AlertCircle, CheckCircle2, KeyRound, Lock } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
@@ -78,28 +80,38 @@ export default function ResetPasswordPage({
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
-              <div>
-                <label htmlFor="reset-token" className="mb-1 block text-xs font-semibold text-slate-600">
-                  {t("auth.reset.token")}
-                </label>
-                <div className="relative">
-                  <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="reset-token"
-                    type="text"
-                    value={token}
-                    onChange={(e) => {
-                      setToken(e.target.value);
-                      if (fieldErrors.token) setFieldErrors((prev) => ({ ...prev, token: undefined }));
-                    }}
-                    autoComplete="off"
-                    spellCheck={false}
-                    className={inputClass}
-                    placeholder={t("auth.reset.token_placeholder")}
-                  />
+              {initialToken ? (
+                <div
+                  role="status"
+                  className="flex items-start gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-slate-600"
+                >
+                  <KeyRound size={14} className="mt-0.5 shrink-0 text-slate-400" />
+                  {t("auth.reset.token_loaded")}
                 </div>
-                {fieldErrors.token && <p className="mt-1 text-xs font-medium text-rose-600">{fieldErrors.token}</p>}
-              </div>
+              ) : (
+                <div>
+                  <label htmlFor="reset-token" className="mb-1 block text-xs font-semibold text-slate-600">
+                    {t("auth.reset.token")}
+                  </label>
+                  <div className="relative">
+                    <KeyRound size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      id="reset-token"
+                      type="text"
+                      value={token}
+                      onChange={(e) => {
+                        setToken(e.target.value);
+                        if (fieldErrors.token) setFieldErrors((prev) => ({ ...prev, token: undefined }));
+                      }}
+                      autoComplete="off"
+                      spellCheck={false}
+                      className={inputClass}
+                      placeholder={t("auth.reset.token_placeholder")}
+                    />
+                  </div>
+                  {fieldErrors.token && <p className="mt-1 text-xs font-medium text-rose-600">{fieldErrors.token}</p>}
+                </div>
+              )}
               <div>
                 <label htmlFor="reset-password" className="mb-1 block text-xs font-semibold text-slate-600">
                   {t("auth.reset.new_password")}

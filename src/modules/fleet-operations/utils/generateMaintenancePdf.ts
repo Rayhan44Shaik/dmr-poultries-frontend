@@ -7,10 +7,10 @@
 // two-pair-per-column grid, the parts bill, the total band and the vehicle's
 // complete maintenance history.
 
-import jsPDF from "jspdf";
 import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
 import { localizeMaintenanceText, localizeMaintenanceName } from "./maintenanceLocalization";
 import type { MaintenanceEvent } from "../types";
+import { escapeHtml as esc } from "../../../utils/escapeHtml";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -22,9 +22,6 @@ const statusLabel = (row: MaintenanceEvent, t: Translate) => {
   if (row.paymentStatus === "approved") return t("status.approved");
   return t("status.pending");
 };
-
-const esc = (v: string) =>
-  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const BRAND_GREEN = "#0d7a3f";
 const INK = "#0f172a";
@@ -207,7 +204,9 @@ export async function generateMaintenancePdf(
     // Fonts/images inside the sheet need a beat to lay out before capture.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
     const canvas = await html2canvas(sheet, { scale: 2, backgroundColor: "#ffffff", logging: false, useCORS: true });
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    // jsPDF is only needed once the DOM sheet has been captured.
+    const { default: JsPDF } = await import("jspdf");
+    const pdf = new JsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
 

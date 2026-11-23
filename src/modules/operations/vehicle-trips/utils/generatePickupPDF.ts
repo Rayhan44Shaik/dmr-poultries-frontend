@@ -6,7 +6,6 @@
 // below the box table. Long box lists flow onto additional pages without
 // cutting rows.
 
-import autoTable from "jspdf-autotable";
 import type { Trip } from "../types/trip";
 import henImage from "../../../../assets/dmr-hen.jpg";
 import {
@@ -55,7 +54,9 @@ export async function generatePickupReportPDF(
   trip: Trip,
   options: PickupReportOptions = {}
 ): Promise<void> {
-  const doc = createDmrPoultryPdf("portrait");
+  // Loaded on demand: opening a trip never downloads the PDF libraries.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — Pickup Report`,
     subject: "DMR POULTRIES pickup report",

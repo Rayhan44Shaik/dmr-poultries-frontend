@@ -25,8 +25,6 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
-import * as XLSX from "xlsx";
-import autoTable from "jspdf-autotable";
 import type { jsPDF } from "jspdf";
 import {
   createDmrPoultryPdf,
@@ -401,12 +399,14 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     return `Collection_Report_${dateStr}.${ext}`;
   }, [report]);
 
-  const exportExcel = useCallback(() => {
+  const exportExcel = useCallback(async () => {
     if (!report || report.totalCount === 0) {
       showNotification(t("ops.collection.no_data_export"), "error");
       return;
     }
     try {
+      // Loaded on demand: the report page opens without the exporters.
+      const XLSX = await import("xlsx");
       const wb = XLSX.utils.book_new();
 
       const pmData = paymentModeSummary.map((row) => ({
@@ -459,7 +459,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
 
       // A4 portrait with the shared branded letterhead (proprietor block,
       // centred DMR POULTRIES wordmark, hen mark, decorative divider).
-      const doc: jsPDF = createDmrPoultryPdf("portrait");
+      const { default: autoTable } = await import("jspdf-autotable");
+      const doc: jsPDF = await createDmrPoultryPdf("portrait");
       doc.setProperties({
         title: "Collection Report",
         subject: "DMR POULTRIES collection report",

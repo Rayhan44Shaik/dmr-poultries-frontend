@@ -89,7 +89,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
       const filename = `Banks_${date}`;
 
       try {
-        exportBanksToPDF(filteredBanks, filename);
+        await exportBanksToPDF(filteredBanks, filename);
 
         logAuditEvent("EXPORT_PDF", "Banks", undefined, {
           count: filteredBanks.length,

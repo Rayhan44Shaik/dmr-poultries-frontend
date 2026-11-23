@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Download, FileSpreadsheet, Loader2, Search, Upload, X } from "lucide-react";
-import * as XLSX from "xlsx";
 import MasterDialog from "../../../../masters/components/MasterDialog";
 import { collectionService } from "../../services/collectionService";
 import {
@@ -117,7 +116,9 @@ export default function CollectionImportModal({ open, onClose, shops, collectors
   const reset = () => { setStep(1); setRows([]); setFileName(""); setError(""); setQuery(""); setRowView("notReady"); setSortField(null); setImportedRows([]); setResultFilter(null); setServerIssues(new Map()); setBatchId(crypto.randomUUID()); if (fileRef.current) fileRef.current.value = ""; };
   const close = () => { if (importing) return; reset(); onClose(); };
 
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    // Loaded on demand: the entry page opens without the sheet library.
+    const XLSX = await import("xlsx");
     const sheet = XLSX.utils.json_to_sheet([{ "S.No": 1, Date: "12-10-2026", "Shop Name": shops[0] ?? "Sample Shop", Collector: collectors[0] ?? "Sample Collector", Mode: modes[0] ?? "Cash", Amount: 12500, Remark: "Weekly collection", "Reference Number": "REF-001" }]);
     sheet["!cols"] = [{ wch: 8 }, { wch: 14 }, { wch: 28 }, { wch: 24 }, { wch: 22 }, { wch: 15 }, { wch: 30 }, { wch: 22 }];
     const book = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(book, sheet, "Collection Import"); XLSX.writeFile(book, "Collection_Entry_Import_Template.xlsx");
@@ -130,6 +131,7 @@ export default function CollectionImportModal({ open, onClose, shops, collectors
     try {
       const currentMasters = await collectionService.fetchCollectionImportMasters();
       setLiveMasters(currentMasters);
+      const XLSX = await import("xlsx");
       const book = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true });
       const sheet = book.Sheets[book.SheetNames[0]];
       // `raw: true` preserves typed Excel dates as Date objects. Formatting

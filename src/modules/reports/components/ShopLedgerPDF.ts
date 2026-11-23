@@ -1,5 +1,4 @@
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
 import { formatLedgerNumber } from "../utils/shopLedgerRounding";
 import { pdfStatementParticulars } from "../utils/shopLedgerPdfParticulars";
 import henImage from "../../../assets/dmr-hen.jpg";
@@ -324,7 +323,11 @@ export const generateShopLedgerPDF = async (
       : printableCumulativeRows(buildShopLedgerCumulativeRows(allLedgers));
   const showSummary = requestedSummary && summaryRowsSource.length > 0;
 
-  const doc = new jsPDF({
+  // Loaded on demand: the ledger page opens without the PDF libraries.
+  const { jsPDF: JsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
+
+  const doc = new JsPDF({
     orientation: showSummary ? "landscape" : "portrait",
     unit: "mm",
     format: "a4",

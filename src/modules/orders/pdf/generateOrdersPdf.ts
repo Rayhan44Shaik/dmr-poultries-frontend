@@ -8,7 +8,6 @@
 // to the existing ERP. Long shop lists paginate automatically; rows are never
 // split across pages.
 
-import autoTable from "jspdf-autotable";
 import type { Trip } from "../../../shared/trip";
 import henImage from "../../../assets/dmr-hen.jpg";
 import {
@@ -79,7 +78,9 @@ export async function generateOrdersPdf({
   language = "en",
   mode = "download",
 }: OrdersPdfInput): Promise<OrdersPdfResult> {
-  const doc = createDmrPoultryPdf("portrait");
+  // Loaded on demand: the orders board opens without the PDF libraries.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("portrait");
   doc.setProperties({
     title: `${trip.tripNo || "Trip"} — Delivery Report`,
     subject: "DMR POULTRIES delivery report",

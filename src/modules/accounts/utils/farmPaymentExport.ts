@@ -1,4 +1,3 @@
-import autoTable from "jspdf-autotable";
 import henImage from "../../../assets/dmr-hen.jpg";
 import { exportToExcel } from "../../../utils/exportUtils";
 import {
@@ -45,7 +44,7 @@ function tableRows(rows: FarmPaymentExportRow[]): (string | number)[][] {
   ]);
 }
 
-export function exportFarmPaymentsExcel(rows: FarmPaymentExportRow[], scope: FarmPaymentExportScope): void {
+export async function exportFarmPaymentsExcel(rows: FarmPaymentExportRow[], scope: FarmPaymentExportScope): Promise<void> {
   const totals = rows.reduce((sum, row) => ({
     birds: sum.birds + row.birds,
     weight: sum.weight + row.dcWeight,
@@ -58,7 +57,7 @@ export function exportFarmPaymentsExcel(rows: FarmPaymentExportRow[], scope: Far
     row.birdType || "-", row.birds, row.dcWeight, row.rate, row.totalAmount,
   ]);
   data.push(["", "", "TOTAL", "", "", "", totals.birds, totals.weight, "", totals.amount]);
-  exportToExcel(
+  await exportToExcel(
     "Farm Payments",
     ["S.No", "Date", "Trip No", "Farm", "Vehicle", "Bird Type", "DC Birds", "DC Weight (KG)", "Rate/KG", "Total Amount"],
     data,
@@ -67,7 +66,9 @@ export function exportFarmPaymentsExcel(rows: FarmPaymentExportRow[], scope: Far
 }
 
 export async function exportFarmPaymentsPdf(rows: FarmPaymentExportRow[], scope: FarmPaymentExportScope): Promise<void> {
-  const doc = createDmrPoultryPdf("landscape");
+  // Loaded on demand: the payments register opens without jsPDF.
+  const { default: autoTable } = await import("jspdf-autotable");
+  const doc = await createDmrPoultryPdf("landscape");
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
   const margin = 14;
   const headerBottom = drawPreparedDmrPoultryHeader(doc, { margin, top: 7 }, assets);

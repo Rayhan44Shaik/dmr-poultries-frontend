@@ -21,8 +21,6 @@ import { handleApiError } from "../services/farmService";
 import type { Farm } from "../types/farm";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildFarmBulkImportConfig } from "../bulkImportConfig";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 
 type FarmsPageProps = { embedded?: boolean };
 
@@ -85,8 +83,12 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
         return;
       }
 
+      // Loaded on demand: opening the Farms page never downloads the exporters.
+      const { default: JsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
       // Initialize jsPDF in Landscape ('l') orientation with exact dimensions
-      const doc = new jsPDF("l", "mm", "a4");
+      const doc = new JsPDF("l", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 Landscape
       const margin = 14;
       const usableWidth = pageWidth - margin * 2;

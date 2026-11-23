@@ -14,8 +14,6 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError, loadShops } from "../services/shopService";
 import type { Shop } from "../types/shop";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildShopBulkImportConfig } from "../bulkImportConfig";
 import { buildOpeningBalanceImportConfig } from "../openingBalanceImportConfig";
@@ -125,7 +123,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
         return;
       }
 
-      const doc = new jsPDF("l", "mm", "a4");
+      // Loaded on demand: opening the Shops page never downloads the exporters.
+      const { default: JsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
+
+      const doc = new JsPDF("l", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 14;
       const usableWidth = pageWidth - margin * 2;

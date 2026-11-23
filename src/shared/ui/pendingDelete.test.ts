@@ -160,8 +160,11 @@ describe("pending delete progress helpers", () => {
     assert.equal(pendingDeleteBarPercent(0), 0);
   });
 
-  it("uses singular second at 1", () => {
+  it("uses singular second at 1 and clamps an expired countdown", () => {
     assert.equal(pendingDeleteCountdownLabel(10), "Deleting in 10 seconds...");
+    assert.equal(pendingDeleteCountdownLabel(2), "Deleting in 2 seconds...");
     assert.equal(pendingDeleteCountdownLabel(1), "Deleting in 1 second...");
+    // The controller commits at one second; zero must never render "0 seconds".
+    assert.equal(pendingDeleteCountdownLabel(0), "Deleting in 1 second...");
   });
 });

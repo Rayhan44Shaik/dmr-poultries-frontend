@@ -1,8 +1,8 @@
 // src/utils/exportUtils.ts
-
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+//
+// jsPDF and XLSX are large and are only needed when the user actually exports.
+// They are loaded on demand so page bundles (and PDF previews) do not carry
+// both libraries up front.
 
 /** One brand identity for every PDF the product emits. */
 const BRAND_NAME = 'DMR POULTRIES';
@@ -42,14 +42,18 @@ export interface ExportToPDFOptions {
  * Everything is measured off `pageWidth`/`pageHeight` so it stays inside the
  * A4 margins no matter how many columns a caller passes.
  */
-export const exportToPDF = (
+export const exportToPDF = async (
   title: string,
   headers: string[],
   rows: (string | number)[][],
   filename: string,
   options: ExportToPDFOptions = {}
-): void => {
+): Promise<void> => {
   const { filters = [], summary = [], numericColumns = [], subtitle } = options;
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
+    import('jspdf'),
+    import('jspdf-autotable'),
+  ]);
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -198,12 +202,13 @@ export const exportToPDF = (
 /**
  * Generates and downloads a clean, formatted Excel sheet.
  */
-export const exportToExcel = (
+export const exportToExcel = async (
   title: string,
   headers: string[],
   rows: (string | number)[][],
   filename: string
-): void => {
+): Promise<void> => {
+  const XLSX = await import('xlsx');
   const worksheetData = [
     [title],
     [], // Blank row

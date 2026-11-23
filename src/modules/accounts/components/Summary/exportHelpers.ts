@@ -1,8 +1,6 @@
 // src/modules/accounts/components/Summary/exportHelpers.ts
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import type { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../../types/summary.types';
 
@@ -35,7 +33,11 @@ export const exportPDF = async (
   totalExpenses: ExpenseBreakdown,
   extra?: { totalDistanceKm?: number }
 ): Promise<void> => {
-  const doc = new jsPDF('p', 'mm', 'a4');
+  // Loaded on demand: the summary page renders without the exporters.
+  const { default: JsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+
+  const doc = new JsPDF('p', 'mm', 'a4');
   const margin = 12;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -357,7 +359,7 @@ export const exportPDF = async (
 };
 
 // ---- Excel Export – Unchanged + includes Weight Loss ----
-export const exportExcel = (
+export const exportExcel = async (
   title: string,
   dateRange: string,
   weeklyGroups: { label: string }[],
@@ -365,7 +367,8 @@ export const exportExcel = (
   weeklyExpenses: ExpenseBreakdown[],
   totalMetrics: WeeklyMetrics,
   totalExpenses: ExpenseBreakdown
-): void => {
+): Promise<void> => {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
   const wsData: any[][] = [];
 

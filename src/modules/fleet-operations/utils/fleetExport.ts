@@ -1,6 +1,3 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
 
 interface ExportOptions {
   fileName: string;
@@ -9,8 +6,11 @@ interface ExportOptions {
   title?: string;
 }
 
-export const exportToPDF = ({ fileName, headers, rows, title }: ExportOptions): void => {
-  const doc = new jsPDF();
+export const exportToPDF = async ({ fileName, headers, rows, title }: ExportOptions): Promise<void> => {
+  // Loaded on demand so opening a fleet page never downloads the exporters.
+  const { default: JsPDF } = await import('jspdf');
+  const { default: autoTable } = await import('jspdf-autotable');
+  const doc = new JsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 14;
   let y = 20;
@@ -47,7 +47,8 @@ export const exportToPDF = ({ fileName, headers, rows, title }: ExportOptions): 
   doc.save(`${fileName}.pdf`);
 };
 
-export const exportToExcel = ({ fileName, headers, rows }: ExportOptions): void => {
+export const exportToExcel = async ({ fileName, headers, rows }: ExportOptions): Promise<void> => {
+  const XLSX = await import('xlsx');
   const data = rows.map(row => {
     const obj: Record<string, any> = {};
     headers.forEach((header, index) => {
@@ -67,12 +68,12 @@ export const exportToExcel = ({ fileName, headers, rows }: ExportOptions): void 
   XLSX.writeFile(wb, `${fileName}.xlsx`);
 };
 
-export const exportFleetReport = (
+export const exportFleetReport = async (
   data: any[],
   reportType: string,
   format: 'pdf' | 'excel',
   headers?: string[]
-): void => {
+): Promise<void> => {
   const fileName = `${reportType}_Report_${new Date().toISOString().split('T')[0]}`;
   const defaultHeaders = Object.keys(data[0] || {});
   const exportHeaders = headers || defaultHeaders;
@@ -86,8 +87,8 @@ export const exportFleetReport = (
   };
 
   if (format === 'pdf') {
-    exportToPDF(options);
+    await exportToPDF(options);
   } else {
-    exportToExcel(options);
+    await exportToExcel(options);
   }
 };

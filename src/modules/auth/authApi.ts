@@ -19,12 +19,16 @@ import { storeToken } from "./tokenStore";
  */
 export function normalizeRole(value: unknown): AppRole {
   const raw = String(value ?? "").toUpperCase();
+  // Legacy/minimal identity responses that omit a role fail to the read-only
+  // UI role; they must never inherit OWNER capabilities client-side.
+  if (!raw) return "AUDIT";
+  if (raw === "OWNER") return "OWNER";
   if (raw === "FULL_ACCESS") return "FULL_ACCESS";
   if (raw === "AUDIT") return "AUDIT";
   if (raw === "OFFICE") return "OFFICE";
   if (raw === "COLLECTION") return "COLLECTION";
   if (raw.includes("SUPERVISOR")) return "SUPERVISOR";
-  return "OWNER";
+  throw new Error("The server returned an unrecognized role");
 }
 
 /** The login/me payloads across backend generations spell fields loosely. */
@@ -97,9 +101,8 @@ export async function loginRequest(username: string, password: string): Promise<
         user: normalizeUser(response.data?.user),
       };
     }
-    // Real backend returns both HttpOnly `dmr_session` cookie and `token` in the
-    // JSON body. The SPA persists Bearer [REDACTED] /api calls through the Vite proxy
-    // (and Electron / cross-origin previews) keep working after reload.
+    // The backend sets an HttpOnly cookie; no desktop token is returned to or
+    // persisted by JavaScript.
     return {
       user: normalizeUser(response.data?.user),
       expiresAt: response.data?.expiresAt,

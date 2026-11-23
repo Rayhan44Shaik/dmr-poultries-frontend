@@ -83,9 +83,6 @@ const pages = {
   settings: lazyWithRetry(
     lazyShell(() => import("../modules/settings/pages/SettingsPage")),
   ),
-  supervisorMobile: lazyWithRetry(
-    () => import("../modules/supervisor-mobile/pages/SupervisorMobilePage"),
-  ),
 };
 
 function PageLoading() {
@@ -129,7 +126,9 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<RoleLanding />} />
 
-      {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
+      {/* Supervisor Mobile is intentionally disabled in this release. These
+          redirects only keep old bookmarks out of a dead page; no mobile API
+          is mounted by the backend. */}
       <Route
         path="/mobile"
         element={

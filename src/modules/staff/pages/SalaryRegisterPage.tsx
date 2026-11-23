@@ -49,6 +49,7 @@ import {
 } from "../../../shared/ui/operationsStyles";
 import TableLoading from "../components/common/TableLoading";
 import { useI18n, type Language } from "../../../i18n";
+import { CAPABILITIES, useCan } from "../../auth/permissions";
 import { salaryDisplayText, salaryLocale, salaryMatchesQuery } from "../utils/salaryDisplay";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
@@ -97,6 +98,9 @@ const MONTHS = [
 function SalaryRegisterPage() {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
+  const can = useCan();
+  const canGenerateSalary = can(CAPABILITIES.SALARY_GENERATE);
+  const canSubmitSalary = can(CAPABILITIES.SALARY_SUBMIT);
 
   const getCurrentYearMonth = () => {
     const now = new Date();
@@ -339,6 +343,7 @@ function SalaryRegisterPage() {
   );
 
   const handleGenerate = useCallback(() => {
+    if (!canGenerateSalary) return;
     confirm(
       t("staff.register.generate_confirm_title"),
       t("staff.register.generate_confirm_msg", { month: formatMonthName(month, language) }),
@@ -347,10 +352,11 @@ function SalaryRegisterPage() {
         void runConfirm(generate());
       }
     );
-  }, [confirm, generate, month, runConfirm, t, language]);
+  }, [canGenerateSalary, confirm, generate, month, runConfirm, t, language]);
 
   const handleSubmitSelected = useCallback(
     async (ids: string[]) => {
+      if (!canSubmitSalary) return;
       // ONE-TIME SUBMIT: only PENDING rows of the selection move to Paid.
       // Already Submitted/Paid rows are skipped — selecting "All" can never
       // submit (or pay) anyone twice.
@@ -397,7 +403,7 @@ function SalaryRegisterPage() {
         );
       }
     },
-    [allRecords, refresh, showNotification, t, language, month]
+    [allRecords, canSubmitSalary, refresh, showNotification, t, language, month]
   );
 
   const handleDownload = useCallback(
@@ -762,15 +768,17 @@ function SalaryRegisterPage() {
               className="shrink-0"
             />
             <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} className="shrink-0" />
-            <button
-              type="button"
-              onClick={() => setSubmitMonthOpen(true)}
-              disabled={saving || refreshing || allRecords.length === 0}
-              className={`group relative shrink-0 whitespace-nowrap ${uiButton("success", "md")}`}
-            >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
-              {t("staff.register.review_submit")}
-            </button>
+            {canSubmitSalary && (
+              <button
+                type="button"
+                onClick={() => setSubmitMonthOpen(true)}
+                disabled={saving || refreshing || allRecords.length === 0}
+                className={`group relative shrink-0 whitespace-nowrap ${uiButton("success", "md")}`}
+              >
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
+                {t("staff.register.review_submit")}
+              </button>
+            )}
             {/* Send Payslips — the bulk-send entry point. Opens the Send
                 Payslips popup (Mail / WhatsApp) for the submitted employees
                 whose payslip has not gone out yet. Downloads live inside
@@ -809,15 +817,17 @@ function SalaryRegisterPage() {
             title={t("staff.register.no_records_title", { month: formatMonthName(month, language) })}
             description={t("staff.register.no_records_desc")}
             action={
-              <Button
-                variant="primary"
-                size="md"
-                onClick={handleGenerate}
-                loading={saving}
-                icon={<Plus size={14} />}
-              >
-                {t("staff.register.generate_action")}
-              </Button>
+              canGenerateSalary ? (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={handleGenerate}
+                  loading={saving}
+                  icon={<Plus size={14} />}
+                >
+                  {t("staff.register.generate_action")}
+                </Button>
+              ) : undefined
             }
           />
         </div>
@@ -856,7 +866,7 @@ function SalaryRegisterPage() {
         />
       )}
 
-      {submitMonthOpen && (
+      {canSubmitSalary && submitMonthOpen && (
         <SalaryReviewModal
           monthLabel={formatMonthName(month, language)}
           records={allRecords}

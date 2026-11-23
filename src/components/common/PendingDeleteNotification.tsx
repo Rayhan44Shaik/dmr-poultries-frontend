@@ -81,7 +81,9 @@ export function PendingDeleteNotification<TId extends string | number>({
                 </h3>
                 <p className="mt-1 max-w-sm text-sm text-slate-500">
                   {item.description ??
-                    t("pendingDelete.auto", { seconds: totalSeconds })}
+                    t(totalSeconds === 1 ? "pendingDelete.auto_one" : "pendingDelete.auto_many", {
+                      seconds: totalSeconds,
+                    })}
                 </p>
               </div>
 
