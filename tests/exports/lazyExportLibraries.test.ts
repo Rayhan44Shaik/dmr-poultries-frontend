@@ -206,7 +206,7 @@ describe("export libraries are loaded on demand", () => {
   }
 });
 
-describe("Excel export output is unchanged", () => {
+describe("Excel and PDF export output is unchanged", () => {
   it("shop sales keeps its filename, sheet, title, headers and KPI block", async () => {
     const { exportShopSalesExcel } = await import(
       "../../src/modules/operations/shop-sales/utils/exportShopSales"
@@ -273,6 +273,32 @@ describe("Excel export output is unchanged", () => {
     });
   });
 
+  it("pending collections PDF keeps its filename and rendered columns", async () => {
+    const { exportPendingCollectionsPdf } = await import(
+      "../../src/modules/operations/collections/utils/exportPendingCollections"
+    );
+    await inTempDir(async (dir) => {
+      await exportPendingCollectionsPdf(PENDING_ROWS as never, "pending-collections-2026-11-20");
+
+      const file = path.join(dir, "pending-collections-2026-11-20.pdf");
+      assert.ok(fs.existsSync(file), "exportPendingCollectionsPdf writes <filename>.pdf");
+      const bytes = fs.readFileSync(file);
+      assert.equal(bytes.subarray(0, 5).toString(), "%PDF-");
+
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const pdf = await pdfjs.getDocument({ data: new Uint8Array(bytes) }).promise;
+      assert.equal(pdf.numPages, 1);
+      const content = await (await pdf.getPage(1)).getTextContent();
+      const text = content.items
+        .map((item) => (item as { str?: string }).str ?? "")
+        .join(" ")
+        .replace(/\s+/g, " ");
+      assert.match(text, /PENDING COLLECTIONS/);
+      assert.match(text, /Sri Balaji/);
+      assert.match(text, /68\.75/);
+    });
+  });
+
   it("bulk import template keeps both sheets, headers and filename", async () => {
     const { downloadImportTemplate } = await import(
       "../../src/modules/masters/components/bulk-import/bulkImportUtils"
@@ -316,6 +342,17 @@ describe("failing exports surface as catchable errors", () => {
     );
     await assert.rejects(() =>
       exportPendingCollectionsExcel(PENDING_ROWS as never, "missing-dir/out"),
+    );
+  });
+
+  it("rejects when the pending-collections PDF destination is unwritable", async () => {
+    const { exportPendingCollectionsPdf } = await import(
+      "../../src/modules/operations/collections/utils/exportPendingCollections"
+    );
+    await assert.rejects(
+      () => exportPendingCollectionsPdf(PENDING_ROWS as never, "missing-dir/out"),
+      (error: unknown) => error instanceof Error,
+      "the page's PDF catch path receives a normal Error",
     );
   });
 });

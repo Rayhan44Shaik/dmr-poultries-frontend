@@ -367,9 +367,14 @@ export default function PendingCollectionsPage() {
   const tableLoading = firstLoad;
   const hasKpiFilters = Boolean(appliedShopName || (appliedFromDate && appliedToDate));
   const exportFileName = `pending-collections-${todayBusinessDate()}`;
-  const handleExportPdf = useCallback(() => {
-    void exportPendingCollectionsPdf(filteredData, exportFileName);
-  }, [filteredData, exportFileName]);
+  const handleExportPdf = useCallback(async () => {
+    try {
+      await exportPendingCollectionsPdf(filteredData, exportFileName);
+    } catch (error) {
+      console.error("Pending collections PDF export failed:", error);
+      toast.error(t("ops.collection.pdf_failed"));
+    }
+  }, [filteredData, exportFileName, toast, t]);
   const handleExportExcel = useCallback(async () => {
     try {
       await exportPendingCollectionsExcel(filteredData, exportFileName);
