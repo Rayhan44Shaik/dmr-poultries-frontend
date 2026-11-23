@@ -10,6 +10,7 @@
 import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
 import { localizeMaintenanceText, localizeMaintenanceName } from "./maintenanceLocalization";
 import type { MaintenanceEvent } from "../types";
+import { escapeHtml as esc } from "../../../utils/escapeHtml";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -21,9 +22,6 @@ const statusLabel = (row: MaintenanceEvent, t: Translate) => {
   if (row.paymentStatus === "approved") return t("status.approved");
   return t("status.pending");
 };
-
-const esc = (v: string) =>
-  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 const BRAND_GREEN = "#0d7a3f";
 const INK = "#0f172a";

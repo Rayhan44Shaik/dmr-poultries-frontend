@@ -15,13 +15,7 @@ registerHooks({
     if (IMAGE.test(specifier)) {
       return { url: STUB_URL, format: "module", shortCircuit: true };
     }
-    try {
-      return nextResolve(specifier, context);
-    } catch (error) {
-      // Relative image imports arrive without an extension match only when the
-      // bundler would have rewritten them; surface the original error.
-      throw error;
-    }
+    return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
     if (url === STUB_URL) {

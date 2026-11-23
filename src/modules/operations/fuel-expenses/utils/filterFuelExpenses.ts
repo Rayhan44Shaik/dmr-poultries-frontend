@@ -28,7 +28,7 @@ const dateOnly = (value: string | undefined) => {
   const raw = String(value || "").trim();
   const iso = /^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/.exec(raw);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
-  const display = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/.exec(raw);
+  const display = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(raw);
   if (display) {
     return `${display[3]}-${display[2].padStart(2, "0")}-${display[1].padStart(2, "0")}`;
   }
